@@ -49,7 +49,7 @@ STUDIO_PREFIXES = ("/studio", "/api/projects", "/api/spec", "/api/generate",
                    "/api/diagnose", "/api/queue/", "/api/key-pool", "/api/meta",
                    "/api/series/", "/api/prompt/", "/api/novel/", "/api/style/",
                    "/api/outline/", "/api/asset/", "/assets/", "/projects/", "/vendor/",
-                   "/api/faceqc", "/api/facefix",
+                   "/api/faceqc", "/api/facefix", "/api/agnes/",
                    "/api/log", "/api/logs")
 BOARD_PORT = int(os.environ.get("BOARD_PORT", "8788"))
 BOARD_BASE = "http://127.0.0.1:%d" % BOARD_PORT
