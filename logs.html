@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>运行日志 · Studio</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0b1220; color: #cbd5e1; font: 13px/1.6 "Microsoft YaHei", sans-serif; padding: 16px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 17px; margin-bottom: 4px; color: #e2e8f0; }
+  .sub { color: #64748b; font-size: 12px; margin-bottom: 14px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .toolbar select, .toolbar input, .toolbar button {
+    background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; font-size: 12px; outline: none;
+  }
+  .toolbar input[type=text] { width: 180px; }
+  .toolbar button { cursor: pointer; }
+  .toolbar button:hover { background: #334155; }
+  .toolbar .spacer { flex: 1; }
+  #onlyErr.on { background: #b91c1c; border-color: #ef4444; color: #fff; }
+  .meta { color: #64748b; font-size: 11px; margin-bottom: 8px; }
+  pre { background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 12px; font: 11.5px/1.55 Consolas, "Courier New", monospace;
+        white-space: pre-wrap; word-break: break-all; max-height: 76vh; overflow-y: auto; }
+  .l-ERROR { color: #f87171; } .l-WARN, .l-WARNING { color: #fbbf24; }
+  .l-INFO { color: #7dd3fc; } .l-DEBUG { color: #94a3b8; }
+  a.back { color: #38bdf8; text-decoration: none; font-size: 12px; }
+  a.back:hover { text-decoration: underline; }
+  .empty { color: #64748b; text-align: center; padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📋 运行日志 <a class="back" href="/hub">← 返回门户</a></h1>
+  <div class="sub">服务端 server.py 与前端上报共用一份日志（logs/ 按天归档，保留 7 天）。您说「出问题了」，到这里按时间线回溯即可。</div>
+  <div class="toolbar">
+    <select id="dateSel" title="日期文件"></select>
+    <select id="lvlSel">
+      <option value="">全部级别</option>
+      <option value="ERROR">仅 ERROR</option>
+      <option value="WARN">WARN+ERROR</option>
+      <option value="INFO">INFO 及以上</option>
+      <option value="DEBUG">DEBUG 及以上</option>
+    </select>
+    <button id="onlyErr">🚨 只看错误</button>
+    <input type="text" id="kw" placeholder="关键词过滤…">
+    <button id="refresh">⟳ 刷新</button>
+    <label style="font-size:12px;color:#64748b"><input type="checkbox" id="auto"> 自动刷新 10s</label>
+  </div>
+  <div class="meta" id="meta">加载中…</div>
+  <pre id="box"><div class="empty">加载日志…</div></pre>
+</div>
+<script>
+var state = { files: [], date: 'today', onlyErr: false, auto: false, timer: null };
+var $ = function (id) { return document.getElementById(id); };
+
+function loadFiles() {
+  return fetch('/api/logs?date=today&lines=1').then(function (r) { return r.json(); }).then(function (d) {
+    state.files = d.files || [];
+    var sel = $('dateSel');
+    sel.innerHTML = '<option value="today">今天（实时）</option>' +
+      state.files.filter(function (f) { return f !== 'server.log'; })
+        .sort().reverse()
+        .map(function (f) {
+          var d = f.replace('server.log.', '');
+          return '<option value="' + d + '">' + d + '</option>';
+        }).join('');
+    sel.value = state.date;
+  }).catch(function () {});
+}
+
+function applyFilter() {
+  var lvl = $('lvlSel').value, kw = $('kw').value.trim().toLowerCase(), onlyErr = state.onlyErr;
+  var rows = document.querySelectorAll('#box .row');
+  rows.forEach(function (row) {
+    var text = row.textContent;
+    var l = row.getAttribute('data-l') || '';
+    var show = true;
+    if (lvl) {
+      if (lvl === 'WARN') show = (l === 'ERROR' || l === 'WARN' || l === 'WARNING');
+      else if (lvl === 'INFO') show = (l !== 'DEBUG');
+      else show = (l === lvl);
+    }
+    if (onlyErr) show = show && (l === 'ERROR');
+    if (kw) show = show && text.toLowerCase().indexOf(kw) >= 0;
+    row.style.display = show ? '' : 'none';
+  });
+}
+
+function render(content) {
+  var box = $('box');
+  var lines = (content || '').split('\n').filter(Boolean);
+  if (!lines.length) { box.innerHTML = '<div class="empty">（当日暂无日志）</div>'; return; }
+  box.innerHTML = lines.map(function (ln) {
+    var l = 'INFO';
+    var m = ln.match(/\[(ERROR|WARN|WARNING|INFO|DEBUG)\]/);
+    if (m) l = m[1];
+    var esc = ln.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return '<div class="row l-' + l + '" data-l="' + l + '">' + esc + '</div>';
+  }).join('');
+  applyFilter();
+}
+
+function load() {
+  $('meta').textContent = '加载 ' + state.date + ' …';
+  fetch('/api/logs?date=' + encodeURIComponent(state.date) + '&lines=2000')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { $('meta').textContent = d.error || '接口不可用'; return; }
+      state.files = d.files || [];
+      $('meta').textContent = '文件 ' + d.file + '（共 ' + (d.content || '').split('\n').filter(Boolean).length + ' 行，显示末尾 ' + d.lines + ' 行）';
+      render(d.content);
+    })
+    .catch(function () { $('meta').textContent = '日志接口加载失败（开发模式开放，正式发布关闭）'; });
+}
+
+$('dateSel').addEventListener('change', function () { state.date = this.value; load(); });
+$('lvlSel').addEventListener('change', applyFilter);
+$('kw').addEventListener('input', applyFilter);
+$('refresh').addEventListener('click', load);
+$('onlyErr').addEventListener('click', function () {
+  state.onlyErr = !state.onlyErr;
+  this.classList.toggle('on', state.onlyErr);
+  if (state.onlyErr) $('lvlSel').value = 'ERROR';
+  applyFilter();
+});
+$('auto').addEventListener('change', function () {
+  state.auto = this.checked;
+  clearInterval(state.timer);
+  if (state.auto) state.timer = setInterval(load, 10000);
+});
+
+loadFiles().then(load);
+</script>
+</body>
+</html>

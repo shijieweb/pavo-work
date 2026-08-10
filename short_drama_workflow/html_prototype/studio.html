@@ -1,0 +1,2785 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>短剧工作室 · 引擎版</title>
+<!-- 内联 data-URI favicon：避免浏览器请求 /favicon.ico 触发 404 控制台噪声 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E">
+<script src="/vendor/tailwind.js"></script>
+<script src="/vendor/vue.global.prod.js"></script>
+<style>
+  body{font-family:ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:8px;}
+  .stage-video{width:100%;height:100%;object-fit:contain;background:#000;}
+  [v-cloak]{display:none;}
+  /* 手机端防横向溢出：长 URL / 长提示词会把整页撑宽出现左右滚动 */
+  html,body{overflow-x:hidden;max-width:100%;}
+  *{box-sizing:border-box;}
+  img,video{max-width:100%;}
+  /* 触摸目标不小于 44px（iOS HIG），否则手机上按钮点不准 */
+  @media (max-width:640px){
+    button,select,input,textarea{min-height:40px;}
+    button.tap-sm{min-height:32px;}
+  }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+<div id="app" v-cloak>
+
+  <!-- 全局错误告警条 -->
+  <div v-if="errMsg" class="fixed top-2 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm shadow-lg max-w-[90vw] truncate">{{ errMsg }}</div>
+
+  <!-- 顶栏 -->
+  <header class="sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 bg-slate-900/95 border-b border-slate-700 backdrop-blur">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center font-bold text-sm">短</div>
+      <div class="leading-tight">
+        <div class="text-sm font-semibold">短剧工作室</div>
+        <div class="text-[10px] text-slate-400">PAVO 式引擎 · Vue+Tailwind</div>
+      </div>
+    </div>
+    <select v-model="projectId" @change="selectProject" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm max-w-[30vw]">
+      <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name || p.id }}</option>
+    </select>
+    <button @click="renameProject" :disabled="loading" title="重命名当前项目" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs disabled:opacity-50">✏️</button>
+    <button @click="archiveProject" :disabled="loading" title="归档当前项目（隐藏，数据保留可恢复）" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs disabled:opacity-50">🗄</button>
+    <select v-if="outlineData && outlineData.episodes && outlineData.episodes.length > 1" v-model="activeEpisode" @change="saveActiveEpisode" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs max-w-[20vw]">
+      <option v-for="ep in outlineData.episodes" :key="ep.id" :value="ep.id">第{{ ep.id }}集 · {{ ep.title }}</option>
+    </select>
+    <button @click="newProject" :disabled="loading" title="新建一个空白（已初始化）项目，从①创意重新生成" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs disabled:opacity-50 whitespace-nowrap">＋新建项目</button>
+    <span class="text-[11px] px-2 py-1 rounded-full" :class="real ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'">{{ real ? 'REAL 真实模式' : '草稿模式' }}</span>
+    <nav class="flex gap-1 ml-auto overflow-x-auto">
+      <button v-for="(m,i) in modules" :key="m.id"
+        :disabled="!confirmedSteps[i] && activeModule !== m.id"
+        :title="!confirmedSteps[i] && activeModule !== m.id ? '请先完成上一步' : ''"
+        @click="tryNav(m.id, i)"
+        :class="['flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition',
+          activeModule===m.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' :
+          !confirmedSteps[i] ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed' :
+          'bg-slate-800 text-slate-300 hover:bg-slate-700']">
+        <span :class="['w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+          activeModule===m.id?'bg-white/25': !confirmedSteps[i]?'bg-slate-700/50':'bg-slate-700']">{{ m.step }}</span>
+        {{ m.label }}
+      </button>
+      <!-- 设置·提示词库：独立工具模块（不参与 5 步流水线进度） -->
+      <button @click="activeModule='settings'" :title="'设置·提示词库'"
+        :class="['flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm whitespace-nowrap', activeModule==='settings' ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40' : 'bg-slate-800 text-slate-300 hover:bg-slate-700']">
+        <span>⚙</span><span class="hidden sm:inline">设置</span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- O2：长任务进度可见性浮层——任何单个生成任务进行时显示「正在做什么 + 已耗时」，不掉进「引擎规划中一直转」黑箱 -->
+  <div v-if="loading && !pipeRunning && !agentLoading && busyLabel"
+       class="fixed top-2 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900/95 border border-sky-500/60 text-sky-200 text-sm shadow-xl flex items-center gap-2">
+    <span class="inline-block w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></span>
+    <span>⏳ {{ busyLabel }}… 已 {{ busyElapsed }}s</span>
+  </div>
+
+  <!-- 工作台（剧情短片） -->
+  <main v-if="activeModule==='story'" class="p-3 space-y-3">
+
+    <!-- ① 创作入口：双模式 —— 我贴小说 / 一句话主题（让 AI 写小说） -->
+    <section class="bg-slate-900 rounded-xl border border-slate-800 p-3">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-semibold">① 提供创意</h2>
+        <div class="flex gap-0.5 bg-slate-800 rounded-lg p-0.5">
+          <button @click="sourceMode='novel'"
+            :class="['text-xs px-2 py-1 rounded-md', sourceMode==='novel'?'bg-blue-600 text-white':'text-slate-400 hover:text-slate-200']">
+            📄 我贴小说
+          </button>
+          <button @click="sourceMode='theme'"
+            :class="['text-xs px-2 py-1 rounded-md', sourceMode==='theme'?'bg-blue-600 text-white':'text-slate-400 hover:text-slate-200']">
+            💡 一句话主题
+          </button>
+          <button @click="agentOpen=!agentOpen" :class="['text-xs px-2 py-0.5 rounded-md', agentOpen?'bg-purple-600 text-white':'text-slate-400 hover:text-slate-200']" title="一步生成需求卡（不写小说，直接出标题/角色/分镜草案）">🤖 快速生成需求卡</button>
+        </div>
+      </div>
+
+      <!-- 模式 A：我贴小说（原有流程） -->
+      <div v-if="sourceMode==='novel'">
+        <label class="block text-[11px] text-slate-400 mb-1">粘贴你的小说 / 剧本原文</label>
+        <textarea v-model="novelInput" rows="3" placeholder="例：05后实习生林小满在职场被刁难，却用机智化解危机……"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm mb-2"></textarea>
+        <button @click="buildReqFromNovel" :disabled="loading || !novelInput" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50">✅ 采纳小说 → 生成需求卡</button>
+      </div>
+
+      <!-- 模式 B：一句话主题 → AI 写小说 -->
+      <div v-if="sourceMode==='theme'">
+        <label class="block text-[11px] text-slate-400 mb-1">输入一句话主题，让 AI 扩写成完整小说</label>
+        <div class="flex gap-2 mb-2">
+          <input v-model="themeInput" @keyup.enter="genNovelFromTheme" placeholder="例：一个社恐程序员在AI公司逆袭"
+            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+          <button @click="genNovelFromTheme" :disabled="themeGenLoading || !themeInput"
+            class="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm disabled:opacity-40 whitespace-nowrap">
+            {{ themeGenLoading ? '生成中…' : '🤖 AI 写小说' }}
+          </button>
+        </div>
+        <!-- 生成的小说（可编辑 + 可重生成） -->
+        <div v-if="novelInput" class="space-y-2">
+          <label class="block text-[11px] text-slate-400">AI 生成的小说（可编辑修正后再确认）：</label>
+          <textarea v-model="novelInput" rows="6"
+            class="w-full bg-slate-800 border border-purple-700/40 rounded-lg p-2 text-sm"></textarea>
+          <div class="flex gap-2">
+            <button @click="confirmThemeNovel" :disabled="loading" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50">✅ 确认小说 → 生成需求卡</button>
+            <button @click="genNovelFromTheme" :disabled="themeGenLoading" class="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 text-sm disabled:opacity-40">🔄 重新生成</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent 折叠面板（上下文记忆迭代：补一句话只改点名部分，不重建项目） -->
+      <div v-if="agentOpen" class="mt-3 pt-3 border-t border-slate-800 space-y-2">
+        <div v-if="agentHistory.length" class="mb-2 space-y-1 max-h-28 overflow-y-auto">
+          <div v-for="(h,i) in agentHistory" :key="i" class="text-[11px] flex gap-1.5">
+            <span class="shrink-0 text-slate-600">{{ i===0 ? '需求' : '追加' }}</span>
+            <span class="text-slate-400 break-all">{{ h }}</span>
+          </div>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <input v-model="agentPrompt" @keyup.enter="sendAgent"
+            :placeholder="agentPlan ? '继续调整，例：女主换成短发 / 第3镜改特写' : '例：一只穿围裙的小猫在厨房做蛋炒饭，温暖治愈，30秒'"
+            class="flex-1 min-w-[12rem] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+          <button @click="sendAgent" :disabled="agentLoading" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50">{{ agentPlan ? '应用修改' : '生成需求卡' }}</button>
+          <button v-if="agentPlan" @click="resetAgent" :disabled="agentLoading" class="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm disabled:opacity-50">重开</button>
+        </div>
+        <div v-if="agentLoading" class="text-sm text-slate-400 py-4 text-center">{{ agentPlan ? '正在按你的修改增量调整…' : '引擎规划中…' }} <span v-if="agentElapsed>0">(已 {{ agentElapsed }}s)</span></div>
+        <div v-else-if="agentPlan" class="space-y-2">
+          <div v-if="agentChangelog.length" class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
+            <div class="text-[11px] text-amber-300 font-medium mb-0.5">本次改动</div>
+            <div v-for="(c,i) in agentChangelog" :key="i" class="text-[11px] text-amber-200/80">· {{ c }}</div>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-base font-semibold">{{ agentPlan.title }}</span>
+            <span class="text-[11px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300">{{ agentPlan.genre }}</span>
+          </div>
+          <p class="text-xs text-slate-300">{{ agentPlan.logline }}</p>
+          <div class="text-[11px] text-slate-400">角色：<span v-for="c in agentPlan.characters" :key="c.name" class="inline-block mr-2">{{ c.name }}（{{ c.role }}）</span></div>
+          <div class="bg-slate-800 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto">
+            <div v-for="sh in agentPlan.shots" :key="sh.shot" class="text-xs flex flex-wrap gap-x-2 gap-y-0.5 py-1 border-b border-slate-700/50 last:border-0">
+              <span class="text-slate-500 w-6 shrink-0">#{{ sh.shot }}</span>
+              <span class="text-slate-400 w-10 shrink-0">{{ sh.type }}</span>
+              <span class="text-slate-400 w-8 shrink-0">{{ sh.duration }}s</span>
+              <span v-if="sh.shot_size" class="text-sky-300/80 shrink-0">{{ sh.shot_size }}</span>
+              <span v-if="sh.beat" class="text-emerald-300/70 shrink-0">{{ sh.beat }}</span>
+              <span v-if="sh.camera" class="text-violet-300/80 shrink-0">🎥{{ sh.camera }}</span>
+              <span class="flex-1 min-w-[8rem]">{{ sh.action }} <span v-if="sh.line" class="text-slate-500">「{{ sh.line }}」</span></span>
+            </div>
+          </div>
+          <button @click="adoptToReq" :disabled="loading" class="w-full px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50">采纳并填入需求卡</button>
+          <p class="text-[11px] text-slate-500">采纳后把全局参数填入下方「需求卡片」，可编辑确认后再生成分镜。</p>
+        </div>
+        <div v-else class="text-xs text-slate-500 text-center py-4">输入一句话需求，让引擎帮你规划</div>
+      </div>
+    </section>
+
+    <!-- ① 需求卡片确认区（Gap A：全局参数首次校准闸门） -->
+    <section v-if="reqCardReady" id="reqCard" class="bg-slate-900 rounded-xl border border-blue-700/50 p-3 scroll-mt-4">
+      <h2 class="text-sm font-semibold mb-2">📋 需求卡片 · 确认后生成分镜</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+        <div><label class="block text-[11px] text-slate-400 mb-1">标题</label><input v-model="reqCard.title" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-sm"></div>
+        <div><label class="block text-[11px] text-slate-400 mb-1">类型</label><input v-model="reqCard.genre" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-sm"></div>
+        <div><label class="block text-[11px] text-slate-400 mb-1">时长(s)</label><input type="number" v-model.number="reqCard.duration" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-sm"></div>
+        <div><label class="block text-[11px] text-slate-400 mb-1">画幅</label><select v-model="reqCard.aspect" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-sm"><option value="9:16">9:16 竖屏</option><option value="16:9">16:9 横屏</option></select></div>
+        <div><label class="block text-[11px] text-slate-400 mb-1">年代区域</label><input v-model="reqCard.era_region" placeholder="当代中国都市" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-sm"></div>
+        <div><label class="block text-[11px] text-slate-400 mb-1">视觉风格</label><input v-model="reqCard.style" placeholder="真人实拍清新职场" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-sm"></div>
+        <div><label class="block text-[11px] text-slate-400 mb-1">拆镜数</label><input type="number" v-model.number="reqCard.shot_count" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-sm"></div>
+      </div>
+      <div class="text-[11px] text-slate-400 mb-1">角色清单</div>
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        <span v-for="c in reqCard.characters" :key="c.name" class="text-[11px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-200">{{ c.name }}（{{ c.role }}）</span>
+        <span v-if="!reqCard.characters.length" class="text-[11px] text-slate-600">（无）</span>
+      </div>
+      <button @click="confirmReq" :disabled="loading" class="w-full px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50">✅ 确认需求 → 进入② 剧本大纲</button>
+    </section>
+
+  </main>
+
+  <!-- Agent 已折叠进 ① 创意·分镜 模块（见上方创作入口折叠面板） -->
+
+  <!-- ② 剧本大纲：子步A 锁视觉风格(硬闸门) → 子步B 写大纲(角色/场景/道具/BGM/分集) -->
+  <main v-else-if="activeModule==='outline'" class="p-3 max-w-4xl mx-auto space-y-3">
+    <h2 class="text-base font-semibold">② 剧本大纲 · 第{{activeEpisode}}集</h2>
+    <p class="text-xs text-slate-400 -mt-2">先锁定视觉风格方向，再生成可编辑的大纲。大纲确认后解锁 ③ 资产设计。</p>
+
+    <!-- 子步A：锁视觉风格（硬闸门）-->
+    <section class="bg-slate-800/70 rounded-xl p-3 space-y-2" :class="visualStyle.locked ? 'border border-emerald-500/40' : 'border border-slate-700'">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200">子步A</span>
+        <h3 class="text-sm font-semibold">锁定视觉风格</h3>
+        <span v-if="visualStyle.locked" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">✅ 已锁定</span>
+        <button v-if="visualStyle.locked" @click="visualStyle.locked=false" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-600/50 text-slate-400 hover:text-slate-200">🔓 解锁</button>
+      </div>
+      <div class="text-xs text-slate-400">当前风格描述（来自需求卡）：</div>
+      <div class="text-sm text-slate-200 bg-slate-900/60 rounded-lg p-2">{{ reqCard.style || '（未设置）' }}</div>
+      <div class="flex gap-2 flex-wrap">
+        <button @click="genStyleKeywords" :disabled="styleGenLoading || !reqCard.style"
+          class="text-xs px-3 py-1.5 rounded-lg bg-purple-600 text-white disabled:opacity-40">
+          {{ styleGenLoading ? '生成中…' : '🤖 AI 生成英文关键词' }}
+        </button>
+        <span v-if="!reqCard.style" class="text-[10px] text-amber-400 self-center">← 先在 ① 需求卡中填写视觉风格</span>
+      </div>
+      <div v-if="visualStyle.en_keywords.length" class="space-y-2">
+        <div class="text-xs text-slate-400">英文关键词（可编辑）：</div>
+        <div class="flex flex-wrap gap-1">
+          <span v-for="(kw,i) in visualStyle.en_keywords" :key="i"
+            class="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-200">
+            <input v-model="visualStyle.en_keywords[i]" class="bg-transparent border-b border-purple-400/30 w-auto text-[11px] outline-none" style="min-width:80px" />
+          </span>
+        </div>
+        <div class="text-[11px] text-slate-500">中文风格总结：{{ visualStyle.cn_text }}</div>
+        <button @click="lockVisualStyle" :disabled="!visualStyle.en_keywords.length"
+          class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white disabled:opacity-40">
+          🔒 锁定风格 → 开始写大纲
+        </button>
+      </div>
+    </section>
+
+    <!-- 子步B：写大纲（硬闸门——只有锁定风格后才可见）-->
+    <section v-if="visualStyle.locked" class="bg-slate-800/70 rounded-xl p-3 space-y-2 border border-slate-700">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-200">子步B</span>
+        <h3 class="text-sm font-semibold">撰写剧本大纲</h3>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button @click="genOutline" :disabled="outlineLoading"
+          class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white disabled:opacity-40">
+          {{ outlineLoading ? '生成中…' : (outlineData ? '🔄 重新生成大纲' : '🤖 AI 生成剧本大纲') }}
+        </button>
+      </div>
+
+      <!-- 大纲结果（全部可编辑） -->
+      <div v-if="outlineData" class="space-y-3 mt-2">
+        <!-- 角色 -->
+        <div>
+          <div class="text-xs font-semibold text-slate-300 mb-1">👤 主要角色（{{ outlineData.characters.length }}人）</div>
+          <div v-for="(c,ci) in outlineData.characters" :key="ci" class="bg-slate-900/50 rounded-lg p-2 mb-1 space-y-1">
+            <input v-model="c.name" placeholder="姓名" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+            <input v-model="c.role" placeholder="主角/反派/配角" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+            <input v-model="c.identity" placeholder="身份/年龄/性格" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+            <input v-model="c.arc" placeholder="人物弧光/转变" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+          </div>
+        </div>
+        <!-- 场景 -->
+        <div>
+          <div class="text-xs font-semibold text-slate-300 mb-1">📍 场景（{{ outlineData.scenes.length }}个）</div>
+          <div v-for="(sc,si) in outlineData.scenes" :key="si" class="bg-slate-900/50 rounded-lg p-2 mb-1 space-y-1">
+            <input v-model="sc.key" placeholder="场景Key" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+            <input v-model="sc.name" placeholder="中文场景名" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+            <input v-model="sc.desc" placeholder="地点/时间/氛围" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+          </div>
+        </div>
+        <!-- BGM -->
+        <div class="text-xs font-semibold text-slate-300">🎵 全局 BGM <input v-model="outlineData.bgm" class="ml-1 bg-slate-800 rounded px-2 py-1 text-xs text-slate-200 w-full" placeholder="乐器/情绪/节奏" /></div>
+        <!-- 道具 -->
+        <div>
+          <div class="text-xs font-semibold text-slate-300 mb-1">🔧 道具（{{ (outlineData.props||[]).length }}个）</div>
+          <div v-for="(p,pi) in (outlineData.props||[])" :key="pi" class="bg-slate-900/50 rounded-lg p-2 mb-1 space-y-1">
+            <input v-model="p.key" placeholder="道具Key" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+            <input v-model="p.name" placeholder="中文道具名" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+            <input v-model="p.desc" placeholder="作用" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200" />
+          </div>
+        </div>
+        <!-- 分集 -->
+        <div v-for="(ep,ei) in (outlineData.episodes||[])" :key="ei" class="border border-slate-700 rounded-lg p-2 space-y-1">
+          <div class="text-xs font-semibold text-slate-300">📺 第{{ ep.id }}集：{{ ep.title }}</div>
+          <textarea v-model="ep.summary" rows="3" placeholder="本集概要" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200"></textarea>
+          <div class="text-[11px] text-slate-400">核心台词（{{ (ep.lines||[]).length }}句）</div>
+          <div v-for="(l,li) in (ep.lines||[])" :key="li">
+            <input v-model="ep.lines[li]" class="w-full bg-slate-800 rounded px-2 py-1 text-xs text-slate-200 mb-1" />
+          </div>
+        </div>
+        <!-- 操作按钮 -->
+        <div class="flex gap-2">
+          <button @click="saveDraftOutline" :disabled="!outlineData" class="flex-1 px-4 py-2 rounded-lg bg-slate-700 text-slate-200 text-sm disabled:opacity-50">💾 保存草稿</button>
+          <button @click="confirmOutline" :disabled="!outlineData" class="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50">
+            ✅ 确认大纲 → 解锁资产设计
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ③ 资产设计：角色 / 场景 / 道具（中文结构化编辑 → 自动组装英文提示词 → 出图） -->
+  <main v-else-if="activeModule==='image'" class="p-3 max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <h2 class="text-base font-semibold">③ 资产设计 · 第{{activeEpisode}}集</h2>
+      <div class="flex gap-1 flex-wrap">
+        <button @click="assetTab='role'" :class="['text-xs px-3 py-1.5 rounded-lg', assetTab==='role'?'bg-blue-600 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700']">角色 {{ characterList.length }}</button>
+        <button @click="assetTab='scene'" :class="['text-xs px-3 py-1.5 rounded-lg', assetTab==='scene'?'bg-blue-600 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700']">场景 {{ (spec.scenes||[]).length }}</button>
+        <button @click="assetTab='prop'" :class="['text-xs px-3 py-1.5 rounded-lg', assetTab==='prop'?'bg-blue-600 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700']">道具 {{ (spec.props||[]).length }}</button>
+        <button @click="genAllAssets" :disabled="loading" title="一键生成全部未生成的资产（角色+场景+道具）" class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white disabled:opacity-50">⚡ 一键生成全部</button>
+        <button @click="ensureCnPrompts" :disabled="loading" title="为所有缺中文描述的资产自动提取中文（从英文提示词/拍摄剧本反译）" class="text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white disabled:opacity-50">🤖 提取全部中文</button>
+      </div>
+    </div>
+    <p class="text-[11px] text-slate-500 mb-2">中文描述 → 点「🤖生成英文提示词」自动组装 → 点「🔄生成图片」。点缩略图展开编辑。</p>
+
+    <!-- 角色：小图网格 + 中文编辑 -->
+    <template v-if="assetTab==='role'">
+      <div v-if="characterList.length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div v-for="c in characterList" :key="'r:'+c.key" class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="aspect-[9/16] bg-slate-800 relative cursor-pointer" @click="toggleAssetDetail('r:'+c.key)">
+            <img v-if="c.img && !broken[c.img]" :src="assetUrl(c.img)" @error="markBroken(c.img)" class="w-full h-full object-cover" loading="lazy">
+            <div v-else class="absolute inset-0 flex items-center justify-center text-slate-600 text-[10px] text-center p-1 leading-relaxed">未生成<br>{{ c.cn }}</div>
+            <span class="absolute top-0.5 left-0.5 text-[9px] px-1 py-0.5 rounded bg-black/60 text-slate-200">角色 {{ c.cn }}</span>
+            <span class="absolute bottom-0.5 right-0.5 text-[9px] px-1 py-0.5 rounded bg-black/60 text-slate-400">{{ assetDetailOpen['r:'+c.key] ? '收起 ▲' : '编辑 ▼' }}</span>
+          </div>
+          <div v-if="assetDetailOpen['r:'+c.key]" class="p-2 space-y-1.5">
+            <div v-for="f in assetCnFields('role')" :key="f[0]">
+              <label class="block text-[10px] text-slate-400">{{ f[1] }}</label>
+              <textarea v-if="spec.references[c.key] && spec.references[c.key].cn_prompt"
+                v-model="spec.references[c.key].cn_prompt[f[0]]" rows="2"
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1 text-[10px] leading-snug"></textarea>
+            </div>
+            <div class="flex gap-1.5">
+              <button @click="saveAssetCn('role', c.key)" :disabled="loading" title="保存中文描述" class="px-2 py-1 rounded bg-slate-700 text-slate-200 text-[10px]">💾</button>
+              <button @click="genAssetPrompt('role', c.key)" :disabled="assetBusy['r:'+c.key]==='prompt'"
+                class="flex-1 px-2 py-1 rounded bg-purple-600 text-white text-[10px] disabled:opacity-40">{{ assetBusy['r:'+c.key]==='prompt' ? '生成中…' : '🤖 生成英文提示词' }}</button>
+              <button @click="regenAssetImage('role', c.key)" :disabled="assetBusy['r:'+c.key]==='image'"
+                class="flex-1 px-2 py-1 rounded bg-blue-600 text-white text-[10px] disabled:opacity-40">{{ assetBusy['r:'+c.key]==='image' ? '出图中…' : '🔄 生成图片' }}</button>
+            </div>
+            <div v-if="spec.references[c.key] && spec.references[c.key].img_prompt">
+              <label class="block text-[9px] text-slate-500">英文提示词（AI 生成，可手动微调）</label>
+              <textarea v-model="spec.references[c.key].img_prompt" rows="2"
+                class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-[9px] font-mono leading-snug"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="text-center text-slate-500 text-sm py-16">暂无角色。先去「① 创意·需求卡」→「② 剧本大纲」确认后自动生成分镜，角色自动提取。</div>
+    </template>
+
+    <!-- 场景：小图网格 + 中文编辑 -->
+    <template v-else-if="assetTab==='scene'">
+      <div v-if="(spec.scenes||[]).length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div v-for="(s,i) in spec.scenes" :key="'s:'+(s.key||s.name||i)" class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="aspect-[9/16] bg-slate-800 relative cursor-pointer" @click="toggleAssetDetail('s:'+(s.key||s.name||i))">
+            <img v-if="s.asset_image && !broken[s.asset_image]" :src="assetUrl(s.asset_image)" @error="markBroken(s.asset_image)" class="w-full h-full object-cover" loading="lazy">
+            <div v-else class="absolute inset-0 flex items-center justify-center text-slate-600 text-[10px] text-center p-1">未生成<br>{{ s.name || s.key }}</div>
+            <span class="absolute top-0.5 left-0.5 text-[9px] px-1 py-0.5 rounded bg-black/60 text-slate-200">🏞️ {{ s.name || s.key }}</span>
+            <span class="absolute bottom-0.5 right-0.5 text-[9px] px-1 py-0.5 rounded bg-black/60 text-slate-400">{{ assetDetailOpen['s:'+(s.key||s.name||i)] ? '收起 ▲' : '编辑 ▼' }}</span>
+          </div>
+          <div v-if="assetDetailOpen['s:'+(s.key||s.name||i)]" class="p-2 space-y-1.5">
+            <div v-for="f in assetCnFields('scene')" :key="f[0]">
+              <label class="block text-[10px] text-slate-400">{{ f[1] }}</label>
+              <textarea v-if="spec.scenes[i].cn_prompt" v-model="spec.scenes[i].cn_prompt[f[0]]" rows="2"
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1 text-[10px] leading-snug"></textarea>
+            </div>
+            <div class="flex gap-1.5">
+              <button @click="saveAssetCn('scene', s.key||s.name)" :disabled="loading" title="保存中文描述" class="px-2 py-1 rounded bg-slate-700 text-slate-200 text-[10px]">💾</button>
+              <button @click="genAssetPrompt('scene', s.key||s.name)" :disabled="assetBusy['s:'+(s.key||s.name)]==='prompt'"
+                class="flex-1 px-2 py-1 rounded bg-purple-600 text-white text-[10px] disabled:opacity-40">{{ assetBusy['s:'+(s.key||s.name)]==='prompt' ? '生成中…' : '🤖 生成英文提示词' }}</button>
+              <button @click="regenAssetImage('scene', s.key||s.name)" :disabled="assetBusy['s:'+(s.key||s.name)]==='image'"
+                class="flex-1 px-2 py-1 rounded bg-blue-600 text-white text-[10px] disabled:opacity-40">{{ assetBusy['s:'+(s.key||s.name)]==='image' ? '出图中…' : '🔄 生成图片' }}</button>
+            </div>
+            <div v-if="s.img_prompt">
+              <label class="block text-[9px] text-slate-500">英文提示词（AI 生成，可手动微调）</label>
+              <textarea v-model="s.img_prompt" rows="2"
+                class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-[9px] font-mono leading-snug"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="text-center text-slate-500 text-sm py-16">暂无场景。确认大纲生成分镜后自动提取。</div>
+    </template>
+
+    <!-- 道具：小图网格 + 中文编辑 -->
+    <template v-else-if="assetTab==='prop'">
+      <div v-if="(spec.props||[]).length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div v-for="(p,i) in spec.props" :key="'p:'+(p.key||p.name||i)" class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="aspect-[9/16] bg-slate-800 relative cursor-pointer" @click="toggleAssetDetail('p:'+(p.key||p.name||i))">
+            <img v-if="p.asset_image && !broken[p.asset_image]" :src="assetUrl(p.asset_image)" @error="markBroken(p.asset_image)" class="w-full h-full object-cover" loading="lazy">
+            <div v-else class="absolute inset-0 flex items-center justify-center text-slate-600 text-[10px] text-center p-1">未生成<br>{{ p.name || p.key }}</div>
+            <span class="absolute top-0.5 left-0.5 text-[9px] px-1 py-0.5 rounded bg-black/60 text-slate-200">🎯 {{ p.name || p.key }}</span>
+            <span class="absolute bottom-0.5 right-0.5 text-[9px] px-1 py-0.5 rounded bg-black/60 text-slate-400">{{ assetDetailOpen['p:'+(p.key||p.name||i)] ? '收起 ▲' : '编辑 ▼' }}</span>
+          </div>
+          <div v-if="assetDetailOpen['p:'+(p.key||p.name||i)]" class="p-2 space-y-1.5">
+            <div v-for="f in assetCnFields('prop')" :key="f[0]">
+              <label class="block text-[10px] text-slate-400">{{ f[1] }}</label>
+              <textarea v-if="spec.props[i].cn_prompt" v-model="spec.props[i].cn_prompt[f[0]]" rows="2"
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1 text-[10px] leading-snug"></textarea>
+            </div>
+            <div class="flex gap-1.5">
+              <button @click="saveAssetCn('prop', p.key||p.name)" :disabled="loading" title="保存中文描述" class="px-2 py-1 rounded bg-slate-700 text-slate-200 text-[10px]">💾</button>
+              <button @click="genAssetPrompt('prop', p.key||p.name)" :disabled="assetBusy['p:'+(p.key||p.name)]==='prompt'"
+                class="flex-1 px-2 py-1 rounded bg-purple-600 text-white text-[10px] disabled:opacity-40">{{ assetBusy['p:'+(p.key||p.name)]==='prompt' ? '生成中…' : '🤖 生成英文提示词' }}</button>
+              <button @click="regenAssetImage('prop', p.key||p.name)" :disabled="assetBusy['p:'+(p.key||p.name)]==='image'"
+                class="flex-1 px-2 py-1 rounded bg-blue-600 text-white text-[10px] disabled:opacity-40">{{ assetBusy['p:'+(p.key||p.name)]==='image' ? '出图中…' : '🔄 生成图片' }}</button>
+            </div>
+            <div v-if="p.img_prompt">
+              <label class="block text-[9px] text-slate-500">英文提示词（AI 生成，可手动微调）</label>
+              <textarea v-model="p.img_prompt" rows="2"
+                class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-[9px] font-mono leading-snug"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="text-center text-slate-500 text-sm py-16">暂无道具。确认大纲生成分镜后自动提取。</div>
+    </template>
+  </main>
+
+  <!-- ④ 关键帧 · 首尾针：中文拍摄剧本参考 + 按镜模式决策（首尾针/单针/文生视频） + 首尾针编辑 -->
+  <main v-else-if="activeModule==='video'" class="p-3 max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <h2 class="text-base font-semibold">④ 分镜校准·关键帧 · 首尾针 · 第{{activeEpisode}}集</h2>
+      <button @click="genAllKeyframes" :disabled="loading" class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">批量生成全部首尾针</button>
+    </div>
+    <p class="text-[11px] text-slate-500 mb-3">每镜<b class="text-slate-300">全部用首尾针</b>生成（除 UI 动效镜）：<b class="text-slate-300">同场景直接链上镜尾帧</b>保持连贯，<b class="text-slate-300">跳场景/角色切换按新参考重新生成</b>；参考图缺失自动<b class="text-slate-300">文生图兜底</b>，流程不中断。首针参考图与尾针参考在卡片中明确标注，提示词可反复调试。</p>
+
+    <!-- 素材库（首尾针来源：角色/场景/道具） -->
+    <section class="bg-slate-900 rounded-xl border border-slate-800 p-3 mb-3">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-semibold">素材库（首尾针来源）</h3>
+        <span class="text-[11px] text-slate-400">{{ filteredMaterials.length }} 项</span>
+      </div>
+      <div class="flex gap-1 mb-2">
+        <button v-for="f in [{id:'all',label:'全部'},{id:'role',label:'角色'},{id:'scene',label:'场景'},{id:'prop',label:'道具'}]" :key="f.id" @click="matFilter=f.id"
+          :class="['px-2 py-1 rounded-md text-[10px]', matFilter===f.id?'bg-blue-600 text-white':'bg-slate-800 text-slate-400 hover:bg-slate-700']">{{ f.label }}</button>
+      </div>
+      <div v-if="!filteredMaterials.length" class="text-[11px] text-slate-500 py-6 text-center">暂无素材，先去「③ 资产设计」生成角色/场景/道具参考图</div>
+      <div v-else class="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+        <div v-for="a in filteredMaterials" :key="a.key" class="aspect-square rounded-lg overflow-hidden border border-slate-700 relative">
+          <img v-if="a.thumb && !broken[a.thumb]" :src="a.thumb" loading="lazy" @error="markBroken(a.thumb)" class="w-full h-full object-cover">
+          <span v-else class="text-[9px] text-slate-500 flex h-full items-center justify-center p-1 text-center">{{ a.label }}</span>
+          <span class="absolute bottom-0 inset-x-0 bg-black/65 text-[9px] px-1 py-0.5 truncate text-slate-200">{{ a.label }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 按镜拍摄剧本 + 模式决策 + 首尾针编辑 -->
+    <div v-if="spec.shots.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div v-for="sh in spec.shots" :key="sh.id" class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+        <!-- 模式标签 + 镜信息 -->
+        <div class="flex items-center justify-between px-2 py-1 bg-slate-800 gap-1">
+          <span class="text-[11px] text-slate-300 shrink-0">镜 #{{ sh.id }}</span>
+          <select v-model="sh.gen_strategy" @change="strategyChanged(sh)"
+            class="bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-white">
+            <option value="keyframes">🎬 首尾针</option>
+            <option value="reference">🖼 单针(图生视频)</option>
+            <option value="text2video">🌫 文生视频</option>
+            <option value="ui">🖥 UI动效</option>
+          </select>
+        </div>
+        <!-- 拍摄剧本参考（中文） -->
+        <div class="px-2 py-1.5 bg-slate-900/60 border-b border-slate-800 text-[10px] text-slate-400 space-y-0.5">
+          <div v-if="sh.cn_story" class="text-slate-300 leading-snug">📖 {{ sh.cn_story }}</div>
+          <div v-else class="text-slate-600 italic">（无中文画面描述，去 ⑤ 分镜视频补）</div>
+          <div class="flex flex-wrap gap-x-2 text-[9px] text-slate-500">
+            <span v-if="sh.subtitle">💬 {{ sh.subtitle }}</span>
+            <span v-if="sh.camera">🎥 {{ sh.camera }}<template v-if="sh.camera_angle">·{{ sh.camera_angle }}</template></span>
+            <span v-if="sh.audio_tags">🔊 {{ sh.audio_tags }}</span>
+            <span v-if="sh.continuity_note" class="w-full">🔗 {{ sh.continuity_note }}</span>
+          </div>
+        </div>
+        <!-- 首/尾帧 -->
+        <div class="flex gap-1 p-1 bg-slate-800">
+          <div class="relative flex-1 aspect-[9/16] bg-black">
+            <img v-if="firstFrameUrl(sh) && !broken[firstFrameUrl(sh)]" :src="firstFrameUrl(sh)" @error="markBroken(firstFrameUrl(sh))" class="w-full h-full object-cover">
+            <div v-else class="absolute inset-0 flex items-center justify-center text-slate-600 text-[10px] text-center leading-tight px-1">首帧未生成</div>
+            <span class="absolute bottom-0 inset-x-0 text-center text-[9px] bg-black/60 text-slate-200">{{ frameStartLabel(sh) }}</span>
+            <div v-if="kfBusy[sh.id]" class="absolute inset-0 bg-black/65 flex items-center justify-center z-10">
+              <span class="text-[10px] text-amber-300 flex items-center gap-1.5">
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" style="animation: kfspin 0.8s linear infinite"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-dasharray="28" stroke-linecap="round" opacity="0.35"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                生成中…
+              </span>
+            </div>
+          </div>
+          <div class="relative flex-1 aspect-[9/16] bg-black">
+            <img v-if="sh.asset_frame_end && !broken[sh.asset_frame_end]" :src="sh.asset_frame_end" @error="markBroken(sh.asset_frame_end)" class="w-full h-full object-cover">
+            <div v-else class="absolute inset-0 flex items-center justify-center text-slate-600 text-[10px] text-center leading-tight px-1">尾帧未生成</div>
+            <span class="absolute bottom-0 inset-x-0 text-center text-[9px] bg-black/60 text-slate-200">{{ sh.gen_strategy==='keyframes' ? '尾帧' : '无需尾帧' }}</span>
+            <div v-if="kfBusy[sh.id]" class="absolute inset-0 bg-black/65 flex items-center justify-center z-10">
+              <span class="text-[10px] text-amber-300 flex items-center gap-1.5">
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" style="animation: kfspin 0.8s linear infinite"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-dasharray="28" stroke-linecap="round" opacity="0.35"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                生成中…
+              </span>
+            </div>
+          </div>
+        </div>
+        <!-- 编辑区：首针/尾针 两栏独立参考 + 提示词（老板 0810 全首尾针） -->
+        <div class="p-2 space-y-1.5">
+          <template v-if="sh.gen_strategy==='keyframes'">
+            <div class="flex items-center gap-1 text-[10px] text-slate-400">
+              <span class="shrink-0 text-cyan-300">🎞 首针参考图:</span>
+              <select v-model="sh.ref" @change="putSpec().catch(()=>{})"
+                class="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-cyan-200">
+                <option value="">— 无（空镜/场景图） —</option>
+                <option v-for="(a,i) in refOptions" :key="i" :value="a.ref">{{ a.label }}</option>
+              </select>
+            </div>
+            <label class="block text-[10px] text-slate-400">首针提示词（参考图缺失时自动文生图兜底）</label>
+            <textarea v-model="sh.first_frame_prompt" rows="1" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px] font-mono" placeholder="首针画面描述，留空则用拍摄剧本"></textarea>
+            <div class="flex items-center gap-1 text-[10px] text-slate-400 pt-1 border-t border-slate-800">
+              <span class="shrink-0 text-violet-300">尾针参考[{{ sh.ref || '同首针' }}]</span>
+            </div>
+            <label class="block text-[10px] text-slate-400">尾针提示词（结束态画面，可反复调试）</label>
+            <textarea v-model="sh.last_frame_prompt" rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px] font-mono"></textarea>
+          </template>
+          <template v-else>
+            <label class="block text-[10px] text-slate-400">视频提示词（video_prompt，可反复调试）</label>
+            <textarea v-model="sh.video_prompt" rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px] font-mono"></textarea>
+          </template>
+          <div class="flex gap-1.5">
+            <button v-if="sh.gen_strategy==='keyframes'" @click="optimizeKeyframe(sh)" :disabled="loading || optimizingKey==='kf'+sh.id" class="flex-1 px-2 py-1.5 rounded bg-violet-600 text-white text-[11px] disabled:opacity-50">🤖 AI优化</button>
+            <button @click="regenKeyframe(sh)" :disabled="loading" class="flex-1 px-2 py-1.5 rounded bg-blue-600 text-white text-[11px] disabled:opacity-50">🔄 重生成</button>
+            <span v-if="kfBusy[sh.id]" class="flex-1 flex items-center justify-center gap-1.5 text-[11px] text-amber-300">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" style="animation: kfspin 0.8s linear infinite"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-dasharray="28" stroke-linecap="round" opacity="0.35"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+              <style>@keyframes kfspin { to { transform: rotate(360deg); } }</style>
+              生成中…
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-else class="text-center text-slate-500 text-sm py-16">暂无分镜。先去「① 创意·需求卡」生成分镜。</div>
+  </main>
+
+  <!-- ④ 分镜视频流程：首末帧缩略图 + 转场 + 生成/重渲（数据跟着分镜走） -->
+    <!-- ④ 分镜视频：分镜拆解校准 + 每镜生成视频（视频显示在每镜下方） -->
+  <main v-else-if="activeModule==='shots'" class="p-3 max-w-6xl mx-auto space-y-3">
+    <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
+      <h2 class="text-base font-semibold">⑤ 分镜视频 · 分镜拆解与精控 · 第{{activeEpisode}}集</h2>
+      <span class="text-[11px] text-slate-400">{{ spec.shots.length }} 镜</span>
+    </div>
+    <p class="text-[11px] text-slate-500">先在此拆解校准每镜（台词/运镜/画面/引用素材，可多次修改），再逐镜生成视频；生成出的视频显示在每镜卡片下方（标注几秒、用什么方式）。</p>
+
+    <!-- P3 人脸一致性质检面板（0811 补回：方法/数据一直在，模板缺失） -->
+    <div class="bg-slate-900 rounded-xl border border-slate-800 p-3">
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <h3 class="text-sm font-semibold">👤 人脸一致性质检</h3>
+        <div class="flex gap-2">
+          <button @click="runFaceQC" :disabled="faceLoading" class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 disabled:opacity-50">{{ faceLoading ? '质检中…' : '🔄 运行质检' }}</button>
+          <button v-if="faceReport && faceReport.ok && (faceReport.issues||[]).length" @click="runFaceFix" :disabled="faceLoading" class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white disabled:opacity-50">🔧 修复低分镜</button>
+        </div>
+      </div>
+      <div v-if="faceLoading" class="text-[11px] text-amber-300 py-2">⏳ 逐帧抽取身份分（本地 SFace，免额度）…</div>
+      <template v-else-if="faceReport && faceReport.ok">
+        <div class="flex gap-4 text-[11px] mb-2 flex-wrap">
+          <span>平均分 <b :class="faceColor(faceReport.overall && faceReport.overall.avg_identity)">{{ ((faceReport.overall||{}).avg_identity!=null ? (faceReport.overall.avg_identity).toFixed(2) : '—') }}</b></span>
+          <span>通过率 <b class="text-slate-200">{{ Math.round(((faceReport.overall||{}).identity_pass_rate||0)*100) }}%</b></span>
+          <span v-if="faceReport.overall && faceReport.overall.worst_shot">最差镜 <b class="text-rose-300">#{{ faceReport.overall.worst_shot }}</b></span>
+        </div>
+        <div v-if="(faceReport.per_shot||[]).length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+          <div v-for="ps in faceReport.per_shot" :key="ps.shot" class="bg-slate-800/60 rounded-lg px-2 py-1 text-[10px] flex items-center gap-1.5">
+            <span class="text-slate-400">#{{ ps.shot }}</span>
+            <span :class="faceColor(ps.identity)">{{ ps.identity!=null ? ps.identity.toFixed(2) : '—' }}</span>
+            <span :class="ps.face_ok===false ? 'text-rose-400' : 'text-emerald-400'">{{ ps.face_ok===false ? '⚠ 低' : '✓' }}</span>
+          </div>
+        </div>
+        <p class="text-[10px] text-slate-500 mt-2">阈值：警告 ≥{{ (faceReport.thresholds||{}).warn ?? 0.30 }} · 失败 ＜{{ (faceReport.thresholds||{}).fail ?? 0.30 }}；SFace 余弦相似度（本地，免额度）</p>
+      </template>
+      <div v-else class="text-[11px] text-slate-500 py-2">{{ (faceReport && faceReport.error) || '点「运行质检」对已出视频逐镜打分（需已生成视频）' }}</div>
+    </div>
+
+    <!-- 逐镜视频卡片：原始分镜拆解 + 生成视频（在每镜下方） -->
+    <div class="flex items-center justify-between mt-2 mb-1">
+      <h3 class="text-sm font-semibold">逐镜视频</h3>
+      <button @click="genAllShots" :disabled="loading" class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">批量生成全部视频</button>
+    </div>
+    <div v-if="spec.shots.length" class="space-y-3">
+      <div v-for="sh in spec.shots" :key="sh.id" class="bg-slate-900 rounded-xl border border-slate-800 p-3">
+        <div class="flex items-center gap-2 flex-wrap mb-2">
+          <span class="text-sm font-medium">镜 #{{ sh.id }}</span>
+          <span :class="['text-[10px] px-1.5 py-0.5 rounded', statusClass(sh.status)]">{{ statusText(sh.status) }}</span>
+          <span :class="['text-[10px] px-1.5 py-0.5 rounded', sceneTypeMeta(sh).cls]">{{ sceneTypeMeta(sh).icon }} {{ sceneTypeMeta(sh).label }}</span>
+          <span class="text-[11px] text-slate-400">{{ sh.duration }}s</span>
+          <span v-if="sh.ref" class="text-[11px] text-slate-400">· 引用：{{ sh.ref }}</span>
+          <span v-if="sh.camera" class="text-[11px] text-violet-300/80">🎥{{ sh.camera }}<template v-if="sh.camera_angle">·{{ sh.camera_angle }}</template></span>
+          <span :class="['text-[10px] px-1.5 py-0.5 rounded', strategyBadgeClass(sh.gen_strategy)]">{{ strategyBadge(sh.gen_strategy) }}</span>
+          <span v-if="sh.asset_video" class="text-[11px] text-emerald-400">▶ 已出视频（{{ sh.duration }}s · {{ shotMethod(sh) }}）</span>
+          <span v-if="sh.satisfied" class="text-[11px] text-emerald-300">✓ 已满意</span>
+        </div>
+        <!-- 【老板 0810 布局】左列：参考图 + 视频；右列：描述/情绪/台词/运镜 等全部数据 -->
+        <div class="grid grid-cols-1 md:grid-cols-[230px_1fr] gap-3">
+          <!-- 左列：首尾针参考图 + 视频预览 -->
+          <div class="space-y-2">
+            <div class="grid grid-cols-2 gap-1.5">
+              <div>
+                <div class="text-[9px] text-slate-400 mb-0.5 truncate">🎞 首针参考图:{{ sh.ref || sh.scene_key || '自动' }}</div>
+                <div class="relative aspect-[9/16] bg-black rounded overflow-hidden border border-slate-700">
+                  <img v-if="firstFrameUrl(sh) && !broken[firstFrameUrl(sh)]" :src="firstFrameUrl(sh)" @error="markBroken(firstFrameUrl(sh))" class="w-full h-full object-cover">
+                  <span v-else class="absolute inset-0 flex items-center justify-center text-slate-600 text-[8px] text-center">无</span>
+                  <span class="absolute bottom-0 inset-x-0 text-center text-[8px] bg-black/60 text-slate-300 truncate">{{ frameStartLabel(sh) }}</span>
+                  <div v-if="vidBusy[sh.id]" class="absolute inset-0 bg-black/60 flex items-center justify-center z-10"><span class="text-[9px] text-amber-300">⏳</span></div>
+                </div>
+              </div>
+              <div>
+                <div class="text-[9px] text-slate-400 mb-0.5 truncate">尾针参考[{{ sh.ref || '同首针' }}]</div>
+                <div class="relative aspect-[9/16] bg-black rounded overflow-hidden border border-slate-700">
+                  <img v-if="sh.asset_frame_end && !broken[sh.asset_frame_end]" :src="sh.asset_frame_end" @error="markBroken(sh.asset_frame_end)" class="w-full h-full object-cover">
+                  <span v-else class="absolute inset-0 flex items-center justify-center text-slate-600 text-[8px] text-center">无</span>
+                  <div v-if="vidBusy[sh.id]" class="absolute inset-0 bg-black/60 flex items-center justify-center z-10"><span class="text-[9px] text-amber-300">⏳</span></div>
+                </div>
+              </div>
+            </div>
+            <div v-if="vidBusy[sh.id]" class="flex items-center gap-1.5 text-[10px] text-amber-300 bg-slate-800/60 border border-amber-700/40 rounded-lg px-2 py-1.5">
+              <svg class="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" style="animation: kfspin 0.8s linear infinite"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-dasharray="28" stroke-linecap="round" opacity="0.35"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+              视频生成中…（约 2~10 分钟）
+            </div>
+            <div v-else-if="sh.asset_video" class="aspect-[9/16] bg-black rounded-lg overflow-hidden">
+              <video :key="videoUrl(sh)" :src="videoUrl(sh)" :poster="posterUrl(sh)" class="w-full h-full object-contain" controls playsinline preload="metadata"></video>
+            </div>
+            <div v-else class="h-16 border border-dashed border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] text-slate-600 gap-1">
+              <span>本镜尚未生成视频</span>
+              <button @click="genShot(sh.id)" :disabled="loading" class="px-2 py-0.5 rounded bg-blue-600/80 text-white text-[9px] disabled:opacity-50">生成</button>
+            </div>
+          </div>
+          <!-- 右列：官方结构参数（主体/动作/场景→画面描述，运镜/光线/风格）+ 最终提示词 -->
+          <div class="space-y-2 min-w-0">
+            <div v-if="sh.cn_story" class="text-[11px] text-slate-300 bg-slate-800/60 border border-slate-800 rounded-lg p-2 leading-snug">📖 {{ sh.cn_story }}</div>
+            <div class="grid grid-cols-1 gap-2">
+              <div><label class="block text-[10px] text-slate-400 mb-0.5">台词 / 旁白（原生中文音画同步）</label><textarea v-model="sh.subtitle" rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px]"></textarea></div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="block text-[10px] text-slate-400 mb-0.5">情绪</label><input v-model="sh.emotion" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px]"></div>
+                <div><label class="block text-[10px] text-slate-400 mb-0.5">运镜</label><input v-model="sh.camera" placeholder="推近/环绕/过肩…" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px]">
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <button v-for="c in cameraPresetsList" :key="c" @click="sh.camera=c" :class="['px-1.5 py-0.5 rounded text-[9px]', sh.camera===c ? 'bg-violet-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700']">{{ c }}</button>
+                  </div>
+                </div>
+              </div>
+              <div><label class="block text-[10px] text-slate-400 mb-0.5">画面描述（video_prompt · 主体+动作+场景）</label><textarea v-model="sh.video_prompt" rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px] font-mono"></textarea></div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="block text-[10px] text-slate-400 mb-0.5">光线</label>
+                  <select v-model="sh.lighting" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px]">
+                    <option value="">自动（按镜头类型）</option>
+                    <option v-for="(l,i) in lightingOptions" :key="i" :value="l">{{ l }}</option>
+                  </select>
+                </div>
+                <div><label class="block text-[10px] text-slate-400 mb-0.5">风格</label>
+                  <select v-model="sh.style" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px]">
+                    <option value="">全局风格</option>
+                    <option v-for="(s,i) in styleOptions" :key="i" :value="s">{{ s }}</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <button @click="sh._promptOpen = !sh._promptOpen" class="text-[10px] text-cyan-300 hover:text-cyan-200 flex items-center gap-1">
+                  <span>🎬 最终提示词（送引擎 · 实时拼装）</span><span class="text-slate-500">{{ sh._promptOpen ? '▾' : '▸' }}</span>
+                </button>
+                <textarea v-if="sh._promptOpen" :value="finalPrompt(sh)" readonly rows="4" class="w-full bg-slate-950 border border-cyan-900/60 rounded-lg p-1.5 text-[10px] font-mono text-cyan-200/90 leading-relaxed"></textarea>
+              </div>
+              <div>
+                <button @click="sh._engineOpen = !sh._engineOpen" class="text-[10px] text-slate-400 hover:text-slate-300 flex items-center gap-1">
+                  <span>⚙️ 引擎参数（官方接口）</span><span class="text-slate-500">{{ sh._engineOpen ? '▾' : '▸' }}</span>
+                </button>
+                <div v-if="sh._engineOpen" class="grid grid-cols-2 gap-x-3 gap-y-1 mt-1">
+                  <div class="text-[9px] text-slate-500">尺寸（{{ aspectMode==='landscape' ? '官方 16:9' : '官方 9:16' }}）<br><b class="text-slate-300">{{ aspectMode==='landscape' ? (resolutionMode==='prod' ? '1280 × 720' : '854 × 480') : (resolutionMode==='prod' ? '720 × 1280' : '480 × 854') }}<template v-if="sh.video_size"> → 成片 {{ sh.video_size }}</template></b></div>
+                  <div class="text-[9px] text-slate-500">时长 / 帧数<br><b class="text-slate-300">{{ sh.duration }}s ≈ {{ nfFor(sh.duration) }}帧 @24fps</b></div>
+                  <div class="text-[9px] text-slate-500">生成模式<br><b class="text-slate-300">{{ sh.gen_strategy==='keyframes' ? '首尾2图 keyframes' : (sh.gen_strategy==='reference' ? '单图 reference' : sh.gen_strategy) }}</b></div>
+                  <div class="text-[9px] text-slate-500">参考图<br><b class="text-slate-300 truncate block">{{ sh.ref || '无（空镜）' }}</b></div>
+                  <div class="col-span-2">
+                    <label class="block text-[9px] text-slate-500 mb-0.5">负向提示词 negative_prompt（空 = 系统默认：防换脸/烧字幕）</label>
+                    <textarea v-model="sh.negative_prompt" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-[10px] font-mono text-slate-400 leading-relaxed"></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button @click="genShot(sh.id)" :disabled="loading" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs disabled:opacity-50">生成视频</button>
+          <button @click="genShot(sh.id, true)" :disabled="loading" class="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs disabled:opacity-50">保存并重渲</button>
+          <button @click="optimizeVideoPrompt(sh)" :disabled="loading || optimizingKey==='vp'+sh.id" class="px-3 py-1.5 rounded-lg bg-fuchsia-600 text-white text-xs disabled:opacity-50">🤖 优化视频提示词</button>
+          <button @click="runDiagnose(sh)" :disabled="loading || diagBusy[sh.id]" class="px-3 py-1.5 rounded-lg bg-cyan-700 text-white text-xs disabled:opacity-50">{{ diagBusy[sh.id] ? '诊断中…' : '🧠 AI 诊断' }}</button>
+          <button @click="saveShot" :disabled="loading||!dirty" class="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 text-xs disabled:opacity-40">保存修改</button>
+          <button @click="toggleSatisfied(sh)" :class="['px-3 py-1.5 rounded-lg text-xs', sh.satisfied ? 'bg-emerald-600 text-white':'bg-slate-700 text-slate-200']">标记满意</button>
+          <button @click="sh._reworkOpen = !sh._reworkOpen" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs">✎ 返工</button>
+        </div>
+        <!-- AI 诊断结果（4 维语义评分，写回 shot.diagnosis） -->
+        <div v-if="sh.diagnosis && sh.diagnosis.scores && Object.keys(sh.diagnosis.scores).length" class="mt-2 bg-slate-800/40 border border-slate-700/60 rounded-lg p-2">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-[10px] text-slate-400">🧠 诊断</span>
+            <span :class="sh.diagnosis.verdict==='pass' ? 'text-emerald-400' : (sh.diagnosis.verdict==='fail' ? 'text-rose-400' : 'text-amber-300')" class="text-[10px] font-semibold">{{ sh.diagnosis.verdict==='pass' ? '✅ 通过' : (sh.diagnosis.verdict==='fail' ? '❌ 未通过' : '⚖ ' + (sh.diagnosis.verdict||'')) }}</span>
+            <span class="ml-auto text-[9px] text-slate-500">AGNES 多模态 · 抽帧评分</span>
+          </div>
+          <div class="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span v-for="(v,k) in sh.diagnosis.scores" :key="k" class="text-[10px]"><span class="text-slate-500">{{ diagLabel(k) }}:</span> <b :class="diagColor(v)">{{ v }}</b></span>
+          </div>
+          <p v-if="sh.diagnosis.summary" class="text-[10px] text-slate-400 mt-1 leading-snug">{{ sh.diagnosis.summary }}</p>
+        </div>
+        <div v-if="sh._reworkOpen" class="flex gap-2 items-center mt-2">
+          <input v-model="sh._reworkNote" @keyup.enter="reworkShot(sh.id)" placeholder="描述这镜怎么改" class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs">
+          <button @click="reworkShot(sh.id)" :disabled="loading" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs disabled:opacity-50">提交返工</button>
+        </div>
+      </div>
+    </div>
+    <div v-else class="text-center text-slate-500 text-sm py-16">暂无分镜。先去「① 创意·需求卡」生成分镜。</div>
+  </main>
+
+  <!-- 设置·提示词库：独立工具模块（不参与 5 步流水线） -->
+  <main v-else-if="activeModule==='settings'" class="p-3 max-w-4xl mx-auto space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h2 class="text-base font-semibold">⚙ 设置 · 提示词库</h2>
+      <button @click="loadPromptLib" :disabled="loading" class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 disabled:opacity-50">重新载入</button>
+    </div>
+    <p class="text-[11px] text-slate-500">所有模板均为中文、可编辑；「优化元提示」驱动所有 🤖 AI 优化按钮（②/③/④ 的提示词优化都走它）。改完点「保存提示词库」即生效，分类库可持续扩充。</p>
+
+    <div v-if="settingsMsg" class="text-[11px] px-2 py-1 rounded bg-slate-800 border border-slate-700">{{ settingsMsg }}</div>
+
+    <!-- 生成分辨率/画幅开关：测试 480p 快速迭代 / 正式 720p 出片；竖屏 9:16 / 横屏 16:9（老板 0811） -->
+    <section class="bg-slate-900 rounded-xl border border-blue-700/40 p-3">
+      <h3 class="text-sm font-semibold mb-1">🎬 生成参数 <span class="text-[10px] font-normal text-slate-400 ml-1">（视频生成档位与画幅，首尾针图不受影响）</span></h3>
+      <div class="flex items-center gap-2 flex-wrap">
+        <label class="text-[11px] text-slate-400">分辨率</label>
+        <select v-model="resolutionMode" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs">
+          <option value="test">测试（480p · 快速迭代）</option>
+          <option value="prod">正式（720p · 商用出片）</option>
+        </select>
+        <label class="text-[11px] text-slate-400 ml-2">画幅</label>
+        <select v-model="aspectMode" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs">
+          <option value="portrait">竖屏 9:16（短剧标准）</option>
+          <option value="landscape">横屏 16:9（横版平台）</option>
+        </select>
+        <button @click="saveResolutionMode" :disabled="loading" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs disabled:opacity-50">保存</button>
+        <span class="text-[10px] text-slate-500">测试档生成快、适合功能验证；正式档画质高、适合最终出片。横屏用于横版平台/电脑端，竖屏为抖音快手标准。</span>
+      </div>
+    </section>
+
+    <template v-if="promptLib">
+      <!-- 优化元提示（AI 优化的系统提示） -->
+      <section class="bg-slate-900 rounded-xl border border-violet-700/40 p-3">
+        <h3 class="text-sm font-semibold mb-1">🤖 提示词优化元提示（优化引擎的"说明书"）</h3>
+        <p class="text-[11px] text-slate-500 mb-2">支持占位符 <code class="text-slate-300" v-pre>{{type}}</code>（类型中文名）与 <code class="text-slate-300" v-pre>{{text}}</code>（待优化文本）。所有 AI 优化都基于此。</p>
+        <textarea v-model="promptLib.optimize" rows="8" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[11px] font-mono leading-snug"></textarea>
+      </section>
+
+      <!-- 按 group 分组展示提示词库（可折叠） -->
+      <section class="bg-slate-900 rounded-xl border border-slate-800 p-3 space-y-2">
+        <h3 class="text-sm font-semibold">分类型提示词模板库（按模块分组）</h3>
+        <template v-for="g in (promptLib.groups||['创意','剧本','资产','分镜','视频'])" :key="g">
+          <details class="group-detail bg-slate-800/50 rounded-lg" :open="g==='创意'">
+            <summary class="cursor-pointer px-2 py-1.5 text-xs font-semibold text-slate-300 hover:text-white select-none">
+              {{ g }}
+              <span class="text-slate-500 ml-1">({{ groupTypeKeys(g).length }} 类)</span>
+            </summary>
+            <div class="p-2 space-y-2">
+              <div v-for="(cfg, key) in groupTypeEntries(g)" :key="key" class="border border-slate-700/60 rounded-lg p-2">
+                <div class="text-[11px] text-slate-400 mb-1">
+                  {{ promptLabels[key] || key }}
+                  <span class="text-slate-600">（{{ key }}）</span>
+                  <button @click="optimizeTypePrompt(key)" :disabled="loading" class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-violet-700/50 text-violet-300 hover:bg-violet-600/50">🤖 AI优化</button>
+                  <button @click="toggleTestPanel(key)" class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-700/50 text-cyan-300 hover:bg-cyan-600/50">
+                    {{ testState[key] && testState[key].open ? '▲ 收起测试' : '🧪 测试' }}
+                  </button>
+                </div>
+                <textarea v-model="cfg.prompt" rows="4" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[11px] font-mono leading-snug"></textarea>
+
+                <!-- 内联测试沙盒 -->
+                <div v-if="testState[key] && testState[key].open" class="mt-2 space-y-1 border-t border-slate-700/50 pt-2">
+                  <textarea v-model="testState[key].input" rows="2" :placeholder="'输入样本测试「'+ (promptLabels[key]||key) +'」提示词效果…'" class="w-full bg-slate-800 border border-cyan-700/30 rounded-lg p-1.5 text-[10px] font-mono"></textarea>
+                  <div class="flex gap-2 items-center">
+                    <button @click="runTestPrompt(key)" :disabled="testState[key].loading" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white disabled:opacity-40">
+                      {{ testState[key].loading ? '运行中…' : '▶ 运行' }}
+                    </button>
+                    <button @click="testState[key].input=''; testState[key].result=''" class="text-[10px] px-1 py-0.5 text-slate-500">清空</button>
+                  </div>
+                  <div v-if="testState[key].result" class="bg-slate-800 rounded-lg p-2 text-[10px] font-mono whitespace-pre-wrap text-emerald-200 max-h-32 overflow-y-auto">{{ testState[key].result }}</div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </template>
+      </section>
+
+      <!-- 测试优化（全局） -->
+      <section class="bg-slate-900 rounded-xl border border-slate-800 p-3 space-y-2">
+        <h3 class="text-sm font-semibold">🧪 提示词优化预览（全局，不落盘）</h3>
+        <select v-model="optimizeTestType" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs">
+          <option v-for="(lbl, key) in promptLabels" :key="key" :value="key">{{ lbl }}</option>
+        </select>
+        <textarea v-model="optimizeTestText" rows="3" placeholder="粘贴一段想优化的提示词，点测试看效果" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[11px] font-mono"></textarea>
+        <button @click="testOptimize" :disabled="loading" class="px-3 py-1.5 rounded-lg bg-fuchsia-600 text-white text-xs disabled:opacity-50">🤖 运行测试优化</button>
+        <div v-if="optimizeTestResult" class="bg-slate-800 rounded-lg p-2 text-[11px] font-mono whitespace-pre-wrap text-emerald-200">{{ optimizeTestResult }}</div>
+      </section>
+
+      <button @click="savePromptLib" :disabled="loading" class="w-full px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50">💾 保存提示词库</button>
+    </template>
+    <div v-else class="text-center text-slate-500 text-sm py-16">正在载入提示词库…</div>
+
+    <!-- 批量任务队列（O3）—— 独立于提示词库加载（必须与 v-if/v-else 相邻性隔离） -->
+    <section class="bg-slate-900 rounded-xl border border-slate-800 p-3 space-y-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold">📋 任务队列</h3>
+        <div class="flex gap-1">
+          <button @click="loadQueue" :disabled="loading" class="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-300 disabled:opacity-40">刷新</button>
+          <button @click="toggleQueueWorker" :disabled="loading" class="text-[10px] px-2 py-1 rounded" :class="queuePaused ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300'">
+            {{ queuePaused ? '▶ 恢复' : '⏸ 暂停' }}
+          </button>
+        </div>
+      </div>
+      <div v-if="queueJobs !== null && queueJobs.length === 0" class="text-[11px] text-slate-500 text-center py-3">队列为空</div>
+      <div v-for="j in (queueJobs||[])" :key="j.id" class="bg-slate-800/50 rounded-lg p-2 text-[11px] flex items-center gap-2">
+        <span :class="['inline-block w-2 h-2 rounded-full shrink-0',
+          j.status==='pending'?'bg-amber-400':j.status==='running'?'bg-cyan-400 animate-pulse':j.status==='done'?'bg-emerald-400':'bg-red-400']"></span>
+        <span class="text-slate-300 flex-1 truncate">{{ j.type || j.id }}</span>
+        <span v-if="j.progress != null" class="text-slate-500 w-8 text-right">{{ j.progress }}%</span>
+        <span v-if="j.elapsed_sec" class="text-slate-600 w-10 text-right">{{ j.elapsed_sec }}s</span>
+        <span class="text-slate-600 text-[10px]">{{ j.status }}</span>
+        <button v-if="j.status==='pending'" @click="cancelQueueJob(j.id)" class="text-[10px] px-1 py-0.5 rounded bg-red-700/50 text-red-300">取消</button>
+      </div>
+      <div v-if="queueJobs === null" class="text-[11px] text-slate-500 text-center py-3">点「刷新」加载队列</div>
+    </section>
+
+    <!-- 已归档项目（归档=数据保留可恢复；删除=彻底释放磁盘，二次确认） -->
+    <section class="bg-slate-900 rounded-xl border border-slate-800 p-3 space-y-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold">🗄 已归档项目</h3>
+        <button @click="loadProjects" :disabled="loading" class="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-300 disabled:opacity-40">刷新</button>
+      </div>
+      <p class="text-[10px] text-slate-500">归档只隐藏不删数据，可一键恢复；确定不要的项目可「删除」彻底释放磁盘（不可恢复）。</p>
+      <div v-if="!archivedProjects.length" class="text-[11px] text-slate-500 text-center py-2">暂无归档项目</div>
+      <div v-for="ap in archivedProjects" :key="ap.id" class="bg-slate-800/50 rounded-lg p-2 text-[11px] flex items-center gap-2">
+        <span class="text-slate-300 flex-1 truncate">{{ ap.name || ap.id }}</span>
+        <span class="text-slate-600 text-[10px]">{{ ap.id }}</span>
+        <button @click="restoreProject(ap.id)" class="text-[10px] px-2 py-0.5 rounded bg-emerald-700/50 text-emerald-300">↩ 恢复</button>
+        <button @click="deleteProject(ap.id)" class="text-[10px] px-2 py-0.5 rounded bg-red-700/50 text-red-300">🗑 删除</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ⑤ 合并成片：组装 + 成片播放 + 分发占位 -->
+  <main v-else-if="activeModule==='advanced'" class="p-3 max-w-3xl mx-auto space-y-3">
+    <h2 class="text-base font-semibold">⑥ 合并成片 · 第{{activeEpisode}}集</h2>
+    <div class="bg-slate-900 rounded-xl border border-emerald-700/50 p-3">
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <span class="text-sm font-medium text-emerald-300">🎬 最终成片</span>
+        <div class="flex items-center gap-2">
+          <select v-model="mergeTransition" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs">
+            <option v-for="t in transitionOptions" :key="t" :value="t">{{ t }}</option>
+          </select>
+          <button @click="assemble" :disabled="loading" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white disabled:opacity-50">▶ 合并全部分镜</button>
+        </div>
+      </div>
+      <video v-if="finalUrl && !broken[finalUrl]" :src="finalUrl" @error="markBroken(finalUrl)" controls playsinline preload="metadata" class="w-full max-w-[360px] mx-auto rounded-lg bg-black aspect-[9/16]"></video>
+      <div v-else-if="finalUrl" class="w-full max-w-[360px] mx-auto rounded-lg bg-black aspect-[9/16] flex flex-col items-center justify-center text-center gap-2 text-slate-300">
+        <div class="text-xs">成片已生成，当前浏览器无法内联播放</div>
+        <a :href="finalUrl" download class="text-xs px-3 py-1.5 rounded bg-emerald-600 text-white">下载 final.mp4</a>
+      </div>
+      <div v-else class="text-center text-slate-500 text-sm py-8">尚未合并。点「合并全部分镜」生成 final.mp4</div>
+    </div>
+    <div class="bg-slate-900 rounded-xl border border-slate-800 p-3">
+      <div class="text-sm font-medium mb-2">项目健康 · {{ projectId || '—' }}</div>
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-slate-800 rounded-lg p-2"><div class="text-lg font-semibold">{{ (spec.shots||[]).length }}</div><div class="text-[10px] text-slate-500">分镜</div></div>
+        <div class="bg-slate-800 rounded-lg p-2"><div class="text-lg font-semibold">{{ videoMaterials.length }}</div><div class="text-[10px] text-slate-500">已出视频</div></div>
+        <div class="bg-slate-800 rounded-lg p-2"><div class="text-lg font-semibold">{{ characterList.length }}</div><div class="text-[10px] text-slate-500">角色</div></div>
+      </div>
+      <button @click="reconcileProject" :disabled="loading" class="mt-2 w-full text-xs px-2 py-2 rounded bg-slate-700 text-slate-300 disabled:opacity-50">修复分镜↔参考图关联</button>
+    </div>
+    <div class="bg-slate-900 rounded-xl border border-slate-800 p-3">
+      <div class="text-sm font-medium mb-2">合成检查表</div>
+      <div class="space-y-1.5 text-[12px]">
+        <div class="flex items-center gap-2"><span :class="finalUrl ? 'text-emerald-400' : 'text-slate-500'">{{ finalUrl ? '✅' : '○' }}</span><span>统一画质 {{ genSizeLabel }}（{{ aspectMode==='landscape' ? '横屏 16:9' : '竖屏 9:16' }}，合成后按实际成片）</span></div>
+        <div class="flex items-center gap-2"><span :class="finalUrl ? 'text-emerald-400' : 'text-slate-500'">{{ finalUrl ? '✅' : '○' }}</span><span>AI 生成标识（合规烧录，{{ finalUrl ? '已烧录' : '合成后烧录' }}）</span></div>
+        <div class="flex items-center gap-2"><span :class="finalUrl ? 'text-emerald-400' : 'text-slate-500'">●</span><span>BGM 背景音乐：{{ finalUrl ? '已套用' : '合成后套用' }}</span></div>
+        <div class="flex items-center gap-2"><span :class="finalUrl ? 'text-emerald-400' : 'text-slate-500'">●</span><span>字幕 + 音画同步：{{ finalUrl ? '已合成' : '合成后生成' }}</span></div>
+        <div class="flex items-center gap-2"><span :class="(spec.shots||[]).length ? 'text-emerald-400' : 'text-slate-500'">●</span><span>转场：{{ mergeTransition }}（{{ (spec.shots||[]).filter(s=>s.transition_in&&s.transition_out).length }}/{{ (spec.shots||[]).length }} 镜已设）</span></div>
+        <div class="flex items-center gap-2"><span :class="videoMaterials.length ? 'text-emerald-400' : 'text-slate-500'">●</span><span>已出视频 {{ videoMaterials.length }} / {{ (spec.shots||[]).length }} 镜</span></div>
+        <div class="flex items-center gap-2"><span :class="((spec.shots||[]).filter(s=>(s.subtitle||'').trim()&&s.asset_video).length) ? 'text-emerald-400' : 'text-slate-500'">●</span><span>音画同步（有台词且已出视频）{{ (spec.shots||[]).filter(s=>(s.subtitle||'').trim()&&s.asset_video).length }} 镜</span></div>
+      </div>
+      <p class="text-[11px] text-slate-500 mt-2">点「合并全部分镜」执行 转场 + BGM + 字幕 + AI 标识 合成；成片生成后右侧「导出 / 分发」可下载或打包工程。</p>
+    </div>
+    <!-- 成片质检（0811 挂 UI：/api/quality 后端一直真实现，前端此前无入口） -->
+    <div class="bg-slate-900 rounded-xl border border-slate-800 p-3">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm font-medium">🔬 成片质检</div>
+        <button @click="runQuality" :disabled="qualityLoading" class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 disabled:opacity-50">{{ qualityLoading ? '质检中…' : '🔄 运行质检' }}</button>
+      </div>
+      <div v-if="qualityLoading" class="text-[11px] text-amber-300 py-1">⏳ 黑场/静音/静帧/编码/内容结构检查（本地 ffmpeg，免额度）…</div>
+      <template v-else-if="qualityReport && qualityReport.ok">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span :class="qualityReport.quality==='pass' ? 'text-emerald-400' : 'text-rose-400'" class="text-xs font-semibold">{{ qualityReport.quality==='pass' ? '✅ 通过' : '⚠️ 未通过' }}</span>
+          <span class="text-[11px] text-slate-400">{{ qualityReport.video }} · {{ (qualityReport.technical||{}).width }}×{{ (qualityReport.technical||{}).height }} · {{ (qualityReport.technical||{}).duration||0 }}s</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+          <div class="bg-slate-800/60 rounded-lg p-1.5"><span class="text-slate-500 block">黑场</span><b :class="(qualityReport.technical||{}).black_count ? 'text-rose-400' : 'text-emerald-400'">{{ (qualityReport.technical||{}).black_count||0 }} 段</b></div>
+          <div class="bg-slate-800/60 rounded-lg p-1.5"><span class="text-slate-500 block">静音</span><b :class="(qualityReport.technical||{}).silence_count ? 'text-rose-400' : 'text-emerald-400'">{{ (qualityReport.technical||{}).silence_count||0 }} 段</b></div>
+          <div class="bg-slate-800/60 rounded-lg p-1.5"><span class="text-slate-500 block">静帧</span><b :class="(qualityReport.technical||{}).freeze_count ? 'text-rose-400' : 'text-emerald-400'">{{ (qualityReport.technical||{}).freeze_count||0 }} 段</b></div>
+          <div class="bg-slate-800/60 rounded-lg p-1.5"><span class="text-slate-500 block">内容结构</span><b class="text-slate-300">{{ (qualityReport.content||{}).total||0 }} 镜 / 台词 {{ (qualityReport.content||{}).sub||0 }}</b></div>
+        </div>
+        <p class="text-[10px] text-slate-500 mt-1.5">成片级技术质检（黑场/静音/静帧阈值分段检测 + 内容结构统计）；单镜质检见 ⑤ 卡片「🧠 AI 诊断」。</p>
+      </template>
+      <div v-else class="text-[11px] text-slate-500 py-1">{{ (qualityReport && qualityReport.error) || '需先「合并全部分镜」生成成片后再质检' }}</div>
+    </div>
+    <div class="bg-slate-900 rounded-xl border border-blue-700/50 p-3">
+      <div class="text-sm font-medium mb-2">导出 / 分发（Gap C）</div>
+      <div class="flex gap-2 flex-wrap">
+        <a :href="finalUrl || '/api/export'" download
+           class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white" :class="{'opacity-60': !finalUrl}">⬇ 导出成片 (final.mp4)</a>
+        <a href="/api/export?zip=1" download
+           class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200">📦 打包工程 (ZIP)</a>
+      </div>
+      <p class="text-[11px] text-slate-500 mt-2">成片未生成时点「导出成片」会自动先合并；打包工程含 storyboard.json + 全部参考图/视频/配音，便于交付与备份。</p>
+    </div>
+    <details class="bg-slate-900 rounded-xl border border-slate-800 p-3">
+      <summary class="text-sm font-medium cursor-pointer text-slate-300 select-none">⚙ 高级工具（密钥池 / 批量）</summary>
+      <div class="mt-2 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-400">密钥池状态</span>
+          <button @click="loadKeyPool" :disabled="loading" class="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300 disabled:opacity-50">刷新</button>
+        </div>
+        <div v-if="keyPool && (keyPool.keys||keyPool.pool)" class="space-y-1">
+          <div v-for="(k,i) in (keyPool.keys||keyPool.pool)" :key="i" class="flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full shrink-0" :class="(k.healthy!==false && k.disabled!==true)?'bg-emerald-500':'bg-rose-500'"></span>
+            <span class="text-slate-300 flex-1 truncate">{{ k.label || k.name || k.tag || ('key #'+(i+1)) }}</span>
+          </div>
+        </div>
+        <button @click="runBatch" :disabled="loading||pipeRunning" class="w-full text-xs px-2 py-2 rounded bg-violet-600 text-white disabled:opacity-50">启动批量流水线（夜间队列）</button>
+      </div>
+    </details>
+  </main>
+
+
+  <!-- 确认门（仅 5 步流水线可见；设置模块为独立工具，不显示） -->
+  <div v-if="activeModule !== 'settings'" class="sticky bottom-0 z-20 bg-slate-900/95 border-t border-slate-700 backdrop-blur"
+    style="padding-bottom:env(safe-area-inset-bottom)">
+    <div v-if="pipeRunning" class="px-3 pt-2">
+      <div class="flex items-center gap-2 text-[11px] text-slate-300 mb-1">
+        <span class="truncate flex-1">⏳ {{ pipeStage || '处理中' }}</span>
+        <span class="shrink-0 tabular-nums">{{ pipePct }}%</span>
+      </div>
+      <div class="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+        <div class="h-full bg-blue-500 transition-all duration-500" :style="{width: pipePct+'%'}"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 px-3 py-2">
+      <div class="text-xs text-slate-400 flex-1 min-w-0 truncate">当前阶段：<span class="text-slate-200">{{ modules[stepIndex].label }}</span></div>
+      <button @click="advanceStep" :disabled="!canAdvance" :title="gateMsg" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-40 shrink-0">确认并进入下一步 →</button>
+      <span v-if="!canAdvance && gateMsg" class="text-[11px] text-amber-300 shrink-0 max-w-[40%] truncate">{{ gateMsg }}</span>
+      <button @click="runAll" :disabled="loading" class="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm disabled:opacity-50 shrink-0">🚀 一键全自动</button>
+    </div>
+  </div>
+
+  <!-- 流水线日志（默认收起，点状态展开） -->
+  <div class="fixed bottom-3 right-3 z-40 max-w-xs">
+    <button @click="showLog=!showLog"
+      :class="['text-[10px] px-2 py-1 rounded-lg backdrop-blur border', showLog ? 'bg-slate-900/95 border-slate-600 text-slate-200' : 'bg-slate-900/80 border-slate-700 text-slate-500 hover:text-slate-300']">
+      {{ showLog ? '▲ 收起日志' : (log.length ? '📋 '+log.length+' 条消息' : '📋 无消息') }}
+    </button>
+    <div v-if="showLog" class="mt-1 w-72 max-h-40 bg-slate-900/95 border border-slate-700 rounded-xl p-2 text-[10px] overflow-y-auto backdrop-blur">
+      <div v-for="(l,i) in log.slice(0,15)" :key="i" class="text-slate-400 whitespace-nowrap">{{ l }}</div>
+      <div v-if="log.length>15" class="text-slate-600">…共 {{ log.length }} 条</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== 日志上报：前端错误/关键事件落盘到服务端日志（老板说「出问题了」→ 阿编顺日志回溯）=====
+(function () {
+  function sendLog(level, msg, url) {
+    try {
+      fetch('/api/log', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: level, msg: String(msg).slice(0, 2000), url: (url || location.href).slice(0, 300), ts: Date.now() }),
+      }).catch(function () {});
+    } catch (e) { /* 静默：日志上报失败绝不影响业务 */ }
+  }
+  window.__sendLog = sendLog;
+  // JS 运行时错误（含 Vue 渲染错误 → 白屏根因），捕获阶段拦截资源加载失败
+  window.addEventListener('error', function (e) {
+    var t = e.target || {};
+    if (t && t.tagName && t.src) {
+      // 资源 404（img/video/script…）单独归类：素材缺失、路径错
+      sendLog('warn', '资源加载失败: ' + t.tagName.toLowerCase() + ' ' + String(t.src).slice(0, 300), location.href);
+      return;
+    }
+    sendLog('error', 'JS错误: ' + (e.message || 'unknown') + ' @' + (e.filename || '') + ':' + (e.lineno || ''), location.href);
+  }, true);
+  // Promise 未捕获 rejection（异步生成失败常见来源）
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason || {};
+    var m = (r && r.message) ? r.message : String(r);
+    sendLog('warn', 'unhandledrejection: ' + String(m).slice(0, 500), location.href);
+  });
+})();
+const { createApp } = Vue;
+createApp({
+  data() {
+    return {
+      projects: [], projectId: '', spec: { shots: [] }, real: false,
+      // P3 · 人脸一致性质检面板状态
+      faceReport: null, faceLoading: false, faceOpen: true,
+      qualityReport: null, qualityLoading: false, diagBusy: {}, // 成片质检 / 单镜 AI 诊断（0811 挂 UI）
+      loading: false, log: [], showLog: false, errMsg: '',
+      pipeRunning: false, pipeStage: '', pipePct: 0,
+      // O2：长任务进度可见性——任何单个生成任务进行时显示「正在做什么+已耗时」，完成后给成功提示
+      busyLabel: '', busyElapsed: 0, _busyTimer: null,
+      modules: [
+        { id: 'story', label: '创意·需求卡', step: 1 },
+        { id: 'outline', label: '剧本大纲', step: 2 },
+        { id: 'image', label: '资产设计', step: 3 },
+        { id: 'video', label: '分镜校准·关键帧', step: 4 },
+        { id: 'shots', label: '分镜视频', step: 5 },
+        { id: 'advanced', label: '合并成片', step: 6 },
+      ],
+      activeModule: 'story',
+      confirmedSteps: [true, false, false, false, false, false], // 闸门链：step 0 始终可进
+      steps: ['① 创意·需求卡', '② 剧本大纲', '③ 资产设计', '④ 分镜校准·关键帧', '⑤ 分镜视频', '⑥ 合并成片'],
+      activeEpisode: 1, // 多集：当前在编第几集
+      agentPrompt: '', agentPlan: null, agentLoading: false, agentTaskId: null, agentElapsed: 0, gateMsg: '',
+      agentHistory: [], agentChangelog: [], keyPool: null, finalUrlSrv: '',
+      resolutionMode: 'test', // 生成分辨率：test=480p 快速迭代 / prod=720p 正式出片（存 meta.resolution_mode）
+      aspectMode: 'portrait', // 画幅：portrait 竖屏 9:16（短剧标准）/ landscape 横屏 16:9（存 meta.aspect_mode）
+      matFilter: 'all', broken: {}, dirty: false, kfBusy: {}, vidBusy: {}, // kfBusy/vidBusy: ④关键帧/⑤视频 每镜生成中状态 { shotId: true }
+      // 官方光线/风格词库（agnes 知识库 prompt_engine）：⑤ 每镜可选，空=自动/全局
+      lightingOptions: ['黄金时刻', '逆光', '霓虹夜', '柔光', '阴雨', '戏剧光', '月夜', '顶光'],
+      styleOptions: ['写实电影', '动漫', '国风', '赛博', '温馨', '暗黑'],
+      // 【T3 官方 14 运镜预设】点击填入 sh.camera（与 cameraEn 翻译表同源）
+      cameraPresetsList: ['推', '拉', '跟', '横移', '摇', '升降', '手持', '荷兰角', '环绕', '变焦', '过肩', '主观', '甩镜', '固定'],
+      agentOpen: false, novelInput: '', mergeTransition: 'dissolve',
+      sourceMode: 'novel', themeInput: '', themeGenLoading: false, // ① 双入口：我贴小说 / 一句话主题
+      // 设置·提示词库：提示词模板（按类型，中文）+ 可配置优化元提示
+      promptLib: null, promptLabels: {}, optimizeMeta: '', optimizingType: null, optimizingKey: '',
+      settingsMsg: '',
+      // 设置·提示词库：测试优化用临时字段
+      optimizeTestText: '', optimizeTestType: 'video', optimizeTestResult: '',
+      testState: {}, // 测试沙盒：{ typeKey: { open, input, result, loading } }
+      queueJobs: null, queuePaused: false, // O3 批量任务队列
+      archivedProjects: [], // 归档项目（设置·归档区管理）
+      // ① 需求卡片（Gap A：全局参数首次校准闸门）
+      reqCard: { title: '', genre: '', duration: 60, aspect: '9:16', era_region: '', style: '', shot_count: 6, characters: [] },
+      reqCardReady: false,
+      // ② 资产设计三 tab
+      assetTab: 'role',
+      assetDetailOpen: {}, // 资产详情展开状态 { 'r:key'|'s:key'|'p:key': true }
+      assetBusy: {},      // 资产操作状态 { key: 'prompt'|'image'|'' }
+      transitionOptions: ['none', 'fade', 'dissolve', 'wipe', 'slide'],
+      transitionLabels: { none: '无', fade: '淡入淡出', dissolve: '溶解', wipe: '擦除', slide: '滑动' },
+      cameraPresets: ['推近特写', '拉远全景', '环绕', '手持跟拍', '固定中景', '俯拍', '仰拍'],
+      matFilters: [
+        { id: 'all', label: '全部' },
+        { id: 'role', label: '角色' },
+        { id: 'scene', label: '场景' },
+        { id: 'prop', label: '道具' },
+        { id: 'video', label: '视频' },
+        { id: 'frame', label: '关键帧' },
+      ],
+      // ② 剧本大纲：视觉风格 + 大纲数据
+      visualStyle: { locked: false, cn_text: '', en_keywords: [], confirmed: false },
+      styleGenLoading: false,
+      outlineLoading: false,
+      outlineData: null,
+    };
+  },
+  computed: {
+    currentShot() { return this.spec.shots.find(s => s.id === this.selectedShot) || null; },
+    stepIndex() { return Math.max(0, this.modules.findIndex(m => m.id === this.activeModule)); },
+    canAdvance() {
+      if (this.stepIndex >= this.modules.length - 1) return false;
+      // Gap E：从 ④ 分镜视频 进入 ⑤ 前，校验全部镜已生成（status=done）且用户「标记满意」
+      if (this.activeModule === 'shots') {
+        const shots = this.spec.shots || [];
+        if (!shots.length) return false;
+        const allDone = shots.every(s => s.status === 'done');
+        const allSat = shots.every(s => s.satisfied);
+        this.gateMsg = allDone ? (allSat ? '' : '还有镜未标记满意')
+                                 : '还有镜未生成完成';
+        return allDone && allSat;
+      }
+      return true;
+    },
+    materialList() {
+      // 素材去重 + 分类。旧版按镜逐条 push，8 镜共用 4 张角色图 → 库里重复 8 次；
+      // 且视频塞进 <img> 永远白块。现在角色图按 URL 去重，视频用首帧图当缩略。
+      const list = [], seen = new Set();
+      const shots = this.spec.shots || [];
+      const push = (o) => { if (!o.key || seen.has(o.key)) return; seen.add(o.key); list.push(o); };
+      shots.forEach(sh => {
+        if (sh.asset_image) {
+          const u = this.assetUrl(sh.asset_image);
+          push({ key: 'r:' + u, kind: 'role', url: u, thumb: u, ref: sh.ref,
+                 label: sh.ref || ('镜#' + sh.id), tip: '角色参考图 · ' + (sh.ref || '') });
+        }
+      });
+      shots.forEach(sh => {
+        if (sh.asset_video) {
+          const u = this.assetUrl(sh.asset_video);
+          push({ key: 'v:' + u, kind: 'video', url: u,
+                 thumb: this.assetUrl(sh.asset_frame_start || sh.asset_image), ref: sh.ref,
+                 label: '镜#' + sh.id, tip: '分镜视频 · ' + (sh.duration || 0) + 's' });
+        }
+      });
+      shots.forEach(sh => {
+        if (sh.asset_frame_start) {
+          const u = this.assetUrl(sh.asset_frame_start);
+          push({ key: 'f:' + u, kind: 'frame', url: u, thumb: u, ref: sh.ref,
+                 label: '镜#' + sh.id + ' 首帧', tip: '关键帧' });
+        }
+      });
+      // ③/④ 素材库也要能显示场景图、道具图（首尾针/引用图来源），否则过滤按钮点了空白
+      (this.spec.scenes || []).forEach(s => {
+        if (s.asset_image) {
+          const u = this.assetUrl(s.asset_image);
+          push({ key: 's:' + u, kind: 'scene', url: u, thumb: u, ref: s.key || s.name,
+                 label: s.name || s.key || '场景', tip: '场景图 · ' + (s.name || s.key || '') });
+        }
+      });
+      (this.spec.props || []).forEach(p => {
+        if (p.asset_image) {
+          const u = this.assetUrl(p.asset_image);
+          push({ key: 'p:' + u, kind: 'prop', url: u, thumb: u, ref: p.key || p.name,
+                 label: p.name || p.key || '道具', tip: '道具图 · ' + (p.name || p.key || '') });
+        }
+      });
+      return list;
+    },
+    // 【0810 夜修】引用素材下拉专用选项：只列参考图类（角色/场景/道具）。
+    // 不能用 materialList——它含 video/frame 项（label 形如「镜#1」「镜#1 首帧」且 value 跟随
+    // sh.ref），与场景/道具 value 重复时 select 会显示第一个匹配项 → 显示成「镜#1」而不是素材名。
+    refOptions() {
+      const list = [], seen = new Set();
+      const push = (o) => { if (!o.ref || seen.has(o.ref)) return; seen.add(o.ref); list.push(o); };
+      Object.keys(this.spec.references || {}).forEach(k => {
+        const r = this.spec.references[k] || {};
+        push({ ref: k, kind: 'role', label: '角色 · ' + (r.cn_name || r.cn || k) });
+      });
+      (this.spec.scenes || []).forEach(s => {
+        push({ ref: s.key || s.name, kind: 'scene', label: '场景 · ' + (s.name || s.key || '') });
+      });
+      (this.spec.props || []).forEach(p => {
+        push({ ref: p.key || p.name, kind: 'prop', label: '道具 · ' + (p.name || p.key || '') });
+      });
+      return list;
+    },
+    filteredMaterials() {
+      return this.matFilter === 'all' ? this.materialList
+        : this.materialList.filter(a => a.kind === this.matFilter);
+    },
+    videoMaterials() { return this.materialList.filter(a => a.kind === 'video'); },
+    // 【0811】合成检查表：按生成档位显示目标分辨率（与后端 _video_size 一致），消除写死 1080×1920 的假状态
+    genSizeLabel() {
+      const p = this.resolutionMode === 'prod';
+      const l = this.aspectMode === 'landscape';
+      if (p) return l ? '1280 × 720' : '720 × 1280';
+      return l ? '854 × 480' : '480 × 854';
+    },
+    characterList() {
+      const refs = this.spec.references || {};
+      const shots = this.spec.shots || [];
+      return Object.keys(refs).map(key => {
+        const ref = refs[key] || {};
+        const sh = shots.find(s => s.ref === key);
+        const img = (sh && sh.asset_image) || ref.remote_url || '';
+        return { key, cn: ref.cn || key, img, img_prompt: ref.img_prompt || '' };
+      });
+    },
+    // ② 场景 / 道具（Gap B）：从 spec.scenes / spec.props 读取，结构同 references
+    sceneList() {
+      return (this.spec.scenes || []).map(s => ({
+        key: s.key || s.name, name: s.name || s.key || '场景',
+        cn: s.name || s.key || '场景', img: s.asset_image || '',
+        img_prompt: s.img_prompt || '', desc: s.desc || '',
+      }));
+    },
+    propList() {
+      return (this.spec.props || []).map(p => ({
+        key: p.key || p.name, name: p.name || p.key || '道具',
+        cn: p.name || p.key || '道具', img: p.asset_image || '',
+        img_prompt: p.img_prompt || '', desc: p.desc || '',
+      }));
+    },
+    finalUrl() {
+      // 权威来源：后端 GET /api/spec 顶层 final_url（后端已 os.path.isfile 判存在）。
+      // 后端说没有就是没有（返回空，成片区块整体不渲染），绝不靠前端猜路径 + video @error 误判。
+      return this.finalUrlSrv || '';
+    },
+  },
+  watch: {
+    // O2：loading 置 true 即开始计时；结束后停表并清除标签（成功 toast 由各方法另行 notify）
+    loading(v) {
+      if (v) {
+        this.busyElapsed = 0;
+        clearInterval(this._busyTimer);
+        this._busyTimer = setInterval(() => { this.busyElapsed++; }, 1000);
+      } else {
+        clearInterval(this._busyTimer);
+        this._busyTimer = null;
+        this.busyLabel = '';
+      }
+    },
+  },
+  methods: {
+    // 设置·提示词库分组工具（带参数 → 必须是 methods，不能放 computed：computed getter 不能传参，否则求值成数组报 is not a function）
+    groupTypeKeys(g) {
+      if (!this.promptLib || !this.promptLib.types) return [];
+      return Object.keys(this.promptLib.types).filter(k => {
+        const v = this.promptLib.types[k];
+        const grp = (v && typeof v === 'object' && v.group) ? v.group : '';
+        return grp === g;
+      });
+    },
+    groupTypeEntries(g) {
+      if (!this.promptLib || !this.promptLib.types) return {};
+      const out = {};
+      for (const [k, v] of Object.entries(this.promptLib.types)) {
+        const grp = (v && typeof v === 'object' && v.group) ? v.group : '';
+        if (grp === g) out[k] = v;
+      }
+      return out;
+    },
+    // 所有 spec 落盘必须走这里，禁止任何地方直接 PUT /api/spec。
+    // 曾经有过惨案：切项目竞态下 this.spec 还是空壳（0 镜），一次 PUT 就把整集分镜抹了。
+    // 前端这道闸 + 后端 409 闸，双保险。
+    async putSpec() {
+      const shots = (this.spec && this.spec.shots) || [];
+      if (!shots.length) {
+        this.notify('⚠️ 分镜为空，已阻止保存（避免覆盖服务器上的分镜数据）');
+        return { ok: false, refused: true, error: 'empty spec refused by client' };
+      }
+      // 【老板 0810 校验】描述含人物但 ref 空 → 警告（防镜#4「林夏放咖啡」但 ref=None 的 bug 重演）
+      const _charKw = /(?:林夏|苏晴|苏念|她|他|主角|男女|女士|先生|女人|男人|女孩|男孩|女生|男生|人物|角色)/;
+      for (const s of shots) {
+        if (s.ref) continue;
+        if (_charKw.test(s.cn_story || '')) {
+          this.pushLog('⚠️ 镜#' + s.id + ' 描述含人物但 ref 为空（视频生成会无人物锚点，请补 ref 或确认是空镜）');
+        }
+      }
+      return await this.api('/api/spec', this.spec, 'PUT');
+    },
+    async api(path, body, method) {
+      // 5 分钟硬超时：网络悬挂/后端异常时绝不无限等待（批量生成卡死修复，老板 0810）
+      const _ctrl = new AbortController();
+      const _timer = setTimeout(() => _ctrl.abort(), 300000);
+      try {
+        const r = await fetch(path, {
+          method: method || (body ? 'POST' : 'GET'),
+          headers: { 'Content-Type': 'application/json' },
+          body: body ? JSON.stringify(body) : undefined,
+          signal: _ctrl.signal,
+        });
+        if (!r.ok) {
+          const t = await r.text();
+          throw new Error('HTTP ' + r.status + ' ' + (t || '').slice(0, 140));
+        }
+        const j = await r.json();
+        if (j && j.ok === false) this.notify('⚠️ ' + (j.error || '操作失败'));
+        return j;
+      } catch (e) {
+        this.notify('⚠️ 接口错误: ' + e.message);
+        return { ok: false, error: e.message };
+      } finally {
+        clearTimeout(_timer);
+      }
+    },
+    notify(msg) {
+      this.errMsg = msg;
+      clearTimeout(this._errTimer);
+      this._errTimer = setTimeout(() => { this.errMsg = ''; }, 5000);
+    },
+    async loadProjects() {
+      const d = await this.api('/api/projects');
+      this.projects = d.projects || [];
+      // 归档项目不进顶栏主列表，单独存 archivedProjects（在设置·归档区管理）
+      this.archivedProjects = this.projects.filter(p => (p.status || 'active') === 'archived');
+      this.projects = this.projects.filter(p => (p.status || 'active') !== 'archived');
+      if (this.projects.length) {
+        // 加载项目优先级（服务端 ACTIVE 是单一事实来源，跨浏览器/IP 一致）：
+        // ① 服务端激活项目（d.active，用户最近操作/切换的项目）
+        // ② 本机记住的项目（lastProjectId，仅本浏览器辅助）
+        // ③ 注册表第一个
+        const serverActive = d.active;
+        const last = localStorage.getItem('lastProjectId');
+        if (serverActive && this.projects.some(p => p.id === serverActive)) {
+          this.projectId = serverActive;
+        } else if (last && this.projects.some(p => p.id === last)) {
+          this.projectId = last;
+        } else {
+          this.projectId = this.projectId || this.projects[0].id;
+        }
+        this.loadSpec();
+      }
+    },
+    rememberProject() {
+      // 切换项目时记住（selectProject 调用）
+      try { localStorage.setItem('lastProjectId', this.projectId); } catch (e) { /* non-fatal */ }
+    },
+    async loadSpec() {
+      if (!this.projectId) return;
+      const d = await this.api('/api/spec?project=' + encodeURIComponent(this.projectId));
+      if (d && d.spec) {
+        this.spec = d.spec;
+        if (!this.spec.shots) this.spec.shots = [];
+        if (!this.spec.scenes) this.spec.scenes = [];
+        if (!this.spec.props) this.spec.props = [];
+        this.real = !!d.real;
+        this.finalUrlSrv = d.final_url || '';
+        if (d.project) this.projectId = d.project;
+        // 回填 meta 字段（无条件按新项目数据覆盖，缺失则重置为默认——否则切项目残留旧值）
+        if (d.meta) {
+          this.visualStyle = Object.assign(
+            { locked: false, cn_text: '', en_keywords: [], confirmed: false },
+            d.meta.visual_style || {});
+          if (!Array.isArray(this.visualStyle.en_keywords)) this.visualStyle.en_keywords = [];
+          this.outlineData = d.meta.outline || null;
+          if (d.meta.active_episode) this.activeEpisode = d.meta.active_episode; else this.activeEpisode = 1;
+          if (d.meta.source_text) this.novelInput = d.meta.source_text;
+          else if (d.meta.novel) this.novelInput = d.meta.novel;
+          else this.novelInput = '';
+          if (d.meta.req_card && d.meta.req_card.title) {
+            // 合并默认值：meta 里的 req_card 可能缺 characters 等字段（历史脏数据），
+            // 直接整体替换会让模板 reqCard.characters.length 崩溃 → 白屏。必须补默认。
+            this.reqCard = Object.assign({
+              title: '', genre: '', duration: 60, aspect: '9:16', era_region: '',
+              style: '', shot_count: 6, characters: [],
+            }, d.meta.req_card);
+            if (!Array.isArray(this.reqCard.characters)) this.reqCard.characters = [];
+            this.reqCardReady = true;
+          } else {
+            this.reqCard = { title: '', genre: '', duration: 60, aspect: '9:16', era_region: '', style: '', shot_count: 6, characters: [] };
+            this.reqCardReady = false;
+          }
+          // 工作台状态恢复：刷新/重新载入后回到之前的模块，已解锁的步骤保持可切换
+          const ws = d.meta.workspace_state || {};
+          // 生成分辨率/画幅开关：项目级设置，存 meta（跨设备生效，重启不丢）
+          if (d.meta.resolution_mode === 'prod' || d.meta.resolution_mode === 'test') {
+            this.resolutionMode = d.meta.resolution_mode;
+          }
+          if (d.meta.aspect_mode === 'portrait' || d.meta.aspect_mode === 'landscape') {
+            this.aspectMode = d.meta.aspect_mode;
+          }
+          if (ws.active_module && this.modules.some(mo => mo.id === ws.active_module)) {
+            this.activeModule = ws.active_module;
+          }
+          if (Array.isArray(ws.confirmed_steps) && ws.confirmed_steps.length === this.modules.length) {
+            this.confirmedSteps = ws.confirmed_steps;
+          }
+          // 模块内操控状态一并还原（入口/资产tab/素材筛选/转场/选中镜），无效值回退默认
+          if (ws.source_mode === 'novel' || ws.source_mode === 'theme') this.sourceMode = ws.source_mode;
+          if (ws.asset_tab === 'role' || ws.asset_tab === 'scene' || ws.asset_tab === 'prop') this.assetTab = ws.asset_tab;
+          if (ws.asset_detail_open && typeof ws.asset_detail_open === 'object' && !Array.isArray(ws.asset_detail_open)) {
+            this.assetDetailOpen = Object.assign({}, ws.asset_detail_open);
+          }
+          if (ws.mat_filter) this.matFilter = ws.mat_filter;
+          if (ws.selected_shot && this.spec.shots.some(s => s.id === ws.selected_shot)) this.selectedShot = ws.selected_shot;
+          if (ws.merge_transition) this.mergeTransition = ws.merge_transition;
+          this.loadUiLocal();  // 输入草稿 + 面板开合（localStorage）一并还原
+          this._wsLoaded = true;  // 首次载入完成，之后模块切换才触发保存
+        }
+        if (this.spec.shots.length && this.selectedShot == null) this.selectedShot = this.spec.shots[0].id;
+        this.$nextTick(() => { this.dirty = false; });
+      } else {
+        // 不再静默失败：契约不符/后端报错都要看得见
+        this.notify('分镜载入失败: ' + ((d && d.error) || '接口未返回 spec'));
+      }
+    },
+    async selectProject() {
+      // 切换项目必须重置所有「项目相关」状态，否则残留上一项目的数据（小说/需求卡/大纲/风格/集数/选中镜）
+      this.selectedShot = null;
+      this.novelInput = '';
+      this.reqCard = { title: '', genre: '', duration: 60, aspect: '9:16', era_region: '', style: '', shot_count: 6, characters: [] };
+      this.reqCardReady = false;
+      this.visualStyle = { locked: false, cn_text: '', en_keywords: [], confirmed: false };
+      this.outlineData = null;
+      this.activeEpisode = 1;
+      this.agentPlan = null; this.agentHistory = []; this.agentChangelog = [];
+      this.keyPool = null;
+      this.rememberProject();  // 记住当前项目（刷新后恢复）
+      await this.loadSpec();
+    },
+    async refreshSpec() {
+      const d = await this.api('/api/spec?project=' + encodeURIComponent(this.projectId));
+      if (d && d.spec) {
+        this.spec = d.spec;
+        if (!this.spec.shots) this.spec.shots = [];
+        if (!this.spec.scenes) this.spec.scenes = [];
+        if (!this.spec.props) this.spec.props = [];
+        this.real = !!d.real;
+        this.finalUrlSrv = d.final_url || '';
+        if (d.meta) {
+          if (d.meta.visual_style) {
+            this.visualStyle = Object.assign(
+              { locked: false, cn_text: '', en_keywords: [], confirmed: false },
+              d.meta.visual_style);
+            if (!Array.isArray(this.visualStyle.en_keywords)) this.visualStyle.en_keywords = [];
+          }
+          this.outlineData = d.meta.outline || null;
+        }
+        this.$nextTick(() => { this.dirty = false; });
+      }
+    },
+    // P3 · 人脸一致性质检
+    faceColor(s) {
+      if (s == null) return 'text-slate-500';
+      if (s >= 0.40) return 'text-emerald-400';
+      if (s >= 0.30) return 'text-amber-400';
+      return 'text-rose-400';
+    },
+    async runFaceQC() {
+      this.faceLoading = true;
+      try {
+        const d = await this.api('/api/faceqc', { project: this.projectId });
+        this.faceReport = d;
+        // 后端已把 face_identity/face_ok 写回 storyboard.json，刷新 spec 让单镜/卡片同步
+        await this.refreshSpec();
+      } catch (e) {
+        this.faceReport = { ok: false, error: String(e) };
+      } finally {
+        this.faceLoading = false;
+      }
+    },
+    async runFaceFix() {
+      if (!this.faceReport || !this.faceReport.ok) return;
+      this.faceLoading = true;
+      try {
+        const d = await this.api('/api/facefix', { project: this.projectId });
+        if (d && d.report_after) {
+          this.faceReport = d.report_after;
+          this.notify(d.msg || ('已纠偏 ' + ((d.fixed || []).length) + ' 镜'));
+        } else if (d && d.dry_run) {
+          this.notify('SIM 模式未重渲；切 REAL=1 后生效');
+        } else {
+          if (d && d.report) this.faceReport = d.report;
+          this.notify(d && d.msg ? d.msg : '纠偏完成');
+        }
+        await this.refreshSpec();
+      } catch (e) {
+        this.notify('纠偏失败: ' + e.message);
+      } finally {
+        this.faceLoading = false;
+      }
+    },
+    // 【0811 挂 UI】成片质检（/api/quality → quality_check.run_quality，本地 ffmpeg 免额度）
+    async runQuality() {
+      this.qualityLoading = true;
+      try {
+        const d = await this.api('/api/quality', {});
+        // 后端返回 {ok, video, report:{technical,content,quality}}——取 report 层
+        this.qualityReport = (d && d.report) ? d.report : d;
+        if (d && d.ok && d.report) {
+          this.pushLog('成片质检：' + (d.report.quality === 'pass' ? '通过 ✅' : '未通过 ⚠️'));
+        } else {
+          this.notify('质检失败: ' + ((d && (d.note || d.error)) || '未知错误'));
+        }
+      } catch (e) {
+        this.qualityReport = { ok: false, error: String(e) };
+      } finally {
+        this.qualityLoading = false;
+      }
+    },
+    // 【0811 挂 UI】单镜 AI 诊断（/api/diagnose → AGNES 4 维语义评分，写回 shot.diagnosis）
+    async runDiagnose(sh) {
+      if (!sh) return;
+      this.diagBusy[sh.id] = true;
+      try {
+        const d = await this.api('/api/diagnose', { id: sh.id });
+        if (d && d.ok) {
+          sh.diagnosis = d;
+          this.pushLog('镜#' + sh.id + ' AI 诊断：' + (d.verdict === 'pass' ? '通过 ✅' : (d.verdict === 'fail' ? '未通过 ⚠️' : d.verdict || '完成')));
+          await this.refreshSpec();  // 落盘诊断结果
+        } else {
+          this.notify('镜#' + sh.id + ' 诊断失败: ' + ((d && d.error) || '未知错误'));
+        }
+      } catch (e) {
+        this.notify('镜#' + sh.id + ' 诊断异常: ' + e.message);
+      } finally {
+        this.diagBusy[sh.id] = false;
+      }
+    },
+    async genShot(id, rerender) {
+      // 单镜视频生成：「提交+轮询」（视频 5-10 分钟，同步请求经 CF 必 524）
+      const sh = this.spec.shots.find(s => s.id === id);
+      if (!sh) { this.notify('找不到镜#' + id); return; }
+      this.loading = true;
+      this.vidBusy[id] = true;
+      const extra = {};
+      if (rerender) {
+        // 只回传引擎真正会读的字段（契约字段），不再传 line/action 这类幽灵字段
+        extra.shot = {
+          id: sh.id, subtitle: sh.subtitle, video_prompt: sh.video_prompt,
+          emotion: sh.emotion, camera: sh.camera, duration: sh.duration, ref: sh.ref,
+        };
+        this.dirty = false;
+      }
+      const r = await this._vidRunShot(sh, !!rerender, extra);
+      this.vidBusy[id] = false;
+      this.loading = false;
+      if (r.ok && !r.skipped) {
+        this.pushLog('生成镜#' + id + (rerender ? '（重渲）' : '') + ' ✅');
+        this.notify('✅ 镜#' + id + (rerender ? ' 重渲' : ' 生成') + '完成');
+        // 重渲后需重新「标记满意」（状态变了，旧满意标记失效）
+        const sh2 = this.spec.shots.find(s => s.id === id);
+        if (sh2) sh2.satisfied = false;
+      } else if (r.ok && r.skipped) {
+        this.notify('镜#' + id + ' 视频已存在，跳过');
+      } else {
+        this.notify('镜#' + id + ' 生成失败: ' + r.error);
+        this.pushLog('镜#' + id + ' 生成失败: ' + r.error);
+      }
+      await this.refreshSpec();
+    },
+    advanceStep() {
+      // 确认并进入下一步：解锁当前步 + 切到下一步，同时持久化工作台状态（刷新不丢进度）
+      const i = this.stepIndex;
+      if (i < this.modules.length - 1) {
+        this.confirmedSteps[i] = true;
+        this.activeModule = this.modules[i + 1].id;
+        this.saveWorkstate();
+      }
+    },
+    tryNav(modId, idx) { if (this.confirmedSteps[idx] || this.activeModule === modId) { this.activeModule = modId; this.saveWorkstate(); } },
+    saveWorkstate() {
+      // 工作台 UI 状态持久化到 meta：当前模块 + 闸门解锁链 + 各模块内操控状态（入口/tab/筛选/选中镜/转场）。
+      // 刷新/重新载入项目后整体还原，不重新开始。输入草稿另走 localStorage（saveUiLocal）。
+      // _wsLoaded 守卫：loadSpec 恢复阶段赋值不触发写回，仅用户操作后保存
+      if (!this.projectId || !this._wsLoaded) return;
+      // 统一防抖 400ms：高频 UI 操作（点分镜/切tab/展开详情/切换筛选）合并为一次写入
+      clearTimeout(this._wsTimer);
+      this._wsTimer = setTimeout(() => {
+        try {
+          this.api('/api/meta', {
+            workspace_state: {
+              active_module: this.activeModule,
+              confirmed_steps: this.confirmedSteps,
+              source_mode: this.sourceMode,
+              asset_tab: this.assetTab,
+              asset_detail_open: this.assetDetailOpen,
+              mat_filter: this.matFilter,
+              selected_shot: this.selectedShot,
+              merge_transition: this.mergeTransition,
+            },
+          }, 'PUT').catch(()=>{});
+        } catch (e) { /* non-fatal */ }
+      }, 400);
+    },
+    saveUiLocal() {
+      // 输入草稿 + 面板开合 + 需求卡/大纲/视觉风格 → 本机 localStorage（按项目分 key）：
+      // 刷新不丢草稿；即使服务端 meta 意外丢失，本地仍可恢复（双保险）
+      if (!this.projectId) return;
+      const k = 'studio:ui:' + this.projectId;
+      try {
+        localStorage.setItem(k, JSON.stringify({
+          novelInput: this.novelInput,
+          themeInput: this.themeInput,
+          agentOpen: this.agentOpen,
+          showLog: this.showLog,
+          faceOpen: this.faceOpen,
+          reqCard: this.reqCard,
+          outlineData: this.outlineData,
+          visualStyle: this.visualStyle,
+        }));
+      } catch (e) { /* 存储满/隐私模式等场景忽略 */ }
+    },
+    loadUiLocal() {
+      if (!this.projectId) return;
+      const k = 'studio:ui:' + this.projectId;
+      try {
+        const s = localStorage.getItem(k);
+        if (!s) return;
+        const v = JSON.parse(s);
+        if (typeof v.novelInput === 'string') this.novelInput = v.novelInput;
+        if (typeof v.themeInput === 'string') this.themeInput = v.themeInput;
+        if (typeof v.agentOpen === 'boolean') this.agentOpen = v.agentOpen;
+        if (typeof v.showLog === 'boolean') this.showLog = v.showLog;
+        if (typeof v.faceOpen === 'boolean') this.faceOpen = v.faceOpen;
+        // 需求卡/大纲/视觉风格：服务端 meta 缺失或丢失时，从本地草稿兜底恢复（合并默认值防脏数据崩溃）
+        if (v.reqCard && typeof v.reqCard === 'object') {
+          this.reqCard = Object.assign({
+            title: '', genre: '', duration: 60, aspect: '9:16', era_region: '',
+            style: '', shot_count: 6, characters: [],
+          }, v.reqCard);
+          if (!Array.isArray(this.reqCard.characters)) this.reqCard.characters = [];
+          this.reqCardReady = true;
+        }
+        if (v.outlineData && typeof v.outlineData === 'object') this.outlineData = v.outlineData;
+        if (v.visualStyle && typeof v.visualStyle === 'object') {
+          this.visualStyle = Object.assign(
+            { locked: false, cn_text: '', en_keywords: [], confirmed: false }, v.visualStyle);
+          if (!Array.isArray(this.visualStyle.en_keywords)) this.visualStyle.en_keywords = [];
+        }
+      } catch (e) { /* 脏数据忽略 */ }
+    },
+    _saveUiLocalSoon() {
+      clearTimeout(this._uiTimer);
+      this._uiTimer = setTimeout(() => this.saveUiLocal(), 300);
+    },
+    async runAll() {
+      this.loading = true;
+      this.pipeRunning = true;
+      this.pipeStage = '启动中';
+      this.pipePct = 0;
+      const d = await this.api('/api/pipeline/run', {});
+      if (!d || !d.ok) {
+        // 后端「已有流程在跑」返回的是 note 而非 error，只读 error 会弹出空白提示
+        this.notify('启动失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+        this.pipeRunning = false;
+        this.loading = false;
+        return;
+      }
+      this.pushLog('已启动一键全流程');
+      this._pollPipe();
+    },
+    async _pollPipe() {
+      const tick = async () => {
+        const d = await this.api('/api/pipeline/progress');
+        const s = d || {};
+        if (s) {
+          this.pipeStage = s.stage || '';
+          this.pipePct = s.stages_total ? Math.round(((s.stage_idx || 0) / s.stages_total) * 100) : 0;
+          if (s.error) this.notify('流程异常: ' + s.error);
+          if (!s.running) {
+            this.pipeRunning = false;
+            this.loading = false;
+            this.pushLog(s.error ? ('流程失败: ' + s.error) : '流程完成 ✅');
+            await this.refreshSpec();
+            return;
+          }
+        }
+        setTimeout(tick, 2000);
+      };
+      tick();
+    },
+    async sendAgent() {
+      const msg = this.agentPrompt.trim();
+      if (!msg) return;
+      this.agentLoading = true; this.agentElapsed = 0;
+      // 异步任务：提交后立即返回 task_id，前端轮询进度（不再同步傻等 LLM）
+      const d = await this.api('/api/agent', {
+        prompt: msg,
+        prev_plan: this.agentPlan || null,
+        history: this.agentHistory.slice(-6),
+      });
+      if (d && d.ok && d.task_id) {
+        await this._pollAgent(d.task_id, msg);
+      } else {
+        this.agentLoading = false;
+        const why = (d && (d.error || d.note)) || '未知错误';
+        this.notify('Agent 启动失败: ' + why);
+        this.pushLog('Agent 启动失败: ' + why);
+      }
+    },
+    async _pollAgent(tid, msg) {
+      // 轮询需求卡异步任务，实时显示「已 Ns」进度；成功采纳、失败明确报错。
+      const started = Date.now();
+      this._agentTimer = setInterval(() => {
+        this.agentElapsed = Math.round((Date.now() - started) / 1000);
+      }, 1000);
+      try {
+        while (this.agentLoading) {
+          await new Promise(r => setTimeout(r, 2500));
+          const s = await this.api('/api/agent?task_id=' + encodeURIComponent(tid));
+          if (!s || !s.ok) {
+            this.notify('查询需求卡进度失败: ' + ((s && s.error) || '未知错误'));
+            this.pushLog('Agent 进度查询失败');
+            break;
+          }
+          if (s.status === 'done') {
+            this.agentPlan = s.plan;
+            this.agentChangelog = (s.plan && s.plan.changelog) || [];
+            this.agentHistory.push(msg);
+            this.agentPrompt = '';
+            this.pushLog((s.revised ? '需求卡已增量修订: ' : '需求卡已生成: ') + msg);
+            break;
+          } else if (s.status === 'error') {
+            this.notify('Agent 失败: ' + (s.error || '未知错误'));
+            this.pushLog('Agent 失败: ' + (s.error || ''));
+            break;
+          }
+        }
+      } finally {
+        clearInterval(this._agentTimer);
+        this._agentTimer = null;
+        this.agentLoading = false;
+        this.agentElapsed = 0;
+      }
+    },
+    resetAgent() {
+      this.agentPlan = null; this.agentHistory = []; this.agentChangelog = []; this.agentPrompt = '';
+      this.agentTaskId = null; this.agentElapsed = 0;
+      if (this._agentTimer) { clearInterval(this._agentTimer); this._agentTimer = null; }
+      this.pushLog('Agent 上下文已清空');
+    },
+    async loadKeyPool() {
+      const d = await this.api('/api/key-pool');
+      if (d && d.ok !== false) { this.keyPool = d; this.pushLog('密钥池状态已刷新'); }
+    },
+    async reconcileProject() {
+      this.loading = true;
+      const d = await this.api('/api/project/reconcile', {});
+      this.loading = false;
+      if (d && d.ok) { this.notify('已补齐 ' + (d.added_refs || 0) + ' 条参考图关联'); await this.loadSpec(); }
+    },
+    async runBatch() {
+      if (!confirm('将顺序跑全部项目的完整流水线，确认启动？')) return;
+      this.loading = true;
+      const d = await this.api('/api/pipeline/batch', {});
+      this.loading = false;
+      if (d && d.ok) { this.notify('批量流水线已启动'); this._pollPipe && this._pollPipe(); }
+      else if (d && d.running) { this.notify('批量已在跑，请先停止'); }
+    },
+    adoptToReq() {
+      // 把当前 Agent 方案填入「需求卡片」（Gap A：全局参数首次校准闸门），不直接生成分镜。
+      // 用户在校验区可改标题/类型/时长/风格/拆镜数/角色后再 confirmReq 落项目。
+      if (!this.agentPlan) { this.notify('请先让 AI 生成需求卡'); return; }
+      const p = this.agentPlan;
+      const shots = p.shots || [];
+      const totalDur = shots.reduce((a, s) => a + (parseInt(s.duration) || 0), 0);
+      this.reqCard = {
+        title: p.title || '',
+        genre: p.genre || '',
+        duration: totalDur || p.duration || 60,
+        aspect: p.aspect || '9:16',
+        era_region: p.era_region || '当代中国都市',
+        style: p.style || '',
+        shot_count: shots.length || p.shot_count || 6,
+        characters: (p.characters || []).map(c => ({ name: c.name || '', role: c.role || '' })),
+      };
+      this.reqCardReady = true;
+      this._saveUiLocalSoon();  // 需求卡填入即存本地草稿（确认按钮另会写服务端 meta）
+      this.pushLog('需求卡已填入，请确认参数后生成分镜');
+    },
+    async confirmReq() {
+      // 新流程：确认需求卡 → 保存 meta → 进入 ② 剧本大纲（不再直接跳转生成分镜）
+      this.busyLabel = '正在保存需求卡…';
+      this.loading = true;
+      // 保存 meta：source_mode + source_text + novel + req_card 元信息
+      const meta = {
+        source_mode: this.novelInput ? 'novel' : 'theme',
+        source_text: this.novelInput || this.agentPrompt || '',
+        novel: this.novelInput || '',
+        req_card: this.reqCard,  // 持久化：刷新后需求卡还在
+      };
+      // 自动命名：首次确认需求卡时，从标题提取项目名
+      const cur = this.projects.find(p => p.id === this.projectId);
+      if (cur && cur.name === '未命名项目' && this.reqCard.title) {
+        meta.project_name = this.reqCard.title;
+      }
+      if (meta.source_text) {
+        try { await this.api('/api/meta', meta, 'PUT'); }
+        catch (e) { this.notify('⚠️ 需求卡保存失败: ' + (e.message || e)); }
+        // 刷新项目列表（名称已从标题自动提取）
+        this.loadProjects();
+      } else {
+        this._saveUiLocalSoon();  // 无小说时至少本地存草稿
+      }
+      this.loading = false; this.busyLabel = '';
+      this.pushLog('需求卡已确认，进入② 剧本大纲阶段');
+      this.advanceStep();
+    },
+    // ===== ② 剧本大纲：视觉风格 + 大纲生成 =====
+    async genStyleKeywords() {
+      if (!this.reqCard.style) { this.notify('请先在 ① 设置视觉风格'); return; }
+      this.styleGenLoading = true;
+      try {
+        const d = await this.api('/api/style/keywords', { style: this.reqCard.style });
+        if (d && d.ok) {
+          this.visualStyle.en_keywords = d.keywords || [];
+          this.visualStyle.cn_text = d.cn || '';
+          this.pushLog('已生成 ' + this.visualStyle.en_keywords.length + ' 个英文关键词');
+        } else { this.notify('生成关键词失败: ' + ((d && d.error) || '')); }
+      } catch (e) { this.notify('网络错误: ' + e.message); }
+      this.styleGenLoading = false;
+    },
+    lockVisualStyle() {
+      this.visualStyle.locked = true;
+      this.pushLog('视觉风格已锁定（' + this.visualStyle.en_keywords.length + ' 个关键词），进入大纲阶段');
+      // 同步保存 meta
+      this.api('/api/meta', { visual_style: this.visualStyle }, 'PUT').catch(()=>{});
+    },
+    async genOutline() {
+      this.outlineLoading = true;
+      try {
+        // 从 meta 载入最新的 novel + req_card 给后端
+        const d = await this.api('/api/outline/generate', {
+          req_card: this.reqCard,
+          novel: this.novelInput || '',
+        });
+        if (d && d.ok && d.outline) {
+          this.outlineData = d.outline;
+          // 【持久化加固】生成即自动保存：不再依赖手动点保存/确认，刷新不丢
+          this.api('/api/meta', { outline: this.outlineData, visual_style: this.visualStyle }, 'PUT')
+            .catch(() => this.notify('⚠️ 大纲自动保存失败，请留意'));
+          this._saveUiLocalSoon();
+          this.pushLog('大纲已生成：' + (d.outline.characters||[]).length + ' 角色 / '
+            + (d.outline.scenes||[]).length + ' 场景 / ' + (d.outline.episodes||[]).length + ' 集');
+        } else { this.notify('生成大纲失败: ' + ((d && d.error) || '')); }
+      } catch (e) { this.notify('网络错误: ' + e.message); }
+      this.outlineLoading = false;
+    },
+    async saveDraftOutline() {
+      if (!this.outlineData) return;
+      try {
+        await this.api('/api/meta', { outline: this.outlineData, visual_style: this.visualStyle }, 'PUT');
+        this.pushLog('大纲草稿已保存');
+      } catch (e) { /* non-fatal */ }
+    },
+    async confirmOutline() {
+      if (!this.outlineData) return;
+      this.busyLabel = '生成分镜中…';
+      this.loading = true;
+      try {
+        await this.api('/api/meta', { outline: this.outlineData, visual_style: this.visualStyle }, 'PUT');
+      } catch (e) { /* non-fatal */ }
+      // ④ 生成分镜：将 小说 + 需求卡 + 大纲 送入 AGNES 产出 storyboard
+      try {
+        const d = await this.api('/api/generate/storyboard', {
+          req: this.reqCard, novel: this.novelInput, script: this.outlineData,
+          project_id: this.projectId,
+        });
+        if (d && d.ok) {
+          if (d.project_id) { this.projectId = d.project_id; this.selectedShot = null; }
+          await this.loadProjects();
+          await this.loadSpec();
+          this.pushLog('大纲确认，分镜已生成 ' + (d.shots || 0) + ' 镜');
+        } else {
+          this.pushLog('分镜生成失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+        }
+      } catch (e) { this.pushLog('分镜生成异常: ' + e.message); }
+      this.loading = false; this.busyLabel = '';
+      this.advanceStep();
+    },
+    // R2：切换集数时持久化到 meta（重载恢复）
+    async saveActiveEpisode() {
+      if (!this.projectId) return;
+      try { await this.api('/api/meta', { active_episode: this.activeEpisode }, 'PUT'); } catch (e) { /* non-fatal */ }
+      this.pushLog('已切换到 第' + this.activeEpisode + '集');
+    },
+    // 归档/恢复/删除项目
+    async archiveProject() {
+      if (!this.projectId) { this.notify('未选择项目'); return; }
+      if (!confirm('归档项目「' + this.currentProjectName() + '」？\n归档后从顶栏隐藏，数据保留，可随时恢复。')) return;
+      const d = await this.api('/api/project/archive', { id: this.projectId }, 'POST');
+      if (d && d.ok) {
+        this.pushLog('项目已归档（数据保留）');
+        // 归档当前激活项目后，切到剩余第一个活跃项目
+        this.projectId = '';
+        await this.loadProjects();
+      } else this.notify('归档失败: ' + ((d && d.error) || ''));
+    },
+    async restoreProject(id) {
+      const d = await this.api('/api/project/restore', { id }, 'POST');
+      if (d && d.ok) { this.pushLog('项目已恢复为活跃'); await this.loadProjects(); }
+      else this.notify('恢复失败: ' + ((d && d.error) || ''));
+    },
+    async deleteProject(id) {
+      const ap = this.archivedProjects.find(p => p.id === id);
+      const name = ap ? (ap.name || id) : id;
+      if (!confirm('⚠️ 彻底删除归档项目「' + name + '」？\n此操作将删除该项目全部数据（分镜/素材/视频/成片），不可恢复！')) return;
+      if (!confirm('再次确认：真的要删除吗？删除后无法找回。')) return;
+      const d = await this.api('/api/project/delete', { id }, 'POST');
+      if (d && d.ok) { this.pushLog('归档项目已删除（释放磁盘）'); await this.loadProjects(); }
+      else this.notify('删除失败: ' + ((d && d.error) || ''));
+    },
+    currentProjectName() {
+      const p = this.projects.find(x => x.id === this.projectId);
+      return p ? (p.name || p.id) : this.projectId;
+    },
+    // R3：手动重命名当前项目
+    async renameProject() {
+      if (!this.projectId) { this.notify('未选择项目'); return; }
+      const cur = this.projects.find(p => p.id === this.projectId);
+      const oldName = cur ? cur.name : '';
+      const nn = prompt('重命名项目（当前：' + oldName + '）:', oldName);
+      if (!nn || !nn.trim() || nn === oldName) return;
+      this.loading = true;
+      try {
+        const d = await this.api('/api/meta', { project_name: nn.trim() }, 'PUT');
+        if (d && d.ok) { await this.loadProjects(); this.pushLog('项目已重命名为「' + nn.trim() + '」'); }
+        else this.notify('改名失败: ' + ((d && d.error) || ''));
+      } catch (e) { this.notify('改名失败: ' + e.message); }
+      this.loading = false;
+    },
+    // 新建一个空白（已初始化）项目：后端建目录+空 storyboard+注册+激活，前端切过去并重置需求卡。
+    // 解决「无法新建一个初始化项目」——让老板能从干净项目上重新走①→⑤。
+    async newProject() {
+      this.loading = true;
+      try {
+        const d = await this.api('/api/project/new', {});
+        if (d && d.ok && d.project_id) {
+          this.projectId = d.project_id;
+          this.rememberProject();  // 新建项目立即记住：刷新后回到新项目，不再掉回旧项目
+          // 【0811 加固】显式清空需求卡/大纲/视觉风格（不等 loadSpec 时序，防旧项目数据
+          // 残留进新项目——曾出现新建后 confirmReq 把旧需求卡保存进新项目 meta）
+          this.reqCard = { title: '', genre: '', duration: 60, aspect: '9:16', era_region: '', style: '', shot_count: 6, characters: [] };
+          this.reqCardReady = false;
+          this.outlineData = null;
+          this.visualStyle = { locked: false, cn_text: '', en_keywords: [], confirmed: false };
+          await this.loadProjects();
+          await this.loadSpec();
+          this.activeModule = 'story';
+          this.pushLog('已新建项目 ' + d.project_id);
+        } else {
+          this.notify('新建项目失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+          this.pushLog('新建项目失败: ' + ((d && (d.error || d.note)) || ''));
+        }
+      } catch (e) {
+        this.notify('新建项目异常: ' + e);
+      } finally {
+        this.loading = false;
+      }
+    },
+    markBroken(u) { if (u) this.broken = Object.assign({}, this.broken, { [u]: true }); },
+    matCount(id) { return id === 'all' ? this.materialList.length : this.materialList.filter(a => a.kind === id).length; },
+    async pickRef(a) {
+      if (!this.currentShot) { this.notify('请先在左侧选中一个分镜'); return; }
+      if (!a.ref) { this.notify('该素材未绑定角色，无法作为参考'); return; }
+      this.currentShot.ref = a.ref;
+      this.pushLog('镜#' + this.currentShot.id + ' 引用 ' + a.label);
+      // 旧版只改内存，刷新即丢（用户以为引用了，其实没存）。现在即时落盘。
+      const d = await this.putSpec();
+      if (!d || d.ok === false) this.notify('引用保存失败: ' + ((d && d.error) || ''));
+    },
+    videoUrl(sh) { return this.assetUrl(sh && sh.asset_video); },
+    posterUrl(sh) { return sh ? this.assetUrl(sh.asset_frame_start || sh.asset_image) : ''; },
+    assetUrl(rel) {
+      if (!rel) return '';
+      if (/^https?:/i.test(rel)) return rel;
+      const clean = String(rel).replace(/^\/+/, '');
+      if (clean.startsWith('projects/')) return '/' + clean;
+      // 资产在 storyboard 里是项目内相对路径（assets/references/林小满.png）。
+      // 旧版拼成 /assets/... 依赖后端「当前激活项目」隐式状态，切项目/多标签页必串；
+      // 现在显式带项目 id，并逐段编码（中文文件名必须编码，后端已做 unquote）。
+      const pid = this.projectId;
+      const enc = clean.split('/').map(encodeURIComponent).join('/');
+      return pid ? ('/projects/' + encodeURIComponent(pid) + '/' + enc) : ('/' + enc);
+    },
+    async saveShot() {
+      const d = await this.putSpec();
+      if (d && d.ok !== false) { this.dirty = false; this.pushLog('镜#' + (this.selectedShot) + ' 已保存'); }
+      else this.notify('保存失败: ' + ((d && d.error) || ''));
+    },
+    toggleSatisfied(sh) {
+      // Gap E：用户逐镜「标记满意」后才放行合成（canAdvance 校验）
+      sh.satisfied = !sh.satisfied;
+      this.dirty = true;
+      this.saveShot();
+      this.pushLog('镜#' + sh.id + (sh.satisfied ? ' 标记为满意' : ' 取消满意'));
+    },
+    async reworkShot(id) {
+      // Gap D：自然语言描述单镜返工（PAVO 护城河：单镜局部改，不动全项目）
+      const sh = this.spec.shots.find(s => s.id === id);
+      const note = (sh && sh._reworkNote || '').trim();
+      if (!note) { this.notify('请先填写返工要求'); return; }
+      this.busyLabel = '返工镜#' + id;
+      this.loading = true;
+      const d = await this.api('/api/shot/rework', { id, instruction: note });
+      this.loading = false;
+      if (d && d.ok) {
+        sh._reworkOpen = false; sh._reworkNote = '';
+        this.notify('已提交返工：' + note);
+        this.pushLog('镜#' + id + ' 返工：' + note);
+        await this.refreshSpec();
+      } else {
+        this.notify('返工失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+      }
+    },
+    firstFrameUrl(sh) {
+      // 【0810 夜修】reference 空镜（无首尾针，场景图单图驱动）：首帧显示对应场景图，
+      // 不再显示「首帧未生成」误导——空镜本来就不需要首尾针。
+      if (!sh) return '';
+      if (sh.asset_frame_start || sh.asset_image) return this.assetUrl(sh.asset_frame_start || sh.asset_image);
+      if (sh.gen_strategy === 'reference' || !sh.ref) {
+        const sc = (this.spec.scenes || []).find(s => s.key === sh.scene_key);
+        if (sc && sc.asset_image) return this.assetUrl(sc.asset_image);
+      }
+      return '';
+    },
+    // 【官方结构·0810·完美拼装】最终提示词实时预览（与后端一致）：
+    // [清洗后画面描述/过渡描述] + [身份锁] + [运镜英文] + [光线] + [风格] + [背景锁定] + [竖屏] + [台词中文]
+    // 要点：① video_prompt 先清洗（尺寸词/水印词由 width-height 参数与 negative_prompt 接管，防 9:16/16:9 冲突重复）
+    //       ② 运镜中文→英文翻译（与后端 _CAMERA_MAP 同源）③ 全英文、结构顺序即官方推荐。
+    finalPrompt(sh) {
+      if (!sh) return '';
+      const parts = [];
+      const LIGHT = { "黄金时刻": "warm golden hour sunlight", "逆光": "backlit silhouette with rim light", "霓虹夜": "neon cyberpunk night lighting, wet reflections", "柔光": "soft diffuse studio light", "阴雨": "overcast rainy daylight, muted tones", "戏剧光": "dramatic chiaroscuro lighting, deep shadows", "月夜": "cold moonlight, blue palette", "顶光": "harsh top light, tense mood" };
+      const STYLE = { "写实电影": "realistic cinematic, film grain, shallow depth of field", "动漫": "semi-realistic anime, vibrant colors", "国风": "Chinese period drama style, rich costumes", "赛博": "cyberpunk, high contrast neon", "温馨": "warm soft focus, cozy atmosphere", "暗黑": "dark moody cinematic, desaturated" };
+      if (sh.gen_strategy === 'keyframes') {
+        parts.push("Smooth cinematic transition from the first keyframe to the second keyframe, maintaining character identity and consistent camera angle, natural motion");
+        const gs = this.cleanPrompt(this.spec.global_style);
+        if (gs) parts.push(gs);
+      } else {
+        const vp = this.cleanPrompt(sh.video_prompt);
+        if (vp) parts.push(vp);
+        const gs = this.cleanPrompt(this.spec.global_style);
+        if (gs && !(vp || '').includes(gs)) parts.push(gs);
+      }
+      if (sh.ref) {
+        const ref = (this.spec.references || {})[sh.ref] || {};
+        const tok = ref.identity_token || '';
+        parts.push((tok ? tok + ', ' : '') + "stable face, consistent facial features, locked character identity");
+      }
+      // 运镜：中文→英文；若画面描述已含运镜词（push/tracking/orbit…）则不再重复追加
+      const cam = this.cameraEn(sh.camera);
+      if (cam) {
+        const joined = parts.join(' ').toLowerCase();
+        const MOV = ['push', 'dolly', 'tracking', 'orbit', 'pan', 'tilt', 'crane', 'zoom', 'handheld', 'dutch', 'over-the-shoulder', 'pov', 'whip'];
+        if (!MOV.some(m => joined.includes(m))) parts.push(cam);
+      }
+      if (sh.lighting) parts.push(LIGHT[sh.lighting] || sh.lighting);
+      if (sh.style) parts.push(STYLE[sh.style] || sh.style);
+      parts.push("consistent set and location throughout every shot, no background morphing, no location change");
+      parts.push("vertical 9:16 mobile short-drama framing, subject chest-up, shallow depth of field");
+      if (sh.subtitle && !sh.use_minimax_audio) {
+        const role = sh.voice && sh.voice !== 'narrator' ? 'The character' : 'The narrator';
+        parts.push(role + ' speaks in Mandarin Chinese, ' + this.emotionEn(sh.emotion) + ': "' + sh.subtitle + '". AUDIO-ONLY, lips moving with natural Chinese speech rhythm, no on-screen text or subtitles');
+      }
+      return parts.filter(Boolean).join(', ');
+    },
+    // 【0811 修复·中英混杂】中文情绪词 → 英文（与后端 _emotion_en 同源翻译表）
+    emotionEn(e) {
+      if (!e || !String(e).trim()) return 'neutral';
+      const s = String(e).trim();
+      const MAP = { '平静':'calm','疲惫':'tired','孤寂':'lonely','疲惫孤寂':'tired and lonely','激动':'excited','愤怒':'angry','生气':'angry','悲伤':'sad','难过':'sad','开心':'happy','高兴':'happy','喜悦':'joyful','温柔':'gentle','坚定':'determined','紧张':'nervous','失落':'lost','期待':'expectant','冷漠':'cold','淡然':'indifferent','尴尬':'awkward','感动':'moved','恐惧':'frightened','害怕':'frightened','惊讶':'surprised','震惊':'shocked','害羞':'shy','无奈':'helpless','委屈':'aggrieved','忧虑':'worried','担心':'worried','绝望':'desperate','深情':'affectionate','心疼':'heartbroken','欣慰':'relieved','冷静':'composed','讽刺':'sarcastic','嘲讽':'sarcastic','焦急':'anxious','不耐烦':'impatient','犹豫':'hesitant','崩溃':'devastated' };
+      if (MAP[s]) return MAP[s];
+      for (const k in MAP) { if (s.includes(k)) return MAP[k]; }
+      return /[\u4e00-\u9fff]/.test(s) ? 'expressive' : s;
+    },
+    // 清洗 video_prompt：尺寸词/水印词由参数与 negative_prompt 接管（与后端 _clean_video_prompt 一致）
+    cleanPrompt(p) {
+      if (!p) return '';
+      return p.replace(/\b9:16\b|\b16:9\b|\blandscape\b|\bportrait\b|\bvertical\b/gi, '')
+        .replace(/\bno watermark\b|\bwatermark\b|\bno on-screen text\b|\bno text\b|\bno subtitles\b/gi, '')
+        .replace(/,\s*,+/g, ',').replace(/^[\s,.]+|[\s,.]+$/g, '');
+    },
+    // 运镜中文→英文（与后端 _CAMERA_MAP 同源；已是英文原样透传）
+    cameraEn(zh) {
+      if (!zh) return '';
+      if (!/[\u4e00-\u9fff]/.test(zh)) return zh;
+      const CAM = [["环绕","orbital camera arc around the subject"],["推近","slow push-in toward the subject"],["推","slow push-in toward the subject"],["拉远","slow pull-out revealing the environment"],["拉","slow pull-out revealing the environment"],["摇","smooth pan across the scene"],["跟拍","tracking shot following the subject"],["跟","tracking shot following the subject"],["移","lateral tracking movement"],["升","crane up rising above the scene"],["降","crane down descending"],["手持","handheld camera with subtle shake"],["固定","locked-off static camera, no movement"],["变焦","smooth optical zoom"],["特写","tight close-up framing"],["近景","medium close-up framing"],["中景","medium shot framing"],["远景","wide establishing framing"],["全景","wide establishing framing"],["俯","high angle looking down at the subject"],["仰","low angle looking up at the subject"],["过肩","over-the-shoulder shot"]];
+      const out = [];
+      for (const [z, e] of CAM) if (zh.includes(z)) out.push(e);
+      return out.join(', ');
+    },
+    // 时长→帧数换算（官方 8n+1 ≤441 @24fps，展示用；与后端 _shot_nf 一致）
+    nfFor(sec) {
+      const f = Math.round((sec || 5) * 24);
+      const n = Math.max(1, Math.round((f - 1) / 8));
+      return Math.min(441, n * 8 + 1);
+    },
+    // 【T3 scene_type 徽章】映射（后端已写回 shot.scene_type，缺省规则兜底 action）
+    sceneTypeMeta(sh) {
+      const st = (sh && sh.scene_type) || 'action';
+      return { monologue: { label: '独白', icon: '🎭', cls: 'bg-purple-500/20 text-purple-300' },
+               dialogue_2: { label: '对话', icon: '💬', cls: 'bg-cyan-500/20 text-cyan-300' },
+               dialogue_multi: { label: '群戏', icon: '👥', cls: 'bg-orange-500/20 text-orange-300' },
+               action: { label: '动作', icon: '🎬', cls: 'bg-slate-600/30 text-slate-300' } }[st] || { label: st, icon: '🎬', cls: 'bg-slate-600/30 text-slate-300' };
+    },
+    frameStartLabel(sh) {
+      // 首帧来源标注：链式=上一镜尾帧；否则锚点/场景图；reference/text2video 说明
+      if (!sh) return '首帧';
+      const src = sh.frame_start_source || '';
+      if (src.startsWith('chain:')) {
+        const pid = src.replace('chain:shot', '');
+        return '← 镜#' + pid + ' 尾帧';
+      }
+      if (sh.gen_strategy === 'text2video') return '文生视频';
+      if (sh.gen_strategy === 'reference') return '单针·场景图';
+      if (src === 'scene_or_anchor') return '首帧·场景/锚点';
+      return '首帧·锚点';
+    },
+    async strategyChanged(sh) {
+      // 改模式立即落盘；keyframes 模式若缺尾帧提示词给个默认引导
+      if (sh.gen_strategy === 'keyframes' && !(sh.last_frame_prompt || '').trim()) {
+        sh.last_frame_prompt = (sh.video_prompt || '').slice(0, 120) + ', final frame, stable composition';
+      }
+      await this.putSpec().catch(()=>{});
+      const label = { keyframes: '首尾针', reference: '单针', text2video: '文生视频', ui: 'UI动效' }[sh.gen_strategy] || sh.gen_strategy;
+      this.pushLog('镜#' + sh.id + ' 生成模式 → ' + label);
+    },
+    async buildReqFromNovel() {
+      // 小说 → 同一套规划引擎解析成结构化需求卡 → 填入需求卡片（不直接落项目）
+      if (!this.novelInput.trim()) { this.notify('请先粘贴小说 / 分镜剧本，或点「让 AI 帮我生成」'); return; }
+      this.loading = true; this.agentLoading = true; this.agentOpen = true; this.agentElapsed = 0;
+      const d = await this.api('/api/agent', { prompt: this.novelInput, prev_plan: null, history: [] });
+      this.loading = false;
+      if (d && d.ok && d.task_id) {
+        await this._pollAgent(d.task_id, this.novelInput);
+        if (this.agentPlan) this.adoptToReq();   // 填入需求卡片并展开确认区
+      } else {
+        this.agentLoading = false;
+        this.notify('需求卡生成失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+      }
+    },
+    // ===== ① 双入口：主题 → AI 写小说 =====
+    async genNovelFromTheme() {
+      if (!this.themeInput.trim()) { this.notify('请输入一句话主题'); return; }
+      this.themeGenLoading = true;
+      try {
+        const d = await this.api('/api/novel/generate', { theme: this.themeInput });
+        if (d && d.ok && d.novel) {
+          this.novelInput = d.novel;
+          this.pushLog('AI 已生成小说（' + d.novel.length + ' 字），请审阅修正后确认');
+        } else { this.notify('生成失败: ' + ((d && d.error) || '')); }
+      } catch (e) { this.notify('网络错误: ' + e.message); }
+      this.themeGenLoading = false;
+    },
+    async confirmThemeNovel() {
+      if (!this.novelInput.trim()) { this.notify('小说内容为空'); return; }
+      this.pushLog('小说已确认，开始生成需求卡…');
+      // 与 buildReqFromNovel 相同流程：送小说到 Agent 解析为需求卡
+      this.sourceMode = 'novel';  // 切回贴小说模式（需求卡生成复用同一套）
+      await this.buildReqFromNovel();
+    },
+    // ===== ③ 资产设计：中文结构化 → 英文提示词 → 出图 =====
+    assetCnFields(type) {
+      // 各类型中文字段（顺序即展示/组装顺序）
+      return {
+        role: [['style','风格'],['content','画面内容'],['basic_req','基本要求'],['identity','身份与年龄'],['appearance','外貌特征'],['costume','服装设计'],['hair_makeup','发型与妆容'],['aura','整体气场/表情与气质']],
+        scene: [['style','风格'],['content','画面内容'],['basic_req','基本要求'],['composition','构图'],['details','空间细节'],['text_lang','文字标识语言'],['lighting','光线氛围']],
+        prop: [['style','风格'],['content','画面内容'],['basic_req','基本要求']],
+      }[type] || [];
+    },
+    _assetObj(type, key) {
+      // 返回 spec 中对应资产对象（确保 cn_prompt 存在）
+      if (type === 'role') {
+        const ref = this.spec.references && this.spec.references[key];
+        if (ref) { if (!ref.cn_prompt) ref.cn_prompt = this._emptyCn('role'); return ref; }
+      } else if (type === 'scene') {
+        const s = (this.spec.scenes || []).find(x => x.key === key || x.name === key);
+        if (s) { if (!s.cn_prompt) s.cn_prompt = this._emptyCn('scene'); return s; }
+      } else if (type === 'prop') {
+        const p = (this.spec.props || []).find(x => x.key === key || x.name === key);
+        if (p) { if (!p.cn_prompt) p.cn_prompt = this._emptyCn('prop'); return p; }
+      }
+      return null;
+    },
+    _emptyCn(type) {
+      const o = {}; this.assetCnFields(type).forEach(f => o[f[0]] = '');
+      o.style = this.reqCard.style || '';  // 预填全局视觉风格
+      return o;
+    },
+    async ensureCnPrompts() {
+      // 遍历三种资产补齐 cn_prompt：已有中文描述 → 不动；只有英文 img_prompt → 自动反向提取中文；
+      // 两者都没有 → 基础填充（style 预填全局风格 + content 用 desc/name 兜底）。
+      // 返回 {done, filled, skipped} 供一键生成判断是否需先提取。
+      // 防重入：若已在提取中，等待同一次提取完成（而非跳过——否则一键生成拿不到中文描述）
+      if (this._ensuringCnPromise) return await this._ensuringCnPromise;
+      this._ensuringCnPromise = this._doEnsureCnPrompts();
+      try { return await this._ensuringCnPromise; }
+      finally { this._ensuringCnPromise = null; }
+    },
+    async _doEnsureCnPrompts() {
+      this._ensuringCn = true;
+      let changed = false, filled = 0, skipped = 0;
+      const candidates = [];
+      (Object.keys(this.spec.references || {})).forEach(k => {
+        const r = this.spec.references[k];
+        if (!r.cn_prompt) { r.cn_prompt = this._emptyCn('role'); changed = true; }
+        // hasCn 必须排除 style（_emptyCn 预填了需求卡风格）——否则 style-only 空壳被误判为已完成，永不补全
+        const hasCn = Object.entries(r.cn_prompt).some(([k2, v]) => k2 !== 'style' && String(v || '').trim());
+        if (!hasCn) candidates.push({ type: 'role', key: k, img_prompt: r.img_prompt || '' });
+        else skipped++;
+      });
+      (this.spec.scenes || []).forEach(s => {
+        if (!s.cn_prompt) { s.cn_prompt = this._emptyCn('scene'); changed = true; }
+        const hasCn = Object.entries(s.cn_prompt).some(([k2, v]) => k2 !== 'style' && String(v || '').trim());
+        if (!hasCn) candidates.push({ type: 'scene', key: s.key || s.name, img_prompt: s.img_prompt || '' });
+        else skipped++;
+      });
+      (this.spec.props || []).forEach(p => {
+        if (!p.cn_prompt) { p.cn_prompt = this._emptyCn('prop'); changed = true; }
+        const hasCn = Object.entries(p.cn_prompt).some(([k2, v]) => k2 !== 'style' && String(v || '').trim());
+        if (!hasCn) candidates.push({ type: 'prop', key: p.key || p.name, img_prompt: p.img_prompt || '' });
+        else skipped++;
+      });
+      if (changed) await this.putSpec().catch(()=>{});
+      // 有英文无中文 → 自动反向提取（逐个，带进度；失败的基础填充兜底）
+      if (candidates.length) this.loading = true;  // O2 浮层：提取进度可见
+      for (let i = 0; i < candidates.length; i++) {
+        const c = candidates[i];
+        const obj = this._assetObj(c.type, c.key);
+        if (!obj) continue;
+        if (!c.img_prompt) { this._fillCnBase(c.type, obj); changed = true; filled++; continue; }
+        this.busyLabel = '提取中文描述 ' + (i + 1) + '/' + candidates.length + ' · ' + (obj.cn || obj.name || c.key);
+        try {
+          const d = await this.api('/api/asset/extract', { type: c.type, img_prompt: c.img_prompt });
+          if (d && d.ok && d.cn_prompt) {
+            // 只合并非空字段，style 优先保留用户预填
+            const merged = Object.assign({}, obj.cn_prompt, d.cn_prompt);
+            if (obj.cn_prompt.style && !d.cn_prompt.style) merged.style = obj.cn_prompt.style;
+            obj.cn_prompt = merged; filled++; changed = true;
+          } else { this._fillCnBase(c.type, obj); filled++; changed = true; }
+        } catch (e) { this._fillCnBase(c.type, obj); filled++; changed = true; }
+        this.busyLabel = '';
+      }
+      if (candidates.length) this.loading = false;
+      if (changed) await this.putSpec().catch(()=>{});
+      this._ensuringCn = false;
+      return { done: true, filled, skipped };
+    },
+    _fillCnBase(type, obj) {
+      // 基础填充：style 预填全局风格，content 用现有中文信息（desc/name/cn/cn_story 聚合）兜底
+      const base = this._emptyCn(type);
+      if (!obj.cn_prompt) obj.cn_prompt = base;
+      if (!String(obj.cn_prompt.style || '').trim()) obj.cn_prompt.style = this.reqCard.style || '';
+      if (!String(obj.cn_prompt.content || '').trim()) {
+        // 优先从分镜 cn_story 聚合该角色的画面描述（新分镜自带中文拍摄剧本）
+        let seed = obj.desc || obj.name || obj.cn || '';
+        if (!seed && type === 'role') {
+          const cn = obj.cn || obj.name || '';
+          const related = (this.spec.shots || [])
+            .filter(s => s.ref === (obj.key || cn) || (s.cn_story || '').includes(cn))
+            .map(s => s.cn_story || '')
+            .filter(Boolean);
+          if (related.length) seed = related.slice(0, 2).join('；');
+        }
+        if (seed) obj.cn_prompt.content = seed;
+      }
+    },
+    toggleAssetDetail(key) {
+      this.assetDetailOpen[key] = !this.assetDetailOpen[key];
+      // 收起时保存中文编辑（v-model 只改内存，不落盘会丢）
+      if (!this.assetDetailOpen[key]) this.putSpec().catch(()=>{});
+      this.assetDetailOpen = Object.assign({}, this.assetDetailOpen); // 触发响应式
+    },
+    async saveAssetCn(type, key) {
+      // 显式保存中文描述（生成提示词/图片前也会自动保存）
+      const obj = this._assetObj(type, key);
+      if (!obj) return;
+      await this.putSpec();
+      this.pushLog('中文描述已保存');
+    },
+    async genAssetPrompt(type, key) {
+      // 中文结构化 → 英文 img_prompt（库驱动）
+      const obj = this._assetObj(type, key);
+      if (!obj) { this.notify('资产不存在'); return; }
+      const bk = type.charAt(0) + ':' + key;  // r:/s:/p: 防键冲突
+      if (this.assetBusy[bk] === 'prompt') { this.notify('正在生成提示词，请稍候'); return; }
+      this.assetBusy[bk] = 'prompt';
+      try {
+        const d = await this.api('/api/asset/prompt', { type, cn_prompt: obj.cn_prompt });
+        if (d && d.ok && d.img_prompt) {
+          obj.img_prompt = d.img_prompt;
+          await this.putSpec();  // 保存中文 + 英文
+          this.pushLog(({role:'角色',scene:'场景',prop:'道具'}[type]) + '「' + (obj.cn || obj.name || obj.key || key) + '」英文提示词已生成');
+        } else { this.notify('生成提示词失败: ' + ((d && d.error) || '')); }
+      } catch (e) { this.notify('生成提示词失败: ' + e.message); }
+      this.assetBusy[bk] = '';
+    },
+    async regenAssetImage(type, key) {
+      // 出图：若无 img_prompt 先组装，再调现有单资产生成端点。返回 true=成功 / false=失败（供一键生成计数）
+      const obj = this._assetObj(type, key);
+      if (!obj) { this.notify('资产不存在'); return false; }
+      const bk = type.charAt(0) + ':' + key;
+      if (this.assetBusy[bk] === 'image') { this.notify('该资产正在生成中，请稍候'); return false; }
+      this.assetBusy[bk] = 'image';
+      const name = obj.cn || obj.name || obj.key || key;
+      try {
+        if (!obj.img_prompt) {
+          const dp = await this.api('/api/asset/prompt', { type, cn_prompt: obj.cn_prompt });
+          if (dp && dp.ok && dp.img_prompt) obj.img_prompt = dp.img_prompt;
+          else { this.notify('先生成英文提示词失败: ' + ((dp && dp.error) || '')); this.assetBusy[bk] = ''; return false; }
+        }
+        const body = type === 'role' ? { ref_key: key, prompt: obj.img_prompt }
+          : type === 'scene' ? { scene_key: key, prompt: obj.img_prompt }
+          : { prop_key: key, prompt: obj.img_prompt };
+        const path = type === 'role' ? '/api/generate/reference'
+          : type === 'scene' ? '/api/generate/scene' : '/api/generate/prop';
+        const d = await this.api(path, body);
+        if (d && d.ok) { this.pushLog(name + ' 图片已生成 ✅'); this.notify('✅ ' + name + ' 图片已生成'); }
+        else if (d && d.note) { this.notify(d.note); }
+        else { this.notify('出图失败: ' + ((d && d.error) || '')); }
+        await this.refreshSpec();
+        return !!(d && d.ok);
+      } catch (e) { this.notify('出图失败: ' + e.message); return false; }
+      finally { this.assetBusy[bk] = ''; }
+    },
+    async genAllAssets() {
+      // 一键生成全部：角色+场景+道具 依次 组装提示词→出图（跳过已有图，带进度）
+      if (this._genAllBusy) { this.notify('一键生成进行中，请稍候'); return; }
+      this._genAllBusy = true;
+      this.loading = true;  // O2 浮层依赖 loading，必须开，否则"没有等待状态"
+      try {
+      const todo = [];
+      // 角色判定用 remote_url（出图端点写它，asset_image 只在 shots 上写，ref 上没有）
+      (Object.keys(this.spec.references || {})).forEach(k => {
+        const r = this.spec.references[k];
+        if (!r.remote_url) todo.push({ type: 'role', key: k, name: r.cn || k });
+      });
+      (this.spec.scenes || []).forEach(s => {
+        if (!s.asset_image) todo.push({ type: 'scene', key: s.key || s.name, name: s.name || s.key || '场景' });
+      });
+      (this.spec.props || []).forEach(p => {
+        if (!p.asset_image) todo.push({ type: 'prop', key: p.key || p.name, name: p.name || p.key || '道具' });
+      });
+      if (!todo.length) { this.notify('所有资产都已生成 ✅'); return; }
+      if (!confirm('一键生成 ' + todo.length + ' 个未生成资产（角色/场景/道具）？\n将依次组装提示词并出图，可能耗时较长。')) return;
+      // 先生成/补齐中文描述（有英文无中文的自动提取），确保出图链路不因空 cn_prompt 中断
+      await this.ensureCnPrompts();
+      let ok = 0, fail = 0;
+      for (let i = 0; i < todo.length; i++) {
+        const t = todo[i];
+        this.busyLabel = '一键生成 ' + (i + 1) + '/' + todo.length + ' · ' + t.name;
+        const r = await this.regenAssetImage(t.type, t.key);
+        if (r === true) ok++; else fail++;
+        if (fail >= 3 && ok === 0) {
+          this.pushLog('连续 3 个资产失败，一键生成已中止（先检查网络/提示词）');
+          break;
+        }
+      }
+      this.busyLabel = '';
+      this.pushLog('一键生成完成：' + ok + '/' + todo.length + ' 成功' + (fail ? ('，' + fail + ' 失败') : ''));
+      this.notify('一键生成完成 ' + ok + '/' + todo.length + (fail ? ('（' + fail + ' 失败）') : ''));
+      } finally { this._genAllBusy = false; this.loading = false; }
+    },
+    async genAllRefs() {
+      this.busyLabel = '批量生成人物图';
+      this.loading = true;
+      const d = await this.api('/api/generate/references', {});
+      this.loading = false;
+      if (d && d.ok) { this.pushLog('人物图已生成 ✅'); this.notify('✅ 人物图已生成（用时 ' + this.busyElapsed + 's）'); }
+      else if (d && d.note) { this.notify(d.note); }
+      else { this.notify('人物图生成失败: ' + (d && d.error || '')); }
+      await this.refreshSpec();
+    },
+    async saveCharacterPrompt(c) {
+      const d = await this.putSpec();
+      if (d && d.ok !== false) this.pushLog('角色『' + c.cn + '』提示词已保存');
+      else this.notify('保存失败: ' + ((d && d.error) || ''));
+    },
+    async regenCharacter(c) {
+      this.busyLabel = '重生成角色图';
+      this.loading = true;
+      const prompt = this.spec.references[c.key] && this.spec.references[c.key].img_prompt;
+      const d = await this.api('/api/generate/reference', { ref_key: c.key, prompt });
+      this.loading = false;
+      if (d && d.ok) { this.pushLog('角色『' + c.cn + '』已重生成 ✅'); }
+      else { this.notify('重生成失败: ' + ((d && (d.error || d.note)) || '未知错误')); }
+      await this.refreshSpec();
+    },
+    // ② 场景 / 道具（Gap B）：批量 + 单条重生成，复用 generate_image 模式
+    async genAllScenes() {
+      this.busyLabel = '批量生成场景图';
+      this.loading = true;
+      const d = await this.api('/api/generate/scenes', {});
+      this.loading = false;
+      if (d && d.ok) { this.pushLog('场景图已生成 ✅'); this.notify('✅ 场景图已生成（用时 ' + this.busyElapsed + 's）'); }
+      else if (d && d.note) { this.notify(d.note); }
+      else { this.notify('场景图生成失败: ' + ((d && d.error) || '未知错误')); }
+      await this.refreshSpec();
+    },
+    async genAllProps() {
+      this.busyLabel = '批量生成道具图';
+      this.loading = true;
+      const d = await this.api('/api/generate/props', {});
+      this.loading = false;
+      if (d && d.ok) { this.pushLog('道具图已生成 ✅'); this.notify('✅ 道具图已生成（用时 ' + this.busyElapsed + 's）'); }
+      else if (d && d.note) { this.notify(d.note); }
+      else { this.notify('道具图生成失败: ' + ((d && d.error) || '未知错误')); }
+      await this.refreshSpec();
+    },
+    async saveScenePrompt(s) {
+      const d = await this.putSpec();
+      if (d && d.ok !== false) this.pushLog('场景『' + (s.name || s.key) + '』提示词已保存');
+      else this.notify('保存失败: ' + ((d && d.error) || ''));
+    },
+    async regenScene(s) {
+      this.busyLabel = '重生成场景图';
+      this.loading = true;
+      const key = s.key || s.name;
+      const d = await this.api('/api/generate/scene', { scene_key: key, prompt: s.img_prompt });
+      this.loading = false;
+      if (d && d.ok) { this.pushLog('场景『' + key + '』已重生成 ✅'); }
+      else { this.notify('场景重生成失败: ' + ((d && (d.error || d.note)) || '未知错误')); }
+      await this.refreshSpec();
+    },
+    async savePropPrompt(p) {
+      const d = await this.putSpec();
+      if (d && d.ok !== false) this.pushLog('道具『' + (p.name || p.key) + '』提示词已保存');
+      else this.notify('保存失败: ' + ((d && d.error) || ''));
+    },
+    async regenProp(p) {
+      this.busyLabel = '重生成道具图';
+      this.loading = true;
+      const key = p.key || p.name;
+      const d = await this.api('/api/generate/prop', { prop_key: key, prompt: p.img_prompt });
+      this.loading = false;
+      if (d && d.ok) { this.pushLog('道具『' + key + '』已重生成 ✅'); }
+      else { this.notify('道具重生成失败: ' + ((d && (d.error || d.note)) || '未知错误')); }
+      await this.refreshSpec();
+    },
+    async _kfRunShot(sh, force) {
+      // 【老板 0810 状态可见】提交后台任务 → 轮询状态（每 3s）：
+      // running=真在生成（可安心等）、done=完成、failed=明确报错、unknown=状态丢失提示重试、超时=提示查日志。
+      // 绝不盲目等：任何异常路径都有明确文案。
+      const submit = await this.api('/api/generate/keyframes/shot', { id: sh.id, force: !!force });
+      if (!submit || !submit.ok) {
+        return { ok: false, error: '任务提交失败: ' + ((submit && (submit.error || submit.note)) || '未知错误') };
+      }
+      const t0 = Date.now();
+      for (let i = 0; i < 200; i++) {  // 最多轮询 ~10 分钟
+        await new Promise(r => setTimeout(r, 3000));
+        const st = await this.api('/api/generate/keyframes/status?shot=' + sh.id);
+        if (!st || st.ok === false) {
+          return { ok: false, error: '状态查询失败: ' + ((st && st.error) || '网络异常，请检查连接后重试') };
+        }
+        if (st.status === 'done') {
+          const res = st.result || {};
+          if (res.ok === false) return { ok: false, error: '生成失败: ' + (res.error || '后端返回失败，详见日志') };
+          return { ok: true, skipped: !!res.skipped };
+        }
+        if (st.status === 'failed') {
+          return { ok: false, error: '生成失败: ' + (st.error || '后端异常，详见日志') };
+        }
+        if (st.status === 'unknown') {
+          if (i < 3) continue;  // 允许前几秒任务状态尚未建立
+          return { ok: false, error: '任务状态丢失（服务可能重启），请重试提交' };
+        }
+        // running/pending：真在生成，实时更新耗时让用户安心
+        this.busyLabel = '镜#' + sh.id + ' 生成中 ' + Math.round((Date.now() - t0) / 1000) + 's …';
+      }
+      return { ok: false, error: '生成超时（>10分钟），请查看运行日志或重试' };
+    },
+    async genAllKeyframes() {
+      // 【老板 0810 并行批量 + 跳过已生成 + 状态可见】已生成首尾针的镜直接跳过；
+      // 未生成的按场景族分组并行（同组串行保链式），每镜「提交+轮询」明确等待/失败。
+      const all = (this.spec.shots || []).filter(s => s.gen_strategy !== 'ui');
+      const skipped = all.filter(s => s.asset_frame_start && s.asset_frame_end);
+      const shots = all.filter(s => !(s.asset_frame_start && s.asset_frame_end));
+      const total = all.length;
+      if (!shots.length) {
+        this.notify(skipped.length ? ('✅ 全部 ' + total + ' 镜已生成过，无需重复生成') : '没有可生成的关键帧镜');
+        return;
+      }
+      this.loading = true;
+      let okCount = 0, failCount = 0;
+      const groups = {};
+      shots.forEach(sh => {
+        const fam = String(sh.scene_key || '').split('_')[0] || 'x';
+        (groups[fam] = groups[fam] || []).push(sh);
+      });
+      const groupList = Object.values(groups);
+      const totalGroups = groupList.length;
+      if (skipped.length) this.pushLog('已跳过 ' + skipped.length + ' 镜（首尾针已生成），待生成 ' + shots.length + ' 镜');
+      const runner = async (g, gi) => {
+        for (let j = 0; j < g.length; j++) {
+          const sh = g[j];
+          this.busyLabel = '批量生成关键帧 组' + (gi + 1) + '/' + totalGroups + ' · ' + (j + 1) + '/' + g.length + '（镜#' + sh.id + '）' + (skipped.length ? ' · 跳过' + skipped.length : '');
+          this.kfBusy[sh.id] = true;  // Vue3 reactive 直接赋值即响应式
+          const r = await this._kfRunShot(sh, false);
+          if (r.ok) {
+            if (r.skipped) { skipped.push(sh); this.pushLog('镜#' + sh.id + ' 已生成过，跳过'); }
+            else { okCount++; this.pushLog('镜#' + sh.id + ' 首尾针完成 ✅'); }
+          } else {
+            failCount++;
+            this.pushLog('镜#' + sh.id + ' 首尾针失败: ' + r.error);
+            this.notify('⚠️ 镜#' + sh.id + ' ' + r.error);
+          }
+          this.kfBusy[sh.id] = false;
+        }
+      };
+      await Promise.all(groupList.map((g, i) => runner(g, i)));  // 组间并行
+      this.loading = false;
+      if (okCount) this.pushLog('关键帧完成 ' + okCount + ' 镜' + (failCount ? '，' + failCount + ' 镜失败' : ''));
+      this.notify(failCount ? ('⚠️ ' + failCount + ' 镜失败（已提示原因），详见日志') : ('✅ ' + okCount + ' 镜完成' + (skipped.length ? '，' + skipped.length + ' 镜已存在跳过' : '')));
+      await this.refreshSpec();
+    },
+    async regenKeyframe(sh) {
+      // 单镜重生成：同样「提交+轮询」，force 强制重做
+      this.loading = true;
+      this.kfBusy[sh.id] = true;
+      this.busyLabel = '镜#' + sh.id + ' 重生成中…';
+      const r = await this._kfRunShot(sh, true);
+      this.kfBusy[sh.id] = false;
+      this.loading = false;
+      if (r.ok) { this.pushLog('镜#' + sh.id + ' 关键帧已重生成 ✅'); }
+      else { this.notify('镜#' + sh.id + ' ' + r.error); this.pushLog('镜#' + sh.id + ' 重生成失败: ' + r.error); }
+      await this.refreshSpec();
+    },
+    async _vidRunShot(sh, force, extra) {
+      // 【老板 0810】视频生成「提交+轮询」：视频 5-10 分钟/镜，同步请求经 CF 必 524，
+      // 改为后台任务 + 轮询状态（5s/次，最长 25min），等待/失败/完成全部明确。
+      const payload = Object.assign({ id: sh.id, force: !!force }, extra || {});
+      const submit = await this.api('/api/generate/shot', payload);
+      if (!submit || !submit.ok) {
+        return { ok: false, error: '任务提交失败: ' + ((submit && (submit.error || submit.note)) || '未知错误') };
+      }
+      const t0 = Date.now();
+      for (let i = 0; i < 300; i++) {  // 最多轮询 ~25 分钟
+        await new Promise(r => setTimeout(r, 5000));
+        const st = await this.api('/api/generate/status?shot=' + sh.id);
+        if (!st || st.ok === false) {
+          return { ok: false, error: '状态查询失败: ' + ((st && st.error) || '网络异常，请检查连接后重试') };
+        }
+        if (st.status === 'done') {
+          const res = st.result || {};
+          if (res.ok === false) return { ok: false, error: '生成失败: ' + (res.error || '后端返回失败，详见日志') };
+          return { ok: true, skipped: !!res.skipped };
+        }
+        if (st.status === 'failed') {
+          return { ok: false, error: '生成失败: ' + (st.error || '后端异常，详见日志') };
+        }
+        if (st.status === 'unknown') {
+          if (i < 2) continue;
+          return { ok: false, error: '任务状态丢失（服务可能重启），请重试提交' };
+        }
+        this.busyLabel = '镜#' + sh.id + ' 视频生成中 ' + Math.round((Date.now() - t0) / 1000) + 's …';
+      }
+      return { ok: false, error: '生成超时（>25分钟），请查看运行日志或重试' };
+    },
+    async genAllShots() {
+      // 【老板 0810】视频批量：跳过已生成 + 并发上限 3 + 每镜「提交+轮询」明确状态。
+      // 视频用固定首尾针，镜间无链式依赖 → 可并发；AGNES 限流保守取 3 并发。
+      const all = (this.spec.shots || []);
+      const skipped = all.filter(s => s.asset_video && !String(s.asset_video).startsWith('sim://'));
+      const todo = all.filter(s => !(s.asset_video && !String(s.asset_video).startsWith('sim://')));
+      const total = all.length;
+      if (!todo.length) {
+        this.notify(skipped.length ? ('✅ 全部 ' + total + ' 镜视频已生成，无需重复') : '没有可生成的分镜');
+        return;
+      }
+      this.loading = true;
+      let okCount = 0, failCount = 0;
+      if (skipped.length) this.pushLog('已跳过 ' + skipped.length + ' 镜（视频已生成），待生成 ' + todo.length + ' 镜');
+      let cursor = 0;
+      const CONC = 3;
+      const worker = async () => {
+        while (true) {
+          const idx = cursor++;
+          if (idx >= todo.length) break;
+          const sh = todo[idx];
+          this.busyLabel = '批量生成视频 ' + (idx + 1) + '/' + todo.length + '（镜#' + sh.id + '）· 并发' + CONC;
+          this.vidBusy[sh.id] = true;
+          const r = await this._vidRunShot(sh, false, null);
+          if (r.ok) {
+            if (r.skipped) { skipped.push(sh); this.pushLog('镜#' + sh.id + ' 视频已存在，跳过'); }
+            else { okCount++; this.pushLog('镜#' + sh.id + ' 视频完成 ✅'); }
+          } else {
+            failCount++;
+            this.pushLog('镜#' + sh.id + ' 视频失败: ' + r.error);
+            this.notify('⚠️ 镜#' + sh.id + ' ' + r.error);
+          }
+          this.vidBusy[sh.id] = false;
+          await this.refreshSpec();  // 每镜完成即刷新，缩略图实时长出
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONC, todo.length) }, () => worker()));
+      this.loading = false;
+      if (okCount) this.pushLog('视频完成 ' + okCount + ' 镜' + (failCount ? '，' + failCount + ' 镜失败' : ''));
+      this.notify(failCount ? ('⚠️ ' + failCount + ' 镜视频失败（已提示原因），详见日志') : ('✅ ' + okCount + ' 镜视频完成' + (skipped.length ? '，' + skipped.length + ' 镜已存在跳过' : '')));
+      await this.refreshSpec();
+    },
+    async assemble() {
+      this.loading = true;
+      const d = await this.api('/api/finalize', { transition: this.mergeTransition, subtitle: true, ai_watermark: true, bgm: true });
+      this.loading = false;
+      if (d && d.ok) { this.pushLog('成片已合并 ✅'); }
+      else { this.notify('合并失败: ' + ((d && (d.error || d.note)) || '未知错误')); }
+      await this.refreshSpec();
+    },
+    diagLabel(k) {
+      return ({ continuity: '连贯性', physical: '物理合理', character: '角色一致', first_last: '首尾衔接' })[k] || k;
+    },
+    diagColor(v) { return v >= 8 ? 'text-emerald-400' : v >= 6 ? 'text-amber-400' : 'text-rose-400'; },
+    shotTitle(sh) {
+      // 旧版读的是后端根本不存在的两个字段，结果每条都退化成「镜头」二字，
+      // 8 个分镜长得一模一样，根本分不清哪个是哪个。现在以台词为主标识。
+      const t = (sh.subtitle || '').trim() || (sh.video_prompt || '').trim();
+      return t ? (t.length > 26 ? t.slice(0, 26) + '…' : t) : ('镜头 #' + sh.id);
+    },
+    statusText(s) { return ({ done: '已完成', failed: '失败', ready: '待渲染', rendering: '渲染中', pending: '待生成' })[s] || '—'; },
+    statusClass(s) {
+      return ({
+        done: 'bg-emerald-500/20 text-emerald-300',
+        failed: 'bg-rose-500/20 text-rose-300',
+        ready: 'bg-slate-700 text-slate-300',
+        pending: 'bg-slate-700 text-slate-400',
+        rendering: 'bg-amber-500/20 text-amber-300',
+      })[s] || 'bg-slate-700 text-slate-300';
+    },
+    // ③ 尾帧提示词 AI 优化：调用可配置优化元提示 + agnes-2.5-flash（不依赖 REAL，仅文本）
+    async optimizeKeyframe(sh) {
+      if (!sh.last_frame_prompt || !sh.last_frame_prompt.trim()) { this.notify('尾帧提示词为空，先写一句再优化'); return; }
+      this.optimizingKey = 'kf' + sh.id;
+      this.loading = true;
+      const d = await this.api('/api/prompt/optimize', { text: sh.last_frame_prompt, type: 'keyframe_end' });
+      this.loading = false;
+      this.optimizingKey = '';
+      if (d && d.ok && d.optimized) {
+        sh.last_frame_prompt = d.optimized;
+        this.dirty = true;
+        this.notify('✅ 镜#' + sh.id + ' 尾帧提示词已优化（AI）');
+        await this.putSpec();
+      } else {
+        this.notify('尾帧优化失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+      }
+    },
+    // ④ 视频提示词 AI 优化
+    async optimizeVideoPrompt(sh) {
+      if (!sh.video_prompt || !sh.video_prompt.trim()) { this.notify('视频提示词为空，先写一句再优化'); return; }
+      this.optimizingKey = 'vp' + sh.id;
+      this.loading = true;
+      const d = await this.api('/api/prompt/optimize', { text: sh.video_prompt, type: 'video' });
+      this.loading = false;
+      this.optimizingKey = '';
+      if (d && d.ok && d.optimized) {
+        sh.video_prompt = d.optimized;
+        this.dirty = true;
+        this.notify('✅ 镜#' + sh.id + ' 视频提示词已优化（AI）');
+        await this.putSpec();
+      } else {
+        this.notify('视频提示词优化失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+      }
+    },
+    // ④ 逐镜卡片标注「用什么方式」生成视频
+    shotMethod(sh) {
+      // 生成方式标注（按 gen_strategy 决策，与后端一致）
+      if (!sh) return '—';
+      const gs = sh.gen_strategy || 'keyframes';
+      if (gs === 'keyframes') return '首尾针图生视频';
+      if (gs === 'reference') return '单针图生视频';
+      if (gs === 'ui') return 'UI动效';
+      return '文生视频';
+    },
+    strategyBadge(gs) {
+      return { keyframes: '🎬 首尾针', reference: '🖼 单针', text2video: '🌫 文生', ui: '🖥 UI' }[gs] || (gs || '—');
+    },
+    strategyBadgeClass(gs) {
+      if (gs === 'keyframes') return 'bg-violet-500/20 text-violet-300';
+      if (gs === 'reference') return 'bg-cyan-500/20 text-cyan-300';
+      if (gs === 'text2video') return 'bg-slate-500/20 text-slate-300';
+      return 'bg-amber-500/20 text-amber-300';
+    },
+    // 设置·提示词库：加载（按类型中文显示名 + 优化元提示）
+    async loadPromptLib() {
+      const d = await this.api('/api/prompt/library');
+      if (d && d.ok && d.library) {
+        this.promptLib = d.library;
+        this.promptLabels = d.labels || {};
+        this.settingsMsg = '';
+      } else {
+        this.notify('提示词库载入失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+      }
+    },
+    async saveResolutionMode() {
+      // 生成参数开关：分辨率 test=480p/prod=720p + 画幅 portrait/landscape，存项目 meta（跨设备生效，重启不丢）
+      const mode = this.resolutionMode === 'prod' ? 'prod' : 'test';
+      const asp = this.aspectMode === 'landscape' ? 'landscape' : 'portrait';
+      this.loading = true;
+      const d = await this.api('/api/meta', { resolution_mode: mode, aspect_mode: asp }, 'PUT');
+      this.loading = false;
+      if (d && d.ok) {
+        const res = mode === 'prod' ? '720p' : '480p';
+        const ar = asp === 'landscape' ? '横屏 16:9' : '竖屏 9:16';
+        this.pushLog('生成参数已保存：' + res + ' / ' + ar);
+        this.notify('✅ 生成参数已保存：' + res + ' / ' + ar + '（后续视频按此生成）');
+      } else {
+        this.notify('保存失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+      }
+    },
+    async savePromptLib() {
+      if (!this.promptLib) return;
+      this.loading = true;
+      const d = await this.api('/api/prompt/library', this.promptLib, 'PUT');
+      this.loading = false;
+      if (d && d.ok) {
+        this.promptLib = (d.library || this.promptLib);
+        this.settingsMsg = '✅ 提示词库已保存（' + new Date().toLocaleTimeString() + '）';
+        this.notify('提示词库已保存');
+      } else {
+        this.settingsMsg = '❌ 保存失败: ' + ((d && (d.error || d.note)) || '未知错误');
+        this.notify('提示词库保存失败');
+      }
+    },
+    // 设置·提示词配置：测试一次优化（不落盘，仅预览效果）
+    async testOptimize() {
+      if (!this.optimizeTestText || !this.optimizeTestText.trim()) { this.notify('先输入一段待优化的提示词'); return; }
+      this.loading = true;
+      const d = await this.api('/api/prompt/optimize', { text: this.optimizeTestText, type: this.optimizeTestType });
+      this.loading = false;
+      if (d && d.ok && d.optimized) this.optimizeTestResult = d.optimized;
+      else this.optimizeTestResult = '❌ ' + ((d && (d.error || d.note)) || '未知错误');
+    },
+    // 设置·提示词库：切换测试面板
+    toggleTestPanel(key) {
+      if (!this.testState[key]) this.testState[key] = { open: false, input: '', result: '', loading: false };
+      this.testState[key].open = !this.testState[key].open;
+    },
+    // 设置·测试沙盒：用当前类型提示词跑一次生成
+    async runTestPrompt(key) {
+      if (!this.testState[key]) this.testState[key] = { open: true, input: '', result: '', loading: false };
+      const st = this.testState[key];
+      if (!st.input || !st.input.trim()) { this.notify('先输入测试样本'); return; }
+      st.loading = true; st.result = '生成中…';
+      try {
+        const d = await this.api('/api/prompt/test', { type: key, sample_input: st.input });
+        st.loading = false;
+        if (d && d.ok) st.result = d.output;
+        else st.result = '❌ ' + ((d && d.error) || '');
+      } catch (e) { st.loading = false; st.result = '❌ 网络错误'; }
+    },
+    // 设置·提示词库：AI 优化某类型的提示词
+    async optimizeTypePrompt(key) {
+      const cfg = this.promptLib.types[key];
+      if (!cfg || !cfg.prompt) { this.notify('该类型无提示词'); return; }
+      this.loading = true;
+      const d = await this.api('/api/prompt/optimize', { text: cfg.prompt, type: key });
+      this.loading = false;
+      if (d && d.ok && d.optimized) {
+        cfg.prompt = d.optimized;
+        this.settingsMsg = '✅ 已优化「' + (this.promptLabels[key] || key) + '」提示词';
+      } else {
+        this.settingsMsg = '❌ 优化失败: ' + ((d && d.error) || '');
+      }
+    },
+    // O3 批量任务队列
+    async loadQueue() {
+      const d = await this.api('/api/queue/list', {}, 'POST');
+      if (d && d.ok) { this.queueJobs = d.jobs || []; this.queuePaused = d.paused || false; }
+      else this.queueJobs = [];
+    },
+    async toggleQueueWorker() {
+      const p = !this.queuePaused;
+      await this.api('/api/queue/stop', { pause: p }, 'POST');
+      this.queuePaused = p;
+      this.pushLog(p ? '队列已暂停' : '队列已恢复');
+    },
+    async cancelQueueJob(id) {
+      await this.api('/api/queue/cancel', { id }, 'POST');
+      this.loadQueue();
+    },
+    pushLog(m) {
+      this.log.unshift('[' + new Date().toLocaleTimeString() + '] ' + m);
+      this.log = this.log.slice(0, 50);
+      // 关键事件同步上报服务端日志（debug 级时间线，排障顺藤摸瓜）
+      if (window.__sendLog && (m.indexOf('✅') >= 0 || m.indexOf('❌') >= 0 || m.indexOf('失败') >= 0 || m.indexOf('已生成') >= 0 || m.indexOf('已启动') >= 0 || m.indexOf('完成') >= 0)) {
+        window.__sendLog('debug', '[studio] ' + m, location.href);
+      }
+    },
+  },
+  watch: {
+    selectedShot() {
+      this.$nextTick(() => { this.dirty = false; });
+      this.saveWorkstate();  // ⑤ 选中镜记住（防抖在 saveWorkstate 内，_wsLoaded 守卫挡恢复阶段）
+    },
+    currentShot: {
+      deep: true,
+      handler(n, o) { if (n && o && n.id === o.id) this.dirty = true; },
+    },
+    activeModule(v) {
+      if (v === 'advanced' && !this.keyPool) this.loadKeyPool();
+      if (v === 'settings' && !this.promptLib) this.loadPromptLib();
+      if (v === 'image') {
+        // 进入③资产设计：确保 spec 已就绪后再自动提取中文描述。
+        // 不能同步调用——切项目/刚生成分镜时 references 可能还没加载完，提取会空跑。
+        this.$nextTick(() => this.ensureCnPrompts());
+      }
+      // 手动切换模块也记住位置（防抖统一在 saveWorkstate 内）
+      if (this.projectId && this._wsLoaded) this.saveWorkstate();
+    },
+    // 全状态记忆：模块内操控状态变化即持久化（防抖合并）
+    sourceMode() { this.saveWorkstate(); },
+    assetTab() { this.saveWorkstate(); },
+    assetDetailOpen: {
+      deep: true,
+      handler() { this.saveWorkstate(); },
+    },
+    matFilter() { this.saveWorkstate(); },
+    mergeTransition() { this.saveWorkstate(); },
+    // 输入草稿 + 面板开合 → 本机 localStorage（防抖）
+    novelInput() { this._saveUiLocalSoon(); },
+    themeInput() { this._saveUiLocalSoon(); },
+    agentOpen() { this._saveUiLocalSoon(); },
+    showLog() { this._saveUiLocalSoon(); },
+    faceOpen() { this._saveUiLocalSoon(); },
+    // 需求卡/大纲/视觉风格：生成即落本地草稿（服务端 meta 兜底，刷新不丢）
+    reqCard: { deep: true, handler() { this._saveUiLocalSoon(); } },
+    outlineData: { deep: true, handler() { this._saveUiLocalSoon(); } },
+    visualStyle: { deep: true, handler() { this._saveUiLocalSoon(); } },
+  },
+  mounted() { this.loadProjects(); },
+}).mount('#app');
+</script>
+</body>
+</html>

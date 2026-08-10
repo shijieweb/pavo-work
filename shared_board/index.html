@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>任务看板</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,system-ui,"PingFang SC",sans-serif;background:#f5f6f8;color:#222;font-size:16px}
+  header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 14px;z-index:10}
+  .topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  select,input,button{font-size:16px;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;background:#fff;min-height:44px}
+  button{background:#2563eb;color:#fff;border:none;cursor:pointer;font-weight:600}
+  button.ghost{background:#eef2ff;color:#2563eb}
+  button.danger{background:#fee2e2;color:#dc2626}
+  .wrap{padding:14px;max-width:760px;margin:0 auto}
+  .node{margin:6px 0}
+  .card{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;cursor:pointer}
+  .card:active{background:#f0f4ff}
+  .tri{width:18px;color:#9ca3af;flex:none;transition:transform .2s;font-size:12px}
+  .tri.open{transform:rotate(90deg)}
+  .ttl{flex:1;font-weight:600;word-break:break-word}
+  .badge{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .todo{background:#f3f4f6;color:#6b7280}
+  .doing{background:#dbeafe;color:#1d4ed8}
+  .blocked{background:#fee2e2;color:#dc2626}
+  .done{background:#dcfce7;color:#16a34a}
+  .pri{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap;font-weight:600}
+  .p0{background:#fee2e2;color:#dc2626}   /* 紧急 */
+  .p1{background:#ffedd5;color:#ea580c}   /* 高 */
+  .p2{background:#f3f4f6;color:#6b7280}   /* 中 */
+  .p3{background:#f8fafc;color:#94a3b8}   /* 低 */
+  .meta{font-size:11px;color:#9ca3af;margin-left:28px}
+  .children{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
+  .children.open{grid-template-rows:1fr}
+  .children>div{overflow:hidden;padding-left:22px;border-left:2px solid #eef2f7;margin-left:8px}
+  .addbtn{font-size:13px;color:#2563eb;background:none;border:none;padding:6px 4px;min-height:auto}
+  /* drawer */
+  .mask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
+  .mask.show{display:block}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(420px,92vw);background:#fff;z-index:21;transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column}
+  .drawer.show{transform:translateX(0)}
+  .dh{padding:14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;font-weight:700}
+  .db{padding:14px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:12px}
+  .db label{font-size:13px;color:#6b7280;display:block;margin-bottom:4px}
+  .db textarea,.db input,.db select{width:100%}
+  .db textarea{min-height:90px;resize:vertical}
+  .empty{color:#9ca3af;text-align:center;margin-top:40px}
+  .presbar{position:sticky;top:0;background:#eef2ff;color:#3730a3;font-size:13px;padding:6px 14px;border-bottom:1px solid #e0e7ff;display:flex;gap:16px;flex-wrap:wrap;align-items:center;z-index:9}
+  .presbar .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+  .dot.on{background:#16a34a}.dot.off{background:#cbd5e1}
+  .auditbox{margin-top:26px;border-top:1px solid #eee;padding-top:12px}
+  .ahead{font-weight:700;color:#374151;margin-bottom:8px;font-size:14px}
+  .arow{font-size:12px;color:#6b7280;padding:4px 0;border-bottom:1px solid #f3f4f6;word-break:break-all}
+  .muted{color:#9ca3af}
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <select id="projSel"><option value="">— 选择项目 —</option></select>
+    <input id="projName" placeholder="新项目名" style="flex:1;min-width:120px">
+    <input id="projOwner" placeholder="归属" value="老板" style="width:84px">
+    <button class="ghost" onclick="addProject()">+ 建项目</button>
+    <button class="ghost" onclick="changeOwner()">改归属</button>
+    <button class="ghost" onclick="copyDispatch()">复制派单</button>
+    <button onclick="addRoot()">+ 主任务</button>
+  </div>
+</header>
+<div id="presence" class="presbar"><span class="muted">无 agent 在线</span></div>
+<div class="wrap"><div id="tree"></div><div id="empty" class="empty">先建一个项目，再开始加任务</div><div id="audit" class="auditbox"></div></div>
+
+<div class="mask" id="mask" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="dh"><span>任务详情</span><button class="ghost" onclick="closeDrawer()">关闭</button></div>
+  <div class="db">
+    <div><label>标题</label><input id="d_title"></div>
+    <div><label>状态</label><select id="d_status">
+      <option value="todo">待办</option><option value="doing">进行中</option>
+      <option value="blocked">阻塞</option><option value="done">完成</option></select></div>
+    <div><label>优先级（紧急 &gt; 高 &gt; 中 &gt; 低）</label><select id="d_priority">
+      <option value="紧急">紧急</option><option value="高">高</option>
+      <option value="中">中</option><option value="低">低</option></select></div>
+    <div><label>详情（长按卡片看这里）</label><textarea id="d_detail"></textarea></div>
+    <div style="display:flex;gap:8px">
+      <button style="flex:1" onclick="saveDrawer()">保存</button>
+      <button class="ghost" style="flex:1" onclick="addChild()">+ 子任务</button>
+    </div>
+    <button class="danger" onclick="delTask()">删除此任务及子任务</button>
+  </div>
+</div>
+
+<script>
+if(location.protocol==="file:"){document.body.innerHTML='<div style="padding:24px;color:#dc2626;line-height:1.7">请通过 <b>http://电脑局域网IP:8788</b> 打开此页面（手机与电脑连同一 WiFi，用电脑的 IP 访问），<br>不要直接双击 html 文件，否则前端连不上服务。</div>';}
+const API=location.origin;
+// 看板令牌：优先 ?token=，其次服务端注入的 window.__BOARD_TOKEN__（本地自用零配置），再退回 localStorage
+let BOARD_TOKEN=new URLSearchParams(location.search).get('token')||window.__BOARD_TOKEN__||localStorage.getItem('board_token')||'';
+if(BOARD_TOKEN)localStorage.setItem('board_token',BOARD_TOKEN);
+const ERR=msg=>alert("操作失败："+msg+"\n请确认：①用 http://电脑局域网IP:8788 打开（不要双击文件）；②手机与电脑同一WiFi；③电脑防火墙允许8788入站");
+async function api(url,opt){opt=opt||{};if(BOARD_TOKEN){opt.headers=Object.assign({},opt.headers||{},{'X-Board-Token':BOARD_TOKEN});}try{const r=await fetch(API+url,opt);if(!r.ok)throw new Error("HTTP "+r.status);if(r.status===204)return{};return await r.json();}catch(e){ERR(e.message);throw e;}}
+let projects=[], tasks=[], cur=null, expanded=new Set(), curTask=null;
+const ST={todo:"待办",doing:"进行中",blocked:"阻塞",done:"完成"};
+
+async function load(){
+  try{
+    projects=await api("/api/projects");
+    const sel=document.getElementById("projSel");
+    sel.innerHTML='<option value="">— 选择项目 —</option>'+projects.map(p=>`<option value="${p.id}">${p.name}${p.owner&&p.owner!=="老板"?" ("+p.owner+")":""}</option>`).join("");
+    if(cur) sel.value=cur;
+    if(cur) tasks=await api("/api/tasks?project_id="+cur);
+    render();
+  }catch(e){}
+}
+function setProj(id){cur=id; if(id) load(); else {tasks=[];render();}}
+document.getElementById("projSel").onchange=e=>{ setProj(e.target.value); const p=projects.find(x=>x.id==e.target.value); document.getElementById("projOwner").value=p?(p.owner||"老板"):"老板"; };
+
+async function addProject(){
+  const n=document.getElementById("projName").value.trim();
+  if(!n) return alert("输入项目名");
+  const owner=document.getElementById("projOwner").value.trim()||"老板";
+  try{
+    const r=await api("/api/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n,owner:owner})});
+    document.getElementById("projName").value=""; cur=r.id; await load(); alert("已创建项目："+n+"（归属："+owner+"）");
+  }catch(e){}
+}
+async function changeOwner(){
+  if(!cur) return alert("先选择项目");
+  const owner=document.getElementById("projOwner").value.trim()||"老板";
+  try{
+    await api("/api/projects/"+cur,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({owner:owner})});
+    await load(); alert("已改归属："+owner);
+  }catch(e){}
+}
+async function copyDispatch(){
+  if(!cur) return alert("先选择项目");
+  const p=projects.find(x=>x.id==cur); if(!p) return;
+  const owner=p.owner||"老板";
+  const txt="【派单】项目："+p.name+"\n负责人(owner)："+owner+"\n请按 owner="+owner+" 拉取此项目，先查看你的任务清单与计划，按优先级（紧急>高>中>低）从高到低推进，先做优先级高的任务；每做完一步用 PUT 更新状态并定时回报进度。";
+  try{ await navigator.clipboard.writeText(txt); alert("已复制派单信息，粘贴给 agent 即可：\n\n"+txt); }
+  catch(e){ fallbackCopy(txt); }
+}
+function fallbackCopy(txt){
+  const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); alert("已复制派单信息：\n\n"+txt); }
+  catch(e){ alert("复制失败，请手动复制：\n\n"+txt); }
+  document.body.removeChild(ta);
+}
+async function addRoot(){
+  if(!cur) return alert("先建/选项目");
+  try{ await api("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({project_id:cur,parent_id:null,title:"新任务",detail:"",author:"老板",priority:"高"})});
+  await load(); }catch(e){}
+}
+async function addChild(){
+  if(!curTask) return;
+  try{ await api("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({project_id:cur,parent_id:curTask.id,title:"子任务",detail:"",author:"老板",priority:"高"})});
+  expanded.add(curTask.id); await load(); openDrawer(curTask.id); }catch(e){}
+}
+async function delTask(){
+  if(!curTask) return; if(!confirm("删除此任务及所有子任务？")) return;
+  try{ await api("/api/tasks/"+curTask.id,{method:"DELETE"}); closeDrawer(); await load(); }catch(e){}
+}
+function saveDrawer(){
+  if(!curTask) return;
+  const d={title:document.getElementById("d_title").value,
+           status:document.getElementById("d_status").value,
+           priority:document.getElementById("d_priority").value,
+           detail:document.getElementById("d_detail").value};
+  api("/api/tasks/"+curTask.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(()=>{closeDrawer();load();}).catch(()=>{});
+}
+function openDrawer(id){
+  curTask=tasks.find(t=>t.id==id); if(!curTask) return;
+  document.getElementById("d_title").value=curTask.title;
+  document.getElementById("d_status").value=curTask.status;
+  document.getElementById("d_priority").value=curTask.priority||"中";
+  document.getElementById("d_detail").value=curTask.detail||"";
+  document.getElementById("drawer").classList.add("show");
+  document.getElementById("mask").classList.add("show");
+}
+function closeDrawer(){document.getElementById("drawer").classList.remove("show");document.getElementById("mask").classList.remove("show");curTask=null;}
+
+function build(id){
+  const kids=tasks.filter(t=>t.parent_id==id);
+  const box=document.createElement("div");
+  kids.forEach(t=>{
+    const node=document.createElement("div"); node.className="node";
+    const card=document.createElement("div"); card.className="card";
+    const tri=document.createElement("span"); tri.className="tri"+(expanded.has(t.id)?" open":""); tri.textContent="▶";
+    const tt=document.createElement("span"); tt.className="ttl"; tt.textContent=t.title;
+    const pr=document.createElement("span"); const priArr=["紧急","高","中","低"]; const pi=priArr.indexOf(t.priority); pr.className="pri p"+(pi>=0?pi:2); pr.textContent=t.priority||"中";
+    const b=document.createElement("span"); b.className="badge "+t.status; b.textContent=ST[t.status];
+    card.append(tri,tt,pr,b);
+    const hasKids=tasks.some(k=>k.parent_id==t.id);
+    card.onclick=()=>{ if(hasKids){expanded.has(t.id)?expanded.delete(t.id):expanded.add(t.id);render();} };
+    // 长按看详情（移动端）
+    let timer=null;
+    card.ontouchstart=()=>{timer=setTimeout(()=>openDrawer(t.id),500);};
+    card.ontouchend=()=>clearTimeout(timer);
+    card.ondblclick=()=>openDrawer(t.id);
+    const det=document.createElement("div"); det.className="meta";
+    det.textContent=(t.author?("👤 "+t.author+" · "):"")+(t.updated||"");
+    const ch=document.createElement("div"); ch.className="children"+(expanded.has(t.id)?" open":"");
+    const inner=document.createElement("div"); inner.append(build(t.id));
+    ch.append(inner);
+    node.append(card,det,ch);
+    if(hasKids){const ab=document.createElement("button");ab.className="addbtn";ab.textContent="+ 子任务";
+      ab.onclick=(e)=>{e.stopPropagation();curTask=t;addChild();}; node.append(ab);}
+    box.append(node);
+  });
+  return box;
+}
+function render(){
+  const tree=document.getElementById("tree"); tree.innerHTML="";
+  if(!cur){document.getElementById("empty").style.display="block";return;}
+  document.getElementById("empty").style.display="none";
+  const roots=tasks.filter(t=>t.parent_id==null);
+  if(!roots.length){tree.innerHTML='<div class="empty">这个项目还没有任务，点上方「+ 主任务」</div>';return;}
+  tree.append(build(null));
+}
+async function loadPresence(){
+  try{ const list=await api("/api/presence"); renderPresence(list); }catch(e){}
+}
+async function loadAudit(){
+  try{ const u=cur?("/api/audit?project_id="+cur):"/api/audit"; const list=await api(u); renderAudit(list); }catch(e){}
+}
+function renderPresence(list){
+  const box=document.getElementById("presence");
+  if(!list||!list.length){ box.innerHTML='<span class="muted">无 agent 在线</span>'; return; }
+  const now=Date.now();
+  box.innerHTML=list.map(a=>{
+    const t=new Date(a.last_seen.replace(/-/g,"/")).getTime();
+    const diff=Math.max(0,Math.floor((now-t)/60000));
+    const online=diff<=5;
+    const ago=diff===0?"刚刚":(diff+"分钟前");
+    return '<span><span class="dot '+(online?"on":"off")+'"></span>'+a.agent+" · "+ago+"</span>";
+  }).join("");
+}
+function renderAudit(list){
+  const box=document.getElementById("audit");
+  const head='<div class="ahead">操作日志'+(cur?'（本项目）':'（全部）')+'</div>';
+  if(!list||!list.length){ box.innerHTML=head+'<div class="muted">暂无记录</div>'; return; }
+  box.innerHTML=head+list.slice(0,20).map(r=>'<div class="arow">['+r.ts+'] '+r.agent+" "+r.action+" "+r.target+"</div>").join("");
+}
+setInterval(()=>{if(cur) load(); loadPresence(); loadAudit();},5000);
+load(); loadPresence(); loadAudit();
+</script>
+</body>
+</html>

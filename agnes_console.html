@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>AGNES 控制台 · 移动端</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0F0E0E; --card:rgba(255,255,255,.05); --card2:rgba(255,255,255,.08);
+    --text:#F2F2F2; --muted:#A8A8A8; --rose:#FF2D55; --gold:#E8C268;
+    --border:rgba(255,255,255,.12); --green:#7FE7A0; --codebg:#0A0A0A; --danger:#FF6B6B;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:#050505;color:var(--text);
+    font-family:"Noto Sans SC",system-ui,-apple-system,"PingFang SC",sans-serif;}
+  body{display:flex;justify-content:center;min-height:100vh;}
+  .phone{width:100%;max-width:430px;background:var(--bg);min-height:100vh;
+    display:flex;flex-direction:column;}
+  /* 状态栏 */
+  .statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;font-size:15px;font-weight:600;flex:0 0 auto;}
+  .statusbar svg{display:block;}
+  /* 顶栏 */
+  .topbar{height:56px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;flex:0 0 auto;}
+  .brand{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:900;}
+  .brand .dot{width:10px;height:10px;border-radius:5px;background:var(--rose);}
+  .mtag{padding:5px 10px;border-radius:12px;background:var(--card2);
+    font-size:11px;font-weight:700;color:var(--rose);}
+  /* 测试模式横幅 */
+  .warnbanner{margin:0 16px 8px;padding:8px 12px;border-radius:10px;
+    background:rgba(232,194,104,.12);border:1px solid rgba(232,194,104,.4);
+    font-size:11px;color:var(--gold);line-height:1.5;}
+  /* Tab */
+  .tabs{display:flex;gap:8px;padding:6px 16px 10px;flex:0 0 auto;}
+  .tab{flex:1;text-align:center;padding:10px 0;border-radius:12px;font-size:13px;
+    font-weight:500;background:var(--card);color:var(--muted);cursor:pointer;
+    transition:.15s;}
+  .tab.active{background:var(--rose);color:#fff;font-weight:700;}
+  /* 面板 */
+  .panel{display:none;flex-direction:column;gap:14px;padding:4px 20px 28px;flex:1 1 auto;}
+  .panel.active{display:flex;}
+  .section-title{font-size:16px;font-weight:700;margin:2px 0 -2px;}
+  .hero-card{background:var(--card);border-radius:16px;padding:16px;display:flex;
+    flex-direction:column;gap:8px;}
+  .hero-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .hero-name{font-size:16px;font-weight:700;}
+  .badge-gold{background:var(--gold);color:#0F0E0E;font-size:10px;font-weight:700;
+    padding:3px 8px;border-radius:6px;white-space:nowrap;}
+  .hero-ep{font-size:12px;color:var(--muted);word-break:break-all;}
+  .hero-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+  /* 表单 */
+  .field{display:flex;flex-direction:column;gap:8px;}
+  .field-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .field-head label{font-size:13px;font-weight:600;}
+  .field-btns{display:flex;gap:6px;flex-wrap:wrap;}
+  .field>label{font-size:13px;font-weight:600;}
+  textarea,input[type=text],input[type=number]{width:100%;background:var(--card);
+    border:1px solid var(--border);border-radius:12px;color:var(--text);
+    font-family:inherit;font-size:13px;padding:12px 14px;resize:vertical;outline:none;}
+  textarea::placeholder,input::placeholder{color:var(--muted);}
+  textarea:focus,input:focus{border-color:var(--rose);}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{padding:8px 14px;border-radius:10px;background:var(--card2);
+    font-size:13px;color:var(--muted);cursor:pointer;user-select:none;transition:.12s;
+    border:1px solid transparent;}
+  .chip.sel{background:var(--rose);color:#fff;font-weight:700;}
+  .hint{font-size:11px;color:var(--muted);}
+  .pill{background:var(--card2);border-radius:8px;padding:5px 12px;font-size:12px;
+    font-weight:700;display:inline-flex;}
+  .param-row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .param-row input[type=number]{width:90px;text-align:center;padding:8px;}
+  .switch-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .btn{width:100%;padding:14px;border-radius:24px;border:none;background:var(--rose);
+    color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;transition:.12s;}
+  .btn:active{transform:scale(.98);}
+  .btn:disabled{opacity:.6;cursor:not-allowed;}
+  .btn svg{width:18px;height:18px;}
+  /* 小按钮（增强/自动配置/选库/入资产库） */
+  .mini{padding:6px 10px;border-radius:9px;border:1px solid var(--border);
+    background:var(--card2);color:var(--text);font-family:inherit;font-size:11px;
+    font-weight:600;cursor:pointer;transition:.12s;white-space:nowrap;}
+  .mini:hover{border-color:var(--rose);}
+  .mini:disabled{opacity:.4;cursor:not-allowed;}
+  .mini.icon{width:42px;padding:0;height:42px;font-size:16px;display:flex;align-items:center;justify-content:center;}
+  .mini.danger{border-color:rgba(255,107,107,.5);color:var(--danger);}
+  .url-row{display:flex;gap:8px;align-items:center;}
+  .url-row input{flex:1;}
+  /* 响应区 */
+  .resp-label{font-size:16px;font-weight:700;}
+  .preview{width:100%;border-radius:14px;overflow:hidden;background:#000;
+    min-height:60px;display:flex;align-items:center;justify-content:center;}
+  .preview img,.preview video{max-width:100%;display:block;}
+  .preview .ph{color:var(--muted);font-size:12px;padding:24px;}
+  pre.code{background:var(--codebg);border:1px solid var(--border);border-radius:10px;
+    padding:12px;font-size:11px;line-height:1.55;color:var(--green);overflow:auto;
+    white-space:pre-wrap;word-break:break-all;margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .status-line{font-size:12px;color:var(--gold);min-height:16px;}
+  .err-line{font-size:12px;color:#FF6B6B;min-height:16px;}
+  .progress{width:100%;height:10px;border-radius:5px;background:var(--card2);overflow:hidden;}
+  .progress>div{height:100%;width:0;background:var(--rose);transition:width .4s;}
+  .reasoning{background:rgba(232,194,104,.08);border:1px solid rgba(232,194,104,.3);
+    border-radius:10px;padding:10px 12px;font-size:12px;color:var(--gold);
+    line-height:1.6;white-space:pre-wrap;margin-top:8px;}
+  .reasoning summary{cursor:pointer;font-weight:700;margin-bottom:6px;}
+  .msg-bubble{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;}
+  .msg-role{font-size:11px;font-weight:700;color:var(--rose);margin-bottom:6px;}
+  .subhead{font-size:13px;font-weight:600;margin-top:2px;}
+  .hidden{display:none!important;}
+
+  /* ===== 资产库 ===== */
+  .assets-section{margin:6px 16px 18px;padding:14px;border:1px solid var(--border);
+    border-radius:16px;background:rgba(255,255,255,.03);}
+  .section-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .asset-count{font-size:11px;font-weight:700;background:var(--card2);
+    border-radius:8px;padding:3px 9px;color:var(--gold);}
+  .asset-actions{margin-left:auto;display:flex;gap:6px;}
+  .asset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+  /* 选图弹窗内的网格：数据过多时独立纵向滚动，避免被弹窗裁掉 */
+  #picker-grid{max-height:62vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:4px;}
+  #picker-grid::-webkit-scrollbar{width:6px;}
+  #picker-grid::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:3px;}
+  #picker-grid::-webkit-scrollbar-track{background:transparent;}
+  .asset-card{position:relative;border-radius:12px;overflow:hidden;background:#000;
+    border:2px solid transparent;cursor:pointer;aspect-ratio:9/16;display:flex;
+    align-items:center;justify-content:center;}
+  .asset-card img,.asset-card video{width:100%;height:100%;object-fit:cover;display:block;}
+  .asset-card.sel{border-color:var(--rose);}
+  .asset-card .asset-type{position:absolute;top:4px;left:4px;font-size:9px;font-weight:700;
+    background:rgba(0,0,0,.6);color:#fff;border-radius:5px;padding:2px 5px;z-index:2;}
+  .asset-card .asset-name{position:absolute;bottom:0;left:0;right:0;font-size:9px;
+    background:linear-gradient(transparent,rgba(0,0,0,.8));color:#fff;padding:10px 5px 4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2;}
+  .asset-card .asset-check{position:absolute;top:4px;right:4px;width:18px;height:18px;
+    border-radius:50%;background:rgba(0,0,0,.5);border:2px solid #fff;z-index:3;}
+  .asset-card.sel .asset-check{background:var(--rose);}
+  .empty-hint{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
+
+  /* ===== 设置 ===== */
+  .settings-section{margin:0 16px 26px;padding:14px;border:1px solid var(--border);
+    border-radius:16px;background:rgba(255,255,255,.03);}
+  .settings-body{display:flex;flex-direction:column;gap:12px;margin-top:12px;}
+  .set-field{display:flex;flex-direction:column;gap:6px;}
+  .set-field>label{font-size:12px;font-weight:600;color:var(--muted);}
+  .set-field textarea{min-height:64px;font-size:12px;line-height:1.5;}
+  .set-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
+  .set-row label{font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--muted);}
+  .settings-actions{display:flex;gap:8px;margin-top:4px;}
+  .toggle{cursor:pointer;}
+
+  /* ===== 弹窗 ===== */
+  .modal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;}
+  .modal-mask{position:absolute;inset:0;background:rgba(0,0,0,.7);}
+  .modal-box{position:relative;z-index:2;width:92%;max-width:400px;max-height:80vh;
+    background:#161515;border:1px solid var(--border);border-radius:16px;padding:14px;
+    display:flex;flex-direction:column;gap:10px;overflow:hidden;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:14px;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 状态栏 -->
+  <div class="statusbar">
+    <span>9:41</span>
+    <svg width="60" height="20" viewBox="0 0 60 20" fill="none">
+      <rect x="0" y="10" width="3" height="6" rx="1" fill="#F2F2F2"/>
+      <rect x="5" y="7" width="3" height="9" rx="1" fill="#F2F2F2"/>
+      <rect x="10" y="4" width="3" height="12" rx="1" fill="#F2F2F2"/>
+      <rect x="15" y="1" width="3" height="15" rx="1" fill="#F2F2F2"/>
+      <path d="M24 13c2-2 5-2 7 0" stroke="#F2F2F2" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M22 10c3.5-3.5 8.5-3.5 12 0" stroke="#F2F2F2" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="28.5" cy="13" r="1.4" fill="#F2F2F2"/>
+      <rect x="37" y="5" width="18" height="11" rx="3" fill="none" stroke="#F2F2F2" stroke-width="1.4"/>
+      <rect x="39" y="7" width="12" height="7" rx="1.5" fill="#F2F2F2"/>
+      <rect x="56" y="8" width="2" height="5" rx="1" fill="#F2F2F2"/>
+    </svg>
+  </div>
+
+  <!-- 顶栏 -->
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>AGNES 控制台</div>
+    <div class="mtag" id="topTag">IMAGE 2.1</div>
+  </div>
+
+  <div class="warnbanner">⚠️ 测试模式：API 密钥已内嵌于本文件，仅限本地 / 内网调试。若预览面板报 <b>Failed to fetch</b>，请运行 <b>agnes_proxy.py</b> 后改用 <b>http://localhost:8787/</b> 打开（同源绕开跨域）。新增：资产库 / 提示词增强 / 自动配置 / 设置。</div>
+
+  <!-- Tab 切换 -->
+  <div class="tabs">
+    <div class="tab active" data-tab="image">图像模型</div>
+    <div class="tab" data-tab="video">视频模型</div>
+    <div class="tab" data-tab="text">文本模型</div>
+  </div>
+
+  <!-- ============ 图像面板 ============ -->
+  <div class="panel active" id="panel-image">
+    <div class="hero-card">
+      <div class="hero-row">
+        <span class="hero-name">agnes-image-2.1-flash</span>
+        <span class="badge-gold">同步返回</span>
+      </div>
+      <div class="hero-ep">POST /v1/images/generations</div>
+      <div class="hero-desc">角色参考图 · 场景概念图 · 文生图 / 图生图（高密度构图）</div>
+    </div>
+
+    <div class="field">
+      <div class="field-head">
+        <label>prompt（必填）</label>
+        <span class="field-btns"><button class="mini" data-enhance="image" data-target="img-prompt">✨优化</button></span>
+      </div>
+      <textarea id="img-prompt" rows="3" placeholder="年轻女子都市夜景，电影感，9:16 竖屏，胸上构图"></textarea>
+    </div>
+
+    <div class="field">
+      <label>模式</label>
+      <div class="chips" data-group="img-mode">
+        <div class="chip sel" data-value="t2i">文生图</div>
+        <div class="chip" data-value="i2i">图生图</div>
+      </div>
+    </div>
+    <div class="field hidden" id="img-input-wrap">
+      <div class="field-head">
+        <label>输入图 URL（图生图，须公开 HTTPS）</label>
+        <button class="mini" data-pick="img-input-url">📦 选图</button>
+      </div>
+      <div class="url-row">
+        <input type="text" id="img-input-url" placeholder="https://.../ref.png" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>尺寸档位 size（推荐档位）</label>
+      <div class="chips" data-group="img-size">
+        <div class="chip" data-value="1K">1K</div>
+        <div class="chip sel" data-value="2K">2K</div>
+        <div class="chip" data-value="3K">3K</div>
+        <div class="chip" data-value="4K">4K</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>比例 ratio（仅档位生效）</label>
+      <div class="chips" data-group="img-ratio">
+        <div class="chip sel" data-value="9:16">9:16</div>
+        <div class="chip" data-value="16:9">16:9</div>
+        <div class="chip" data-value="1:1">1:1</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>response_format（放 extra_body）</label>
+      <div class="chips" data-group="img-fmt">
+        <div class="chip sel" data-value="url">url</div>
+        <div class="chip" data-value="b64_json">b64_json</div>
+      </div>
+    </div>
+
+    <button class="btn" id="img-gen">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg>
+      生成图像
+    </button>
+
+    <div class="status-line" id="img-status"></div>
+    <div class="err-line" id="img-err"></div>
+
+    <div class="resp-label">响应预览</div>
+    <div class="preview" id="img-preview"><span class="ph">生成结果将显示在这里</span></div>
+    <button class="mini hidden" id="img-to-asset" style="align-self:flex-start;">＋加入资产库</button>
+    <pre class="code" id="img-json">// 返回 JSON 将显示在这里</pre>
+  </div>
+
+  <!-- ============ 视频面板 ============ -->
+  <div class="panel" id="panel-video">
+    <div class="hero-card">
+      <div class="hero-row">
+        <span class="hero-name">agnes-video-v2.0</span>
+        <span class="badge-gold">异步轮询</span>
+      </div>
+      <div class="hero-ep">POST /v1/videos → GET /agnesapi?video_id=</div>
+      <div class="hero-desc">镜头成片 · 图生视频锁脸 · 多图关键帧动画（推荐）</div>
+    </div>
+
+    <div class="field">
+      <div class="field-head">
+        <label>prompt（必填，建议纯英文）</label>
+        <span class="field-btns">
+          <button class="mini" data-enhance="video" data-target="vid-prompt">✨优化</button>
+          <button class="mini" data-autocfg="video">🎯自动配置</button>
+        </span>
+      </div>
+      <textarea id="vid-prompt" rows="3" placeholder="A young woman walking in neon city, cinematic tracking shot, 9:16 vertical, stable face"></textarea>
+    </div>
+
+    <div class="field">
+      <label>模式 mode</label>
+      <div class="chips" data-group="vid-mode">
+        <div class="chip" data-value="t2v">文生视频</div>
+        <div class="chip sel" data-value="i2v">图生视频</div>
+        <div class="chip" data-value="kf">关键帧</div>
+      </div>
+    </div>
+    <div class="field hidden" id="vid-i2v-wrap">
+      <div class="field-head">
+        <label>首帧图 URL（图生视频）</label>
+        <button class="mini" data-pick="vid-i2v-url">📦 选图</button>
+      </div>
+      <div class="url-row"><input type="text" id="vid-i2v-url" placeholder="https://.../first_frame.png" /></div>
+    </div>
+    <div class="field hidden" id="vid-kf-wrap">
+      <div class="field-head">
+        <label>关键帧图 URL（2 张，首→末帧过渡）</label>
+        <button class="mini" data-pick="vid-kf-url1">📦 首帧</button>
+      </div>
+      <div class="url-row"><input type="text" id="vid-kf-url1" placeholder="首帧 https://.../f1.png" style="margin-bottom:8px;" /></div>
+      <div class="field-head">
+        <label></label>
+        <button class="mini" data-pick="vid-kf-url2">📦 末帧</button>
+      </div>
+      <div class="url-row"><input type="text" id="vid-kf-url2" placeholder="末帧 https://.../f2.png" /></div>
+    </div>
+
+    <div class="field">
+      <label>分辨率（9:16 竖屏短剧）</label>
+      <div class="chips" data-group="vid-res">
+        <div class="chip sel" data-value="9:16">9:16 · 720×1280</div>
+        <div class="chip" data-value="16:9">16:9 · 1280×720</div>
+        <div class="chip" data-value="1:1">1:1 · 1024×1024</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>时长（num_frames = 8n+1）</label>
+      <div class="chips" data-group="vid-dur">
+        <div class="chip" data-value="3">3s · 73帧</div>
+        <div class="chip sel" data-value="5">5s · 121帧</div>
+        <div class="chip" data-value="6">6s · 145帧</div>
+        <div class="chip" data-value="7">7s · 169帧</div>
+        <div class="chip" data-value="8">8s · 193帧</div>
+        <div class="chip" data-value="10">10s · 241帧</div>
+        <div class="chip" data-value="14">14s · 337帧</div>
+        <div class="chip" data-value="18">18s · 433帧</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-head">
+        <label>negative_prompt（可选）</label>
+        <button class="mini" data-enhance="negative" data-target="vid-neg">✨生成</button>
+      </div>
+      <input type="text" id="vid-neg" placeholder="blurry, deformed face, extra fingers, watermarks" />
+    </div>
+
+    <button class="btn" id="vid-submit">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l15-7-5 15-3-6-7-2z" fill="#fff"/></svg>
+      提交生成
+    </button>
+
+    <div class="status-line" id="vid-status"></div>
+    <div class="err-line" id="vid-err"></div>
+    <div class="progress"><div id="vid-progress"></div></div>
+
+    <div class="resp-label">生成状态 / 响应</div>
+    <div class="preview" id="vid-preview"><span class="ph">成片将显示在这里</span></div>
+    <button class="mini hidden" id="vid-to-asset" style="align-self:flex-start;">＋加入资产库</button>
+    <pre class="code" id="vid-json">// 返回 JSON 将显示在这里</pre>
+  </div>
+
+  <!-- ============ 文本面板 ============ -->
+  <div class="panel" id="panel-text">
+    <div class="hero-card">
+      <div class="hero-row">
+        <span class="hero-name">agnes-2.5-flash</span>
+        <span class="badge-gold">512K 上下文</span>
+      </div>
+      <div class="hero-ep">POST /v1/chat/completions</div>
+      <div class="hero-desc">剧本 / 分镜生成 · 工具调用 · 图像理解 · 代码 / 代理工作流</div>
+    </div>
+
+    <div class="field">
+      <label>system（可选，设定角色）</label>
+      <textarea id="txt-sys" rows="2" placeholder="你是一个顶级短剧编剧，擅长红果爆款结构…"></textarea>
+    </div>
+    <div class="field">
+      <div class="field-head">
+        <label>user message（必填）</label>
+        <button class="mini" data-enhance="text" data-target="txt-user">✨优化</button>
+      </div>
+      <textarea id="txt-user" rows="3" placeholder="把这段小说改成红果爆款分镜：前3秒强钩子、每15秒刷新、台词≤15字。输出 JSON。"></textarea>
+    </div>
+
+    <div class="section-title">生成参数</div>
+    <div class="field">
+      <div class="param-row">
+        <label>temperature（0–2，越低越确定）</label>
+        <input type="number" id="txt-temp" value="0.7" step="0.1" min="0" max="2" />
+      </div>
+    </div>
+    <div class="field">
+      <div class="param-row">
+        <label>top_p（0–1，核采样）</label>
+        <input type="number" id="txt-topp" value="1.0" step="0.1" min="0" max="1" />
+      </div>
+    </div>
+    <div class="field">
+      <div class="param-row">
+        <label>max_tokens（≤ 65536）</label>
+        <input type="number" id="txt-maxt" value="1024" step="128" min="1" max="65536" />
+      </div>
+    </div>
+
+    <div class="section-title">高级能力</div>
+    <div class="switch-row" data-group="txt-adv">
+      <div class="chip sel" data-value="stream">流式输出</div>
+      <div class="chip" data-value="think">推理 Thinking</div>
+      <div class="chip" data-value="tool">工具调用</div>
+      <div class="chip" data-value="img">图像理解</div>
+    </div>
+    <div class="field hidden" id="txt-img-wrap">
+      <label>图像 URL（图像理解，须公开 HTTPS）</label>
+      <input type="text" id="txt-img-url" placeholder="https://.../scene.png" />
+    </div>
+
+    <button class="btn" id="txt-send">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-8-8 18-2-7-8-3z" fill="#fff"/></svg>
+      发送请求
+    </button>
+
+    <div class="status-line" id="txt-status"></div>
+    <div class="err-line" id="txt-err"></div>
+
+    <div class="resp-label">响应预览</div>
+    <div id="txt-reasoning-slot"></div>
+    <div class="msg-bubble" id="txt-msg"><span class="msg-role">assistant</span><span id="txt-content">回复将显示在这里</span></div>
+    <pre class="code" id="txt-json">// 返回 JSON 将显示在这里</pre>
+  </div>
+
+  <!-- ============ 资产库 ============ -->
+  <div class="assets-section">
+    <div class="section-head">
+      <span class="resp-label">📦 资产库</span>
+      <span class="asset-count" id="asset-count">0</span>
+      <div class="asset-actions">
+        <button class="mini" id="asset-export">导出</button>
+        <button class="mini" id="asset-import">导入</button>
+        <button class="mini" id="asset-recover">恢复本地数据</button>
+        <button class="mini" id="asset-merge">拼接选中视频</button>
+        <button class="mini danger" id="asset-del">删除选中</button>
+      </div>
+      <input type="file" id="asset-import-file" accept="application/json,.json" style="display:none" />
+    </div>
+    <div class="asset-grid" id="asset-grid"></div>
+    <div class="empty-hint" id="asset-empty">生成图片 / 视频后可点「＋加入资产库」；多选视频可拼接。数据经本地代理同步保存，localhost 与 127.0.0.1 共享同一份。<b>若之前是在预览面板里加的资产、现在看不见</b>：说明数据卡在预览面板的源里——请在该预览页点「导出」下载 JSON，再回本页点「导入」即可搬运过来（每次保存也会镜像到当前源，导出一定能拿到）。</div>
+  </div>
+
+  <!-- ============ 设置 ============ -->
+  <div class="settings-section">
+    <div class="section-head" id="settings-toggle" style="cursor:pointer;">
+      <span class="resp-label">⚙️ 设置</span>
+      <span class="hint" id="settings-hint">点击展开 / 收起</span>
+    </div>
+    <div class="settings-body hidden" id="settings-body">
+      <div class="set-field">
+        <label>图像提示词增强模板</label>
+        <textarea id="set-ei" data-key="enhance.image"></textarea>
+      </div>
+      <div class="set-field">
+        <label>视频提示词增强模板</label>
+        <textarea id="set-ev" data-key="enhance.video"></textarea>
+      </div>
+      <div class="set-field">
+        <label>负面词生成模板</label>
+        <textarea id="set-en" data-key="enhance.negative"></textarea>
+      </div>
+      <div class="set-field">
+        <label>文本优化模板</label>
+        <textarea id="set-et" data-key="enhance.text"></textarea>
+      </div>
+      <div class="set-field">
+        <label>视频自动配置模板（返回 JSON）</label>
+        <textarea id="set-acv" data-key="autoConfig.video"></textarea>
+      </div>
+      <div class="set-field">
+        <label>图像自动配置模板（返回 JSON）</label>
+        <textarea id="set-aci" data-key="autoConfig.image"></textarea>
+      </div>
+      <div class="set-row">
+        <label>增强模型
+          <select id="set-model" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-family:inherit;">
+            <option value="agnes-2.5-flash">agnes-2.5-flash</option>
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+          </select>
+        </label>
+        <label>温度<input type="number" id="set-temp" value="0.6" step="0.1" min="0" max="2" style="width:64px;" /></label>
+        <label>最大 token<input type="number" id="set-max" value="600" step="64" min="64" max="4000" style="width:80px;" /></label>
+      </div>
+      <div class="set-row">
+        <label class="toggle"><input type="checkbox" id="set-facelock" /> 视频 prompt 自动追加人脸稳定约束</label>
+        <label class="toggle"><input type="checkbox" id="set-vertical" /> 图像 prompt 自动追加 9:16 竖屏锚点</label>
+      </div>
+      <div class="settings-actions">
+        <button class="mini" id="settings-save">保存设置</button>
+        <button class="mini danger" id="settings-reset">恢复默认</button>
+      </div>
+      <div class="hint">提示：增强 / 自动配置会调用上方增强模型。后台不可见的优化开关（人脸约束 / 竖屏锚点）会在生成时自动追加到 prompt，可在「资产库上方生成结果」中核对实际发送内容。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 选图弹窗 ============ -->
+<div class="modal hidden" id="picker-modal">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-box">
+    <div class="modal-head"><span>从资产库选择图片</span><button class="mini" data-close>✕</button></div>
+    <div class="asset-grid" id="picker-grid"></div>
+    <div class="empty-hint hidden" id="picker-empty">资产库暂无图片，请先生成图片并加入资产库。</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   AGNES 控制台 · 真实调用（测试模式，密钥内嵌）
+   端点与参数严格对齐 ~/.workbuddy/skills/agnes-ai/scripts/agnes_client.py
+   ============================================================ */
+const API_KEY   = "cpk-woRMxygEbhxYAXSL4NXsYdHhhUBzrMIeyl12UCY3YgQglw9e";
+const API_ROOT  = "https://apihub.agnes-ai.cn";
+/* 同源模式：file:// 双击 → 直连 API_ROOT；http(s):// 由代理托管 → 同源相对路径 */
+const PROXY_BASE = "";
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const val = id => (document.getElementById(id).value || "").trim();
+const setVal = (id, v) => { document.getElementById(id).value = v; };
+
+function resolveBase(){
+  if(PROXY_BASE) return PROXY_BASE;
+  if(location.protocol === 'file:') return API_ROOT;
+  return '';
+}
+
+async function callApi(path, method, body){
+  const url = resolveBase() + path;
+  const headers = { "Content-Type":"application/json", "Authorization":"Bearer " + API_KEY };
+  const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch(e){ data = text; }
+  if(!res.ok){
+    const detail = (typeof data === "object") ? JSON.stringify(data).slice(0,300) : text.slice(0,300);
+    throw new Error("HTTP " + res.status + " " + detail);
+  }
+  return data;
+}
+
+/* ---------- 通用 chip 单选 ---------- */
+function selected(group){
+  const el = document.querySelector('[data-group="'+group+'"] .chip.sel');
+  return el ? el.dataset.value : null;
+}
+function selectChip(group, value){
+  const g = document.querySelector('[data-group="'+group+'"]');
+  if(!g) return;
+  g.querySelectorAll('.chip').forEach(c => c.classList.toggle('sel', c.dataset.value === value));
+  onChipChange();
+}
+function initChips(){
+  document.querySelectorAll('[data-group]').forEach(g=>{
+    g.addEventListener('click', e=>{
+      const chip = e.target.closest('.chip'); if(!chip) return;
+      g.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+      chip.classList.add('sel');
+      onChipChange();
+    });
+  });
+}
+function onChipChange(){
+  document.getElementById('img-input-wrap').classList.toggle('hidden', selected('img-mode') !== 'i2i');
+  const vm = selected('vid-mode');
+  document.getElementById('vid-i2v-wrap').classList.toggle('hidden', vm !== 'i2v');
+  document.getElementById('vid-kf-wrap').classList.toggle('hidden', vm !== 'kf');
+  document.getElementById('txt-img-wrap').classList.toggle('hidden', selected('txt-adv') !== 'img');
+}
+
+/* ---------- Tab 切换 ---------- */
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  const tag = {image:"IMAGE 2.1", video:"VIDEO 2.0", text:"TEXT 2.5"}[name];
+  document.getElementById('topTag').textContent = tag;
+}
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>switchTab(t.dataset.tab));
+});
+
+/* ---------- 8n+1 帧数换算 ---------- */
+function nfFor(sec, fps=24){
+  let nf = 8 * Math.round((sec*fps - 1)/8) + 1;
+  return Math.min(nf, 441);
+}
+
+/* ============================================================
+   设置（增强提示词 + 隐藏优化开关）
+   ============================================================ */
+const DEFAULT_SETTINGS = {
+  enhance: {
+    image: `你是一名顶尖的 AI 短剧图像提示词工程师，熟悉 AGNES image-2.1-flash 模型。用户会给你一段简短的中文/英文描述。请将其扩写为符合该模型最优结构的高质量英文提示词。
+严格遵循结构：主体 + 场景/环境 + 风格 + 光线 + 构图 + 质量要求。
+追加竖屏锚点：vertical 9:16 mobile short-drama framing, subject chest-up。
+追加质量词：high detail, cinematic lighting, 8k, sharp focus。
+只输出最终提示词本身，不要任何解释、引号或前缀。`,
+    video: `你是一名顶尖的 AI 短剧视频提示词工程师，熟悉 AGNES video-v2.0 模型（提示词需为英文）。用户会给你一段简短描述。请扩写为最优英文视频提示词。
+严格遵循结构：主体 + 动作 + 场景 + 运镜 + 光线 + 风格。
+若含人物，追加人脸稳定约束：stable face, no face distortion, consistent facial features, locked character identity, no morphing。
+只输出最终提示词本身，不要解释或前缀。`,
+    negative: `你是一名 AI 视频生成负面提示词专家。根据给定主题，生成一段英文 negative_prompt，用于规避：变形或扭曲的人脸、多余或畸形的手指、模糊、水印、文字、低质量、穿帮、畸变。
+只输出 negative_prompt 文本本身，不要解释。`,
+    text: `你是一名短剧剧本/分镜优化师。请优化下面的用户需求描述，使其更清晰、具体、具备可执行性，保留原意，可直接作为 AI 生成任务的输入。
+只输出优化后的文本，不要解释。`
+  },
+  autoConfig: {
+    video: `你是一名 AI 短剧视频参数配置专家。根据下面的视频提示词内容，判断并返回最优生成参数。
+严格只输出一个 JSON 对象，格式：{"ratio":"9:16|16:9|1:1", "duration_sec":3|5|6|7|8|10|14|18, "negative_prompt":"英文负面词"}。
+不要任何解释或前缀，只输出 JSON。`,
+    image: `你是一名 AI 短剧图像参数配置专家。根据下面的图像提示词，判断最优参数。
+严格只输出 JSON：{"size":"1K|2K|3K|4K", "ratio":"9:16|16:9|1:1"}。
+只输出 JSON，不要解释。`
+  },
+  enhanceModel: "agnes-2.5-flash",
+  enhanceTemp: 0.6,
+  enhanceMax: 600,
+  autoFaceLock: true,
+  autoVertical: true
+};
+let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+function mergeSettings(s){
+  try{ s = s || {}; }catch(e){ s = {}; }
+  return Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), s);
+}
+/* 持久化抽象：http 同源模式走服务端 /api/state（localhost 与 127.0.0.1 共享同一份）；
+   file:// 离线模式退回 localStorage（按源隔离，二者不互通）。 */
+const PERSIST_MODE = location.protocol.startsWith('http');
+async function persistLoad(){
+  if(PERSIST_MODE){
+    try{
+      const st = await (await fetch(resolveBase() + '/api/state', {cache:'no-store'})).json();
+      const srvAssets = Array.isArray(st.assets) ? st.assets : [];
+      const srvSettings = st.settings || {};
+      let localAssets = [], localSettings = {};
+      try{ localAssets = JSON.parse(localStorage.getItem('agnes_assets') || '[]'); if(!Array.isArray(localAssets)) localAssets = []; }catch(e){}
+      try{ localSettings = JSON.parse(localStorage.getItem('agnes_settings') || '{}'); }catch(e){}
+      // 合并恢复：服务端优先，本地(localStorage)中服务端没有的项按 url 补入，
+      // 这样 localhost / 127.0.0.1 两个源各自的旧数据都会被收拢到同一份服务端状态，不丢。
+      let assets = srvAssets.slice();
+      const urls = new Set(assets.map(a => a.url));
+      for(const a of localAssets){
+        if(a && a.url && !urls.has(a.url)){ assets.unshift(a); urls.add(a.url); }
+      }
+      SETTINGS = mergeSettings(Object.keys(localSettings).length ? localSettings : srvSettings);
+      ASSETS = assets;
+      // 只要本次并入了新的本地项（或本地有设置），就写回服务端，确保 localhost/127.0.0.1 跨域名自动收拢，无需手动按钮
+      let changed = false;
+      if(Object.keys(localSettings).length) changed = true;
+      for(const a of localAssets){ if(a && a.url && !urls.has(a.url)){ changed = true; break; } }
+      if(changed){
+        await persistSave();
+        localStorage.setItem('agnes_migrated_v1', '1');
+      }
+    }catch(e){ /* 服务端不可达则保持默认/空，不阻断界面 */ }
+  }else{
+    try{ SETTINGS = mergeSettings(JSON.parse(localStorage.getItem('agnes_settings') || '{}')); }catch(e){}
+    try{ ASSETS = JSON.parse(localStorage.getItem('agnes_assets') || '[]'); if(!Array.isArray(ASSETS)) ASSETS = []; }catch(e){ ASSETS = []; }
+  }
+}
+/* 手动「恢复本地数据」：把本浏览器(localStorage)里的旧资产/设置合并进当前状态并保存。
+   返回本次新增的资产数量，供提示使用。 */
+async function recoverFromLocal(){
+  let localAssets = [], localSettings = {};
+  try{ localAssets = JSON.parse(localStorage.getItem('agnes_assets') || '[]'); if(!Array.isArray(localAssets)) localAssets = []; }catch(e){}
+  try{ localSettings = JSON.parse(localStorage.getItem('agnes_settings') || '{}'); }catch(e){}
+  const before = ASSETS.length;
+  const urls = new Set(ASSETS.map(a => a.url));
+  for(const a of localAssets){
+    if(a && a.url && !urls.has(a.url)){ ASSETS.unshift(a); urls.add(a.url); }
+  }
+  if(Object.keys(localSettings).length) SETTINGS = mergeSettings(localSettings);
+  await persistSave();
+  renderAssets(); renderSettings();
+  return ASSETS.length - before;
+}
+function toast(msg){
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1c1b1b;color:#f2f2f2;border:1px solid #333;padding:10px 16px;border-radius:10px;font-size:13px;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.5);opacity:0;transition:opacity .25s;max-width:90vw;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2600);
+}
+async function persistSave(){
+  if(PERSIST_MODE){
+    try{
+      fetch(resolveBase() + '/api/state', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ assets: ASSETS, settings: SETTINGS })
+      });
+    }catch(e){ /* 网络错误忽略，下次保存重试 */ }
+    // 镜像到当前源 localStorage：保证「导出」总能拿到本源数据，跨源/跨浏览器可搬运
+    try{ localStorage.setItem('agnes_settings', JSON.stringify(SETTINGS)); }catch(e){}
+    try{ localStorage.setItem('agnes_assets', JSON.stringify(ASSETS)); }catch(e){}
+  }else{
+    try{ localStorage.setItem('agnes_settings', JSON.stringify(SETTINGS)); }catch(e){}
+    try{ localStorage.setItem('agnes_assets', JSON.stringify(ASSETS)); }catch(e){}
+  }
+}
+function saveSettings(){ persistSave(); }
+function renderSettings(){
+  setVal('set-ei', SETTINGS.enhance.image);
+  setVal('set-ev', SETTINGS.enhance.video);
+  setVal('set-en', SETTINGS.enhance.negative);
+  setVal('set-et', SETTINGS.enhance.text);
+  setVal('set-acv', SETTINGS.autoConfig.video);
+  setVal('set-aci', SETTINGS.autoConfig.image);
+  document.getElementById('set-model').value = SETTINGS.enhanceModel;
+  document.getElementById('set-temp').value = SETTINGS.enhanceTemp;
+  document.getElementById('set-max').value = SETTINGS.enhanceMax;
+  document.getElementById('set-facelock').checked = SETTINGS.autoFaceLock;
+  document.getElementById('set-vertical').checked = SETTINGS.autoVertical;
+}
+function saveSettingsFromUI(){
+  SETTINGS.enhance.image = val('set-ei');
+  SETTINGS.enhance.video = val('set-ev');
+  SETTINGS.enhance.negative = val('set-en');
+  SETTINGS.enhance.text = val('set-et');
+  SETTINGS.autoConfig.video = val('set-acv');
+  SETTINGS.autoConfig.image = val('set-aci');
+  SETTINGS.enhanceModel = document.getElementById('set-model').value;
+  SETTINGS.enhanceTemp = parseFloat(document.getElementById('set-temp').value) || 0.6;
+  SETTINGS.enhanceMax = parseInt(document.getElementById('set-max').value,10) || 600;
+  SETTINGS.autoFaceLock = document.getElementById('set-facelock').checked;
+  SETTINGS.autoVertical = document.getElementById('set-vertical').checked;
+  saveSettings();
+  alert('设置已保存');
+}
+document.getElementById('settings-toggle').addEventListener('click', ()=>{
+  document.getElementById('settings-body').classList.toggle('hidden');
+});
+document.getElementById('settings-save').addEventListener('click', saveSettingsFromUI);
+document.getElementById('settings-reset').addEventListener('click', ()=>{
+  if(confirm('恢复默认设置？')){ SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); saveSettings(); renderSettings(); }
+});
+
+/* ============================================================
+   提示词增强 / 自动配置（调用增强模型）
+   ============================================================ */
+async function callLLM(system, user){
+  const body = {
+    model: SETTINGS.enhanceModel,
+    messages: [ {role:'system', content:system}, {role:'user', content:user} ],
+    temperature: SETTINGS.enhanceTemp,
+    max_tokens: SETTINGS.enhanceMax,
+    stream: false,
+    chat_template_kwargs: { enable_thinking:false }
+  };
+  const out = await callApi('/v1/chat/completions', 'POST', body);
+  return (out.choices && out.choices[0] && out.choices[0].message && out.choices[0].message.content) || "";
+}
+async function enhanceField(fieldId, kind, btn){
+  const el = document.getElementById(fieldId);
+  const text = el.value.trim();
+  if(!text){ alert('请先填写内容再优化'); return; }
+  const old = btn.textContent; btn.disabled = true; btn.textContent = '…';
+  try{
+    const out = await callLLM(SETTINGS.enhance[kind], text);
+    el.value = out.trim();
+  }catch(err){
+    alert('优化失败：' + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+function extractJSON(s){
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if(a < 0 || b < 0 || b < a) throw new Error('未返回 JSON');
+  return JSON.parse(s.slice(a, b + 1));
+}
+async function autoConfig(tab){
+  const prompt = (tab === 'video' ? document.getElementById('vid-prompt') : document.getElementById('img-prompt')).value.trim();
+  if(!prompt){ alert('请先填写 prompt'); return; }
+  const st = document.getElementById(tab === 'video' ? 'vid-status' : 'img-status');
+  st.textContent = '自动配置中…';
+  try{
+    const raw = await callLLM(SETTINGS.autoConfig[tab], prompt);
+    const j = extractJSON(raw);
+    applyConfig(tab, j);
+    st.textContent = '已自动配置 ✓';
+  }catch(err){
+    st.textContent = '';
+    alert('自动配置失败：' + err.message);
+  }
+}
+function applyConfig(tab, j){
+  if(tab === 'video'){
+    if(j.ratio) selectChip('vid-res', j.ratio);
+    if(j.duration_sec){
+      const d = [3,5,6,7,8,10,14,18].reduce((p,c)=>Math.abs(c-j.duration_sec)<Math.abs(p-j.duration_sec)?c:p);
+      selectChip('vid-dur', String(d));
+    }
+    if(j.negative_prompt) setVal('vid-neg', j.negative_prompt);
+  }else{
+    if(j.size) selectChip('img-size', j.size);
+    if(j.ratio) selectChip('img-ratio', j.ratio);
+  }
+}
+/* 委托：增强 / 自动配置 / 选图 按钮 */
+document.addEventListener('click', e=>{
+  const en = e.target.closest('[data-enhance]');
+  if(en){ enhanceField(en.dataset.target, en.dataset.enhance, en); return; }
+  const ac = e.target.closest('[data-autocfg]');
+  if(ac){ autoConfig(ac.dataset.autocfg); return; }
+  const pk = e.target.closest('[data-pick]');
+  if(pk){ openPicker(pk.dataset.pick); return; }
+  const cl = e.target.closest('[data-close]');
+  if(cl){ closePicker(); return; }
+});
+
+/* ============================================================
+   资产库
+   ============================================================ */
+let ASSETS = [];
+let selectedAssets = new Set();
+function saveAssets(){ persistSave(); }
+function addAsset(type, url, name){
+  if(!url) return;
+  ASSETS.unshift({ id:'a'+Date.now()+Math.random().toString(36).slice(2,6), type, url, name: name||(type+' '+new Date().toLocaleString()), ts:Date.now() });
+  saveAssets(); renderAssets();
+}
+function assetCardHTML(a, sel){
+  const inner = a.type === 'image'
+    ? '<img src="'+a.url+'" loading="lazy" alt=""/>'
+    : '<video src="'+a.url+'" muted preload="metadata"></video>';
+  return '<div class="asset-card '+(sel?'sel':'')+'" data-id="'+a.id+'">'
+    + '<div class="asset-type">'+(a.type==='image'?'图':'视频')+'</div>'
+    + '<div class="asset-check"></div>'
+    + inner
+    + '<div class="asset-name">'+escapeHtml(a.name)+'</div></div>';
+}
+function renderAssets(){
+  const grid = document.getElementById('asset-grid');
+  const empty = document.getElementById('asset-empty');
+  if(!ASSETS.length){
+    grid.innerHTML = '';
+    if(empty) empty.style.display = 'block';
+    document.getElementById('asset-count').textContent = '0';
+    updateAssetActions();
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+  grid.innerHTML = ASSETS.map(a=>assetCardHTML(a, selectedAssets.has(a.id))).join('');
+  document.getElementById('asset-count').textContent = ASSETS.length;
+  grid.querySelectorAll('.asset-card').forEach(c=>{
+    c.onclick = ()=>{
+      const id = c.dataset.id;
+      if(selectedAssets.has(id)) selectedAssets.delete(id); else selectedAssets.add(id);
+      c.classList.toggle('sel');
+      updateAssetActions();
+    };
+  });
+  updateAssetActions();
+}
+function updateAssetActions(){
+  const vids = ASSETS.filter(a=>a.type==='video' && selectedAssets.has(a.id)).length;
+  const mergeBtn = document.getElementById('asset-merge');
+  const delBtn = document.getElementById('asset-del');
+  if(mergeBtn) mergeBtn.disabled = vids < 2;
+  if(delBtn) delBtn.disabled = selectedAssets.size === 0;
+}
+function deleteSelected(){
+  if(!selectedAssets.size) return;
+  ASSETS = ASSETS.filter(a=>!selectedAssets.has(a.id));
+  selectedAssets.clear();
+  saveAssets(); renderAssets();
+}
+async function mergeVideos(){
+  const vids = ASSETS.filter(a=>a.type==='video' && selectedAssets.has(a.id)).map(a=>a.url);
+  if(vids.length < 2){ alert('请至少选择 2 个视频'); return; }
+  if(resolveBase() === API_ROOT){
+    alert('视频拼接需要本地代理：请用 http://localhost:8787/ 打开本页（先运行 agnes_proxy.py）');
+    return;
+  }
+  const btn = document.getElementById('asset-merge');
+  const old = btn.textContent; btn.disabled = true; btn.textContent = '拼接中…';
+  try{
+    const out = await callApi('/merge', 'POST', { urls: vids });
+    addAsset('video', out.url, '合并视频 ' + new Date().toLocaleTimeString());
+    alert('拼接完成，已加入资产库');
+  }catch(err){
+    alert('拼接失败：' + err.message);
+  }finally{
+    btn.textContent = old; updateAssetActions();
+  }
+}
+document.getElementById('asset-del').addEventListener('click', deleteSelected);
+document.getElementById('asset-merge').addEventListener('click', mergeVideos);
+document.getElementById('asset-recover').addEventListener('click', async () => {
+  let localN = 0;
+  try{ const la = JSON.parse(localStorage.getItem('agnes_assets') || '[]'); localN = Array.isArray(la) ? la.length : 0; }catch(e){}
+  const added = await recoverFromLocal();
+  if(added > 0){
+    toast('已从本机恢复 ' + added + ' 项资产到资产库');
+  }else if(localN > 0){
+    toast('本机有 ' + localN + ' 项，但都与库中重复（未新增）');
+  }else{
+    toast('本机(localStorage)无资产数据 —— 若之前是在预览面板里加的，数据可能卡在另一个源，请用「导出/导入」从旧页面搬运');
+  }
+});
+/* 导出当前资产库 + 设置为 JSON 文件（跨源/跨浏览器搬运用） */
+document.getElementById('asset-export').addEventListener('click', () => {
+  const payload = {
+    _type: 'agnes_console_export',
+    exportedAt: new Date().toISOString(),
+    origin: location.origin,
+    assets: ASSETS,
+    settings: SETTINGS
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'agnes_assets_' + Date.now() + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('已导出 ' + ASSETS.length + ' 项资产（含设置）到 JSON 文件');
+});
+/* 导入 JSON：合并入当前资产库（按 url 去重），设置也一并合并 */
+document.getElementById('asset-import').addEventListener('click', () => {
+  document.getElementById('asset-import-file').click();
+});
+document.getElementById('asset-import-file').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if(!file){ return; }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try{
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data.assets) ? data.assets : (Array.isArray(data) ? data : []);
+      const before = ASSETS.length;
+      const urls = new Set(ASSETS.map(a => a.url));
+      let n = 0;
+      for(const a of incoming){
+        if(a && a.url && !urls.has(a.url)){ ASSETS.unshift(a); urls.add(a.url); n++; }
+      }
+      if(data.settings && typeof data.settings === 'object'){
+        SETTINGS = mergeSettings(Object.assign({}, SETTINGS, data.settings));
+      }
+      await persistSave();
+      renderAssets(); renderSettings();
+      toast('导入成功：新增 ' + n + ' 项资产' + (data.settings ? '，设置已合并' : ''));
+    }catch(err){
+      toast('导入失败：文件不是有效的资产 JSON');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+/* 选图弹窗 */
+let pickerTarget = null;
+function openPicker(fieldId){
+  if(!ASSETS.some(a=>a.type==='image')){ alert('资产库暂无图片，请先生成图片并加入资产库'); return; }
+  pickerTarget = fieldId;
+  renderPicker();
+  document.getElementById('picker-modal').classList.remove('hidden');
+}
+function renderPicker(){
+  const imgs = ASSETS.filter(a=>a.type==='image');
+  const grid = document.getElementById('picker-grid');
+  const empty = document.getElementById('picker-empty');
+  if(!imgs.length){ grid.innerHTML=''; if(empty) empty.classList.remove('hidden'); return; }
+  if(empty) empty.classList.add('hidden');
+  grid.innerHTML = imgs.map(a=>assetCardHTML(a,false)).join('');
+  grid.querySelectorAll('.asset-card').forEach(c=>{
+    c.onclick = ()=>{
+      const a = ASSETS.find(x=>x.id===c.dataset.id);
+      if(a) document.getElementById(pickerTarget).value = a.url;
+      closePicker();
+    };
+  });
+}
+function closePicker(){ document.getElementById('picker-modal').classList.add('hidden'); }
+
+/* ============================================================
+   图像生成
+   ============================================================ */
+let lastImageUrl = null;
+document.getElementById('img-to-asset').addEventListener('click', ()=>{ if(lastImageUrl) addAsset('image', lastImageUrl); });
+
+document.getElementById('img-gen').addEventListener('click', async ()=>{
+  const btn = document.getElementById('img-gen');
+  const status = document.getElementById('img-status');
+  const err = document.getElementById('img-err');
+  const prompt = val('img-prompt');
+  err.textContent = ""; lastImageUrl = null;
+  document.getElementById('img-to-asset').classList.add('hidden');
+  if(!prompt){ err.textContent = "请填写 prompt"; return; }
+  const mode = selected('img-mode'), size = selected('img-size'),
+        ratio = selected('img-ratio'), fmt = selected('img-fmt');
+  let p = prompt;
+  if(SETTINGS.autoVertical) p += ", vertical 9:16 mobile short-drama framing, subject chest-up";
+  const body = { model:"agnes-image-2.1-flash", prompt:p, size, ratio };
+  const extra = { response_format: fmt };
+  if(mode === 'i2i'){
+    const u = val('img-input-url');
+    if(!u){ err.textContent = "图生图需填写输入图 URL"; return; }
+    extra.image = [u];
+  }
+  body.extra_body = extra;
+  btn.disabled = true; status.textContent = "生成中…";
+  try{
+    const out = await callApi('/v1/images/generations', 'POST', body);
+    const item = (out.data && out.data[0]) || {};
+    const src = (fmt === 'b64_json') ? 'data:image/png;base64,' + item.b64_json : item.url;
+    lastImageUrl = (fmt === 'b64_json') ? src : item.url;
+    const prev = document.getElementById('img-preview');
+    prev.innerHTML = '<img src="'+src+'" alt="result" />';
+    document.getElementById('img-json').textContent = JSON.stringify(out, null, 2);
+    document.getElementById('img-to-asset').classList.remove('hidden');
+    status.textContent = "完成 ✓";
+  }catch(e){
+    err.textContent = e.message; status.textContent = "";
+  }finally{ btn.disabled = false; }
+});
+
+/* ============================================================
+   视频生成（含轮询修复：连续错误后停止并重新启用按钮）
+   ============================================================ */
+let lastVideoUrl = null;
+document.getElementById('vid-to-asset').addEventListener('click', ()=>{ if(lastVideoUrl) addAsset('video', lastVideoUrl); });
+
+document.getElementById('vid-submit').addEventListener('click', async ()=>{
+  const btn = document.getElementById('vid-submit');
+  const status = document.getElementById('vid-status');
+  const err = document.getElementById('vid-err');
+  const prog = document.getElementById('vid-progress');
+  const prompt = val('vid-prompt');
+  err.textContent = ""; prog.style.width = "0%"; lastVideoUrl = null;
+  document.getElementById('vid-to-asset').classList.add('hidden');
+  if(!prompt){ err.textContent = "请填写 prompt"; return; }
+  const mode = selected('vid-mode'), res = selected('vid-res'), dur = selected('vid-dur');
+  const neg = val('vid-neg');
+  let w=720, h=1280;
+  if(res==='16:9'){ w=1280; h=720; }
+  if(res==='1:1'){ w=1024; h=1024; }
+  const nf = nfFor(parseInt(dur,10));
+  let p = prompt;
+  if(SETTINGS.autoFaceLock) p += ", stable face, no face distortion, consistent facial features, locked character identity, no morphing";
+  const body = { model:"agnes-video-v2.0", prompt:p, height:h, width:w,
+                 num_frames:nf, frame_rate:24 };
+  if(neg) body.negative_prompt = neg;
+  if(mode === 'i2v'){
+    const u = val('vid-i2v-url');
+    if(!u){ err.textContent = "图生视频需填写首帧图 URL"; return; }
+    body.image = u;
+  }
+  if(mode === 'kf'){
+    const u1 = val('vid-kf-url1'), u2 = val('vid-kf-url2');
+    if(!u1 || !u2){ err.textContent = "关键帧需填写 2 张图 URL"; return; }
+    body.extra_body = { image:[u1, u2], mode:"keyframes" };
+  }
+  btn.disabled = true; status.textContent = "提交中…";
+  try{
+    const task = await callApi('/v1/videos', 'POST', body);
+    const vid = task.video_id || task.task_id || task.id;
+    if(!vid) throw new Error("未返回 video_id: " + JSON.stringify(task).slice(0,200));
+    document.getElementById('vid-json').textContent = JSON.stringify(task, null, 2);
+    await pollVideo(vid, status, err, prog);
+  }catch(e){
+    err.textContent = e.message; status.textContent = "";
+  }finally{ btn.disabled = false; }
+});
+
+async function pollVideo(vid, status, err, prog){
+  const preview = document.getElementById('vid-preview');
+  let consecErr = 0;
+  while(true){
+    let r;
+    try{
+      r = await callApi('/agnesapi?video_id=' + encodeURIComponent(vid), 'GET');
+      consecErr = 0;
+    }catch(e){
+      consecErr++;
+      err.textContent = "轮询出错(" + consecErr + ")：" + e.message + "，将在 8s 后重试";
+      if(consecErr >= 5){ throw new Error("轮询连续失败 5 次，已停止（可再次点击提交重试）"); }
+      await sleep(8000); continue;
+    }
+    const st = r.status, p = (typeof r.progress === 'number') ? r.progress : null;
+    if(p !== null) prog.style.width = Math.max(2, Math.min(100, p*100)) + "%";
+    status.textContent = (st||"?") + (p!==null ? " · " + Math.round(p*100) + "%" : "");
+    if(st === 'completed'){
+      const url = r.url || (r.metadata && r.metadata.url);
+      if(url){
+        lastVideoUrl = url;
+        preview.innerHTML = '<video src="'+url+'" controls autoplay loop></video>';
+        document.getElementById('vid-to-asset').classList.remove('hidden');
+        status.textContent = "完成 ✓";
+      } else { err.textContent = "completed 但无 url 字段"; }
+      break;
+    }
+    if(st === 'failed'){
+      err.textContent = "任务失败：" + JSON.stringify(r.error||r).slice(0,200);
+      status.textContent = ""; break;
+    }
+    await sleep(8000);
+  }
+}
+
+/* ============================================================
+   文本生成
+   ============================================================ */
+document.getElementById('txt-send').addEventListener('click', async ()=>{
+  const btn = document.getElementById('txt-send');
+  const status = document.getElementById('txt-status');
+  const err = document.getElementById('txt-err');
+  const user = val('txt-user');
+  err.textContent = "";
+  if(!user){ err.textContent = "请填写 user message"; return; }
+  const sys = val('txt-sys');
+  const temp = parseFloat(document.getElementById('txt-temp').value);
+  const topP = parseFloat(document.getElementById('txt-topp').value);
+  let maxT = parseInt(document.getElementById('txt-maxt').value,10);
+  const adv = selected('txt-adv');
+  const stream = adv === 'stream', thinking = adv === 'think',
+        tool = adv === 'tool', img = adv === 'img';
+  if(thinking && maxT < 800) maxT = 800;
+
+  const messages = [];
+  if(sys) messages.push({ role:"system", content:sys });
+  if(img){
+    const u = val('txt-img-url');
+    if(!u){ err.textContent = "图像理解需填写图片 URL"; return; }
+    messages.push({ role:"user",
+      content:[{type:"text", text:user}, {type:"image_url", image_url:{url:u}}] });
+  } else {
+    messages.push({ role:"user", content:user });
+  }
+  const body = { model:"agnes-2.5-flash", messages, temperature:temp,
+                 top_p:topP, max_tokens:maxT, stream };
+  if(!thinking) body.chat_template_kwargs = { enable_thinking:false };
+  if(tool){
+    body.tools = [{ type:"function", function:{
+      name:"get_weather", description:"查询城市天气",
+      parameters:{ type:"object", properties:{ city:{type:"string", description:"城市名"} },
+                   required:["city"] } } }];
+    body.tool_choice = "auto";
+  }
+
+  btn.disabled = true;
+  const contentEl = document.getElementById('txt-content');
+  const jsonEl = document.getElementById('txt-json');
+  const reasonSlot = document.getElementById('txt-reasoning-slot');
+  reasonSlot.innerHTML = ""; contentEl.textContent = "生成中…";
+  status.textContent = "请求中…";
+  try{
+    if(stream){ await streamChat(body, contentEl, status); }
+    else{
+      const out = await callApi('/v1/chat/completions', 'POST', body);
+      const msg = out.choices[0].message;
+      contentEl.textContent = msg.content || "(空)";
+      if(msg.reasoning_content){
+        reasonSlot.innerHTML = '<details class="reasoning" open><summary>思考过程 reasoning_content</summary>'
+          + escapeHtml(msg.reasoning_content) + '</details>';
+      }
+      jsonEl.textContent = JSON.stringify(out, null, 2);
+      status.textContent = "完成 ✓";
+    }
+  }catch(e){
+    err.textContent = e.message; status.textContent = "";
+    contentEl.textContent = "出错";
+  }finally{ btn.disabled = false; }
+});
+
+async function streamChat(body, contentEl, status){
+  const url = resolveBase() + '/v1/chat/completions';
+  const res = await fetch(url, { method:'POST',
+    headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + API_KEY },
+    body: JSON.stringify(body) });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error("HTTP " + res.status + " " + t.slice(0,300));
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "", acc = "", reasonAcc = "";
+  const reasonSlot = document.getElementById('txt-reasoning-slot');
+  while(true){
+    const { done, value } = await reader.read();
+    if(done) break;
+    buf += dec.decode(value, { stream:true });
+    let idx;
+    while((idx = buf.indexOf('\n')) >= 0){
+      const line = buf.slice(0, idx).trim(); buf = buf.slice(idx+1);
+      if(!line.startsWith('data:')) continue;
+      const d = line.slice(5).trim();
+      if(d === '[DONE]') continue;
+      try{
+        const j = JSON.parse(d);
+        const delta = j.choices[0].delta;
+        if(delta.content) acc += delta.content;
+        if(delta.reasoning_content) reasonAcc += delta.reasoning_content;
+      }catch(_){}
+    }
+    contentEl.textContent = acc || "…";
+    if(reasonAcc && !reasonSlot.innerHTML)
+      reasonSlot.innerHTML = '<details class="reasoning" open><summary>思考过程 reasoning_content</summary></details>';
+    if(reasonAcc) reasonSlot.querySelector('details').innerHTML =
+      '<summary>思考过程 reasoning_content</summary>' + escapeHtml(reasonAcc);
+    status.textContent = "流式输出中…";
+  }
+  contentEl.textContent = acc || "(空)";
+  document.getElementById('txt-json').textContent = "// 流式响应已实时拼接，无完整 JSON";
+  status.textContent = "完成 ✓";
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* ---------- 初始化 ---------- */
+initChips();
+onChipChange();
+/* 先异步从服务端（或 localStorage）载入持久化数据，再渲染，确保资产库/设置同步 */
+(async () => {
+  await persistLoad();
+  renderSettings();
+  renderAssets();
+})();
+</script>
+</body>
+</html>
