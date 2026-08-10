@@ -33,6 +33,19 @@ from urllib.parse import urlparse, urljoin, parse_qs, unquote
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("PORT", "8777"))
 REAL = os.environ.get("REAL", "0") == "1"
+# 【0811 key 双模式】AGNES_TEST_MODE=1 → 自测/回归用免费 key（无限额度，不占 VIP 500s/天）；
+# 白天正式生成保持默认 prod（VIP key）。启动后 agnes_client 密钥池切 test 模式。
+TEST_KEY_MODE = os.environ.get("AGNES_TEST_MODE", "0") == "1"
+if TEST_KEY_MODE:
+    try:
+        sys.path.insert(0, os.path.expanduser("~/.workbuddy/skills/agnes-ai/scripts"))
+        import agnes_client as _ac
+        if _ac._pool.use_test():
+            print("[key] 已切换测试模式：自测/回归用免费 key（AGNES_TEST_API_KEY），不占 VIP 额度")
+        else:
+            print("[key] WARN: AGNES_TEST_MODE=1 但未配置 AGNES_TEST_API_KEY，继续用 VIP key")
+    except Exception as _ke:
+        print(f"[key] 测试模式初始化失败（忽略，用默认）：{_ke}")
 
 # ===== 日志系统：按天归档 logs/server.log.*，保留 LOG_KEEP_DAYS 天；LOG_LEVEL 控制详略 ====
 # 开发/调试：LOG_LEVEL=DEBUG（默认）；正式发布：LOG_LEVEL=WARNING（只记错误告警，日志页接口同时关闭）
@@ -3535,6 +3548,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, _pipeline_snapshot())
         elif p.path == "/api/pipeline/stream":
             self._stream_pipeline()
+        elif p.path == "/api/agnes/last":
+            # 【0811 排障】AGNES 最近调用原始响应（环形缓存 20 条）：出问题看现场
+            try:
+                sys.path.insert(0, os.path.expanduser("~/.workbuddy/skills/agnes-ai/scripts"))
+                from agnes_client import last_calls
+                self._send(200, {"ok": True, "calls": last_calls(20)})
+            except Exception as e:
+                self._send(500, {"ok": False, "error": str(e)})
         elif p.path == "/api/key-pool":
             # P2：密钥池状态（读类端点统一用 GET；POST 亦支持）
             try:
