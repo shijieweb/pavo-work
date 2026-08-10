@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AGNES 短剧工作站 · 控制台</title>
+<style>
+  :root{
+    --bg:#0B0C0F; --card:rgba(255,255,255,.045); --card-h:rgba(255,255,255,.075);
+    --line:rgba(255,255,255,.10); --text:#ECEFF4; --muted:#8A93A3;
+    --rose:#E8556E; --gold:#E8C268; --blue:#4C8DFF;
+    --ok:#3DD68C; --off:#F2A33C; --red:#FF6B81;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh;}
+  body{
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(232,85,110,.13), transparent 60%),
+      radial-gradient(900px 500px at 85% 0%, rgba(76,141,255,.13), transparent 60%),
+      var(--bg);
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:34px 18px 46px;}
+
+  header{display:flex;align-items:center;gap:11px;margin-bottom:4px;}
+  .logo{width:34px;height:34px;border-radius:10px;flex:none;
+    background:linear-gradient(135deg,var(--rose),var(--gold));
+    display:flex;align-items:center;justify-content:center;font-size:17px;}
+  h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.3px;}
+  .sub{color:var(--muted);font-size:12.5px;margin:7px 0 22px;line-height:1.7;}
+  .sub code{background:rgba(255,255,255,.07);padding:1.5px 6px;border-radius:5px;
+    font-size:11.5px;color:#C9D3E4;}
+
+  /* ===== 实时状态栏 ===== */
+  .statusbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px;}
+  .pill{display:flex;align-items:center;gap:9px;padding:9px 13px;border-radius:12px;
+    background:var(--card);border:1px solid var(--line);font-size:12.5px;}
+  .pill .nm{color:#C9D3E4;font-weight:600;}
+  .pill .ms{color:var(--muted);font-family:ui-monospace,Consolas,monospace;font-size:11px;}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .on{background:var(--ok);box-shadow:0 0 0 3px rgba(61,214,140,.18);}
+  .no{background:var(--off);}
+  .err{background:var(--red);}
+  .pulse{animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%{opacity:1}50%{opacity:.45}100%{opacity:1}}
+
+  /* ===== 通用面板 ===== */
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:17px;
+    padding:18px 18px 16px;margin-bottom:16px;}
+  .ph{display:flex;align-items:center;gap:9px;margin:0 0 14px;}
+  .ph .t{font-size:14px;font-weight:700;letter-spacing:.3px;}
+  .ph .b{margin-left:auto;font-size:11px;color:var(--muted);}
+  .ph .ic{font-size:15px;}
+
+  /* ===== 入口卡片 ===== */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+  @media(max-width:680px){ .grid{grid-template-columns:1fr;} .wrap{padding:26px 14px 40px;} }
+  .card{position:relative;display:block;text-decoration:none;color:inherit;
+    background:var(--card);border:1px solid var(--line);border-radius:17px;
+    padding:19px 18px 16px;overflow:hidden;
+    transition:transform .18s ease, background .18s ease, border-color .18s ease;}
+  .card::before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:3px;
+    background:var(--accent);opacity:.85;}
+  .card:hover{transform:translateY(-3px);background:var(--card-h);border-color:rgba(255,255,255,.2);}
+  .card.down{opacity:.6;}
+  .card.down:hover{transform:none;}
+  .ico{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;
+    justify-content:center;font-size:20px;margin-bottom:12px;
+    background:var(--tint);border:1px solid var(--accent);}
+  .ct{font-size:16px;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .cd{color:var(--muted);font-size:12px;line-height:1.7;margin:0 0 13px;}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:13px;}
+  .tag{font-size:10px;padding:3px 8px;border-radius:20px;
+    background:rgba(255,255,255,.06);border:1px solid var(--line);color:#B6BFCE;}
+  .foot{display:flex;align-items:center;justify-content:space-between;
+    padding-top:11px;border-top:1px solid var(--line);}
+  .port{font-size:11px;color:var(--muted);font-family:ui-monospace,Consolas,monospace;}
+  .go{font-size:12px;font-weight:600;color:var(--accent);}
+  .st{font-size:10px;padding:3px 9px 3px 7px;border-radius:20px;font-weight:600;
+    display:inline-flex;align-items:center;gap:5px;border:1px solid transparent;}
+  .st.on{background:rgba(61,214,140,.14);color:var(--ok);border-color:rgba(61,214,140,.32);}
+  .st.no{background:rgba(242,163,60,.14);color:var(--off);border-color:rgba(242,163,60,.32);}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--off);line-height:1.7;display:none;}
+  .card.down .hint{display:block;}
+  .hint code{display:block;margin-top:5px;background:rgba(0,0,0,.35);padding:8px 10px;
+    border-radius:8px;color:#D8DEE9;font-size:10.5px;overflow-x:auto;white-space:nowrap;
+    font-family:ui-monospace,Consolas,monospace;}
+  .lbtn{display:inline-block;margin:9px 0 4px;padding:9px 14px;border-radius:11px;
+    background:linear-gradient(135deg,var(--blue),#2E6BE8);border:1px solid rgba(76,141,255,.5);
+    color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;
+    transition:transform .12s, filter .15s;}
+  .lbtn:hover{transform:translateY(-1px);filter:brightness(1.1);}
+  .lbtn:disabled{opacity:.6;cursor:default;transform:none;}
+
+  /* ===== 项目切换器 ===== */
+  .proj{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;
+    background:rgba(255,255,255,.025);border:1px solid var(--line);margin-bottom:9px;
+    transition:border-color .15s, background .15s;}
+  .proj:hover{border-color:rgba(76,141,255,.4);background:rgba(76,141,255,.06);}
+  .proj.active{border-color:var(--blue);background:rgba(76,141,255,.10);}
+  .proj .pdot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none;}
+  .proj.active .pdot{background:var(--ok);box-shadow:0 0 0 3px rgba(61,214,140,.2);}
+  .proj .pinfo{flex:1;min-width:0;}
+  .proj .pname{font-size:13.5px;font-weight:600;color:#E6EBF2;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .proj .pmeta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .proj .pact{font-size:11px;font-weight:600;color:var(--blue);text-decoration:none;
+    padding:6px 10px;border:1px solid rgba(76,141,255,.4);border-radius:8px;white-space:nowrap;}
+  .proj .pact:hover{background:rgba(76,141,255,.14);}
+  .empty{color:var(--muted);font-size:12.5px;line-height:1.7;padding:6px 2px;}
+  .empty code{display:block;margin-top:7px;background:rgba(0,0,0,.35);padding:9px 11px;
+    border-radius:8px;color:#D8DEE9;font-size:10.5px;overflow-x:auto;white-space:nowrap;
+    font-family:ui-monospace,Consolas,monospace;}
+
+  /* ===== 快捷操作 ===== */
+  .acts{display:flex;flex-wrap:wrap;gap:9px;}
+  .act{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:11px;
+    background:rgba(255,255,255,.045);border:1px solid var(--line);color:#D8DEE9;
+    text-decoration:none;font-size:12.5px;font-weight:500;cursor:pointer;
+    transition:background .15s, border-color .15s, transform .12s;}
+  .act:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.2);transform:translateY(-1px);}
+  .act .ai{font-size:14px;}
+  .act.dis{opacity:.45;pointer-events:none;}
+
+  footer{margin-top:22px;color:var(--muted);font-size:11.5px;line-height:1.85;
+    border-top:1px solid var(--line);padding-top:14px;}
+  footer b{color:#C9D3E4;font-weight:600;}
+  .res{display:inline-flex;align-items:center;gap:6px;margin-right:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🎬</div>
+    <h1>AGNES 短剧工作站</h1>
+  </header>
+  <p class="sub">
+    同一个入口，两个台共用一套 AGNES 网关与密钥。密钥只留在服务端，浏览器永远拿不到；
+    工作台请求经本机 <code>8787</code> 反向代理转发到 <code>8777</code>。
+  </p>
+
+  <!-- 实时状态栏 -->
+  <div class="statusbar">
+    <div class="pill"><span class="dot on pulse" id="dotConsole"></span>
+      <span class="nm">调试台</span><span class="ms" id="msConsole">:8787</span></div>
+    <div class="pill"><span class="dot no" id="dotStudio"></span>
+      <span class="nm">工作台</span><span class="ms" id="msStudio">检测中…</span></div>
+    <div class="pill"><span class="dot no" id="dotBoard"></span>
+      <span class="nm">共享看板</span><span class="ms" id="msBoard">检测中…</span></div>
+    <div class="pill" id="pillClock"><span class="ms" id="msClock">—</span></div>
+  </div>
+
+  <!-- 双台入口 -->
+  <div class="grid">
+    <a class="card" id="cardConsole" href="/console"
+       style="--accent:var(--rose);--tint:rgba(232,85,110,.13)">
+      <div class="ico">🧪</div>
+      <p class="ct">AGNES 调试台 <span class="st on" id="stConsole"><i class="dot on"></i>在线</span></p>
+      <p class="cd">直连 AGNES 原始接口：单条 prompt 试文生图 / 图生视频，调参、看返回、拼片。<b>验证想法用它。</b></p>
+      <div class="tags"><span class="tag">原始 API</span><span class="tag">参数调试</span><span class="tag">资产库</span><span class="tag">片段拼接</span></div>
+      <div class="foot"><span class="port">:8787 /console</span><span class="go">进入 →</span></div>
+    </a>
+
+    <a class="card down" id="cardStudio" href="/studio"
+       style="--accent:var(--blue);--tint:rgba(76,141,255,.13)">
+      <div class="ico">🎞</div>
+      <p class="ct">Storyboard 工作台 <span class="st no" id="stStudio"><i class="dot"></i>检测中</span></p>
+      <p class="cd">按 SceneSpec 分镜批量生产：参考图 → 逐镜出片 → 合成 → 质检 → AI 诊断。<b>出成片用它。</b></p>
+      <div class="tags"><span class="tag">SceneSpec</span><span class="tag">批量生成</span><span class="tag">技术质检</span><span class="tag">AI 语义诊断</span></div>
+      <div class="foot"><span class="port" id="studioPort">:8777 → 代理</span><span class="go">进入 →</span></div>
+      <div class="hint">工作台后端未启动。
+        <button class="lbtn" id="btnStartStudio">⚡ 一键启动工作台</button>
+        <code>cd short_drama_workflow/html_prototype &amp;&amp; REAL=1 python server.py</code>
+      </div>
+    </a>
+  </div>
+
+  <!-- 共享看板入口：手机经 8787 /board 反代直达（无需直连 8788） -->
+  <a class="card" id="cardBoard" href="#"
+     style="--accent:var(--gold);--tint:rgba(232,194,104,.13);display:block;margin-bottom:16px;">
+    <div class="ico">📋</div>
+    <p class="ct">共享任务看板 <span class="st no" id="stBoard"><i class="dot"></i>检测中</span></p>
+    <p class="cd">跨设备同步的任务进度看板：项目 → 任务树，状态 / 优先级一目了然。<b>手机同 WiFi 即看进度预览。</b></p>
+    <div class="tags"><span class="tag">任务树</span><span class="tag">进度预览</span><span class="tag">跨设备</span><span class="tag">实时</span></div>
+    <div class="foot"><span class="port" id="boardPort">:8788 直连</span><span class="go">进入 →</span></div>
+    <div class="hint">看板后端未启动。
+      <button class="lbtn" id="btnStartBoard">⚡ 一键启动看板</button>
+      <code>cd shared_board &amp;&amp; python server.py</code>
+    </div>
+  </a>
+
+  <!-- 运行日志入口：出问题顺时间线回溯（开发模式开放） -->
+  <a class="card" id="cardLogs" href="/logs"
+     style="--accent:var(--blue);--tint:rgba(76,141,255,.13);display:block;margin-bottom:16px;">
+    <div class="ico">📜</div>
+    <p class="ct">运行日志 <span class="st on" id="stLogs"><i class="dot on"></i>按天归档</span></p>
+    <p class="cd">服务端 + 前端上报共用一份日志：API 请求耗时、生成任务、异常栈、前端 JS 错误。<b>出问题先说一句，阿编顺着这里查。</b></p>
+    <div class="tags"><span class="tag">时间线</span><span class="tag">错误定位</span><span class="tag">保留 7 天</span><span class="tag">正式发布关闭</span></div>
+    <div class="foot"><span class="port">:8787 /logs</span><span class="go">进入 →</span></div>
+  </a>
+
+  <!-- 项目切换器 -->
+  <div class="panel">
+    <div class="ph"><span class="ic">🗂</span><span class="t">项目切换</span>
+      <span class="b" id="projCount">—</span></div>
+    <div id="projList">
+      <div class="empty">等待工作台状态…</div>
+    </div>
+  </div>
+
+  <!-- 快捷操作 -->
+  <div class="panel">
+    <div class="ph"><span class="ic">⚡</span><span class="t">快捷操作</span></div>
+    <div class="acts">
+      <a class="act" href="/console"><span class="ai">🧪</span>调试台直连</a>
+      <a class="act" id="actLaunch" href="javascript:void(0)"><span class="ai">⚡</span>一键启动工作台</a>
+      <a class="act" id="actStudio" href="/studio"><span class="ai">🎞</span>打开工作台</a>
+      <a class="act" id="actFinal" href="#"><span class="ai">🎬</span>看当前成片</a>
+      <a class="act" id="actSwitch" href="#"><span class="ai">🔁</span>切换并刷新工作台</a>
+    </div>
+  </div>
+
+  <footer>
+    <span class="res">🔌 运行服务：<b id="resRunning">8787 门户</b></span>
+    <span class="res">🎯 当前项目：<b id="resActive">—</b></span>
+    <br>
+    <b>怎么选？</b> 拿不准参数怎么写 → 调试台单点试；分镜已定要批量出片 → 工作台跑流水线。<br>
+    <b>REAL 模式</b> 只影响工作台：dry-run 不花 token，<code>REAL=1</code> 才真调 AGNES 扣额度。
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// ---------- 实时探测：服务状态 + 项目列表 ----------
+let _studioOnline = false;
+let _boardOnline = false;
+let _activeProject = null;
+
+async function ping(url){
+  const t0 = performance.now();
+  const r = await fetch(url, {cache:"no-store"});
+  const dt = Math.round(performance.now() - t0);
+  return {ok:true, dt, json: await r.json().catch(()=>({}))};
+}
+
+async function probe(){
+  // 调试台（固定在线，8787 同源）
+  setDot("dotConsole", "on", true);
+  $("msConsole").textContent = "在线 · :8787";
+
+  // 工作台 + 共享看板（同一次 /api/hub/status 探测）
+  let j = null;
+  try{
+    const r = await fetch("/api/hub/status", {cache:"no-store"});
+    j = await r.json();
+  }catch(e){
+    setDot("dotStudio", "err", false);
+    $("msStudio").textContent = "探测失败";
+    markStudio(false);
+    setDot("dotBoard", "err", false);
+    $("msBoard").textContent = "探测失败";
+    markBoard(false);
+    renderProjectsOffline(String(e));
+  }
+
+  if(j){
+    // 工作台
+    _studioOnline = !!j.studio;
+    if(_studioOnline){
+      setDot("dotStudio", "on", true);
+      const extra = j.studio_active ? (" · " + j.studio_active) : "";
+      $("msStudio").textContent = "在线 · :8777" + extra;
+      $("studioPort").textContent = ":8777 → 代理" + extra;
+      markStudio(true);
+      await loadProjects();
+    }else{
+      setDot("dotStudio", "no", false);
+      $("msStudio").textContent = "未启动";
+      $("studioPort").textContent = ":8777 → 代理（离线）";
+      markStudio(false);
+      renderProjectsOffline(j.error);
+    }
+    // 共享看板（8788）：手机经 8787 入口可达
+    _boardOnline = !!j.board;
+    if(_boardOnline){
+      setDot("dotBoard", "on", true);
+      $("msBoard").textContent = "在线 · :8788";
+      markBoard(true);
+    }else{
+      setDot("dotBoard", "no", false);
+      $("msBoard").textContent = "未启动";
+      markBoard(false);
+    }
+  }
+
+  // 统一刷新运行服务文案
+  const running = ["8787 门户"];
+  if(_studioOnline) running.push("8777 工作台");
+  if(_boardOnline) running.push("8788 看板");
+  $("resRunning").textContent = running.join(" + ");
+  $("msClock").textContent = "更新 " + new Date().toLocaleTimeString("zh-CN", {hour12:false});
+}
+
+function setDot(id, cls, pulse){
+  const el = $(id);
+  el.className = "dot " + cls + (pulse ? " pulse" : "");
+}
+function markStudio(online){
+  const c = $("cardStudio");
+  const st = $("stStudio");
+  if(online){
+    c.classList.remove("down");
+    st.className = "st on"; st.innerHTML = '<i class="dot on"></i>在线';
+    $("actStudio").classList.remove("dis");
+    $("actSwitch").classList.remove("dis");
+  }else{
+    c.classList.add("down");
+    st.className = "st no"; st.innerHTML = '<i class="dot"></i>未启动';
+    $("actStudio").classList.add("dis");
+    $("actSwitch").classList.add("dis");
+  }
+}
+
+function markBoard(online){
+  const c = $("cardBoard");
+  const st = $("stBoard");
+  if(online){
+    c.classList.remove("down");
+    st.className = "st on"; st.innerHTML = '<i class="dot on"></i>在线';
+  }else{
+    c.classList.add("down");
+    st.className = "st no"; st.innerHTML = '<i class="dot"></i>未启动';
+  }
+}
+
+async function loadProjects(){
+  try{
+    const r = await fetch("/api/projects", {cache:"no-store"});
+    const j = await r.json();
+    _activeProject = j.active || null;
+    $("resActive").textContent = _activeProject || "—";
+    const list = j.projects || [];
+    $("projCount").textContent = list.length + " 个项目 · 当前 " + (_activeProject || "—");
+    if(!list.length){
+      $("projList").innerHTML = '<div class="empty">工作台暂无项目。</div>';
+      return;
+    }
+    $("projList").innerHTML = list.map(p => {
+      const active = (p.id === _activeProject);
+      const meta = [p.shots ? (p.shots + " 镜") : null, p.name ? "" : p.id]
+        .filter(Boolean).join(" · ");
+      return `<div class="proj ${active ? "active" : ""}" data-id="${p.id}">
+        <span class="pdot"></span>
+        <div class="pinfo">
+          <div class="pname">${esc(p.name || p.id)}</div>
+          <div class="pmeta">${active ? "● 当前项目" : "点击切换"} ${meta ? "· " + esc(meta) : ""}</div>
+        </div>
+        <a class="pact" data-id="${p.id}" href="javascript:void(0)">${active ? "进入工作台" : "切换"}</a>
+      </div>`;
+    }).join("");
+    bindProjectButtons();
+  }catch(e){
+    renderProjectsOffline(String(e));
+  }
+}
+
+function renderProjectsOffline(err){
+  $("projCount").textContent = "工作台离线";
+  $("resActive").textContent = "—";
+  $("projList").innerHTML = `<div class="empty">工作台后端（:8777）未启动，项目列表不可用。
+    启动后此处会自动出现可切换的项目。
+    <code>cd short_drama_workflow/html_prototype &amp;&amp; REAL=1 python server.py</code></div>`;
+}
+
+function bindProjectButtons(){
+  document.querySelectorAll(".proj .pact").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      switchProject(btn.getAttribute("data-id"));
+    });
+  });
+  document.querySelectorAll(".proj").forEach(row => {
+    row.addEventListener("click", (e) => {
+      if(e.target.classList.contains("pact")) return;
+      switchProject(row.getAttribute("data-id"));
+    });
+  });
+}
+
+async function switchProject(pid){
+  if(pid === _activeProject){ window.location.href = "/studio"; return; }
+  try{
+    const r = await fetch("/api/project/switch", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({id: pid})
+    });
+    const j = await r.json();
+    if(j.ok){
+      _activeProject = pid;
+      await loadProjects();
+      // 快捷操作「看当前成片」同步刷新
+      $("actFinal").setAttribute("href", "/projects/" + pid + "/final.mp4");
+    }
+  }catch(e){ /* 忽略，下次探测会自愈 */ }
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// 快捷操作：看当前成片（依赖工作台在线 + 当前项目）
+$("actFinal").addEventListener("click", (e) => {
+  if(!_studioOnline || !_activeProject){ e.preventDefault(); return; }
+  e.target.setAttribute("href", "/projects/" + _activeProject + "/final.mp4");
+});
+$("actSwitch").addEventListener("click", (e) => {
+  e.preventDefault();
+  if(_activeProject) window.location.href = "/studio";
+});
+
+// 一键启动工作台（C）：调 8787 代理拉起 8777 子进程，轮询上线
+$("btnStartStudio").addEventListener("click", launchStudio);
+$("actLaunch").addEventListener("click", launchStudio);
+async function launchStudio(){
+  const btn = $("btnStartStudio"); const act = $("actLaunch");
+  if(btn){ btn.disabled = true; btn.textContent = "启动中…"; }
+  if(act){ act.style.opacity = ".5"; act.style.pointerEvents = "none"; }
+  try{
+    const r = await fetch("/api/hub/start-studio", {method:"POST"});
+    const j = await r.json();
+    if(j.ok){
+      for(let i=0;i<12;i++){
+        await new Promise(res=>setTimeout(res,2500));
+        await probe();
+        if(_studioOnline) break;
+      }
+    }
+  }catch(e){ /* 忽略，下次探测自愈 */ }
+  finally{
+    if(btn){ btn.disabled = false; btn.textContent = "⚡ 一键启动工作台"; }
+    if(act){ act.style.opacity = "1"; act.style.pointerEvents = ""; }
+  }
+}
+
+// 共享看板：点击卡片经 8787 /board 反代直达（手机同 WiFi 只打 8787 即可看进度预览）
+function boardUrl(){
+  return "/board";
+}
+$("cardBoard").addEventListener("click", (e) => {
+  e.preventDefault();
+  window.location.href = boardUrl();
+});
+$("btnStartBoard").addEventListener("click", (e) => { e.stopPropagation(); launchBoard(); });
+async function launchBoard(){
+  const btn = $("btnStartBoard");
+  if(btn){ btn.disabled = true; btn.textContent = "启动中…"; }
+  try{
+    const r = await fetch("/api/hub/start-board", {method:"POST"});
+    const j = await r.json();
+    if(j.ok){
+      for(let i=0;i<12;i++){
+        await new Promise(res=>setTimeout(res,2500));
+        await probe();
+        const st = await (await fetch("/api/hub/status", {cache:"no-store"})).json().catch(()=>({}));
+        if(st.board) break;
+      }
+    }
+  }catch(e){ /* 忽略，下次探测自愈 */ }
+  finally{
+    if(btn){ btn.disabled = false; btn.textContent = "⚡ 一键启动看板"; }
+  }
+}
+
+probe();
+setInterval(probe, 4000);
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# ===== 敏感数据（绝不提交）=====
+# 密钥
+.env
+*.env
+!*.env.example
+
+# 项目数据（真实用户项目，114M+）
+short_drama_workflow/html_prototype/projects/
+short_drama_workflow/html_prototype/.active_project
+
+# 运行状态/日志
+*.log
+short_drama_workflow/html_prototype/logs/
+agnes_state.json
+.p.json
+
+# ===== 工具/缓存 =====
+__pycache__/
+*.pyc
+.workbuddy/
+.trae/
+output/
+node_modules/
+
+# ===== 临时文件 =====
+_t*.js
+_tmp_*
+_qa_*.py
+_scan_*.py
+*.bak.json
+short_drama_workflow/html_prototype/*.bak.json

@@ -1,0 +1,35 @@
+# 短剧自动化工作流依赖
+
+# 核心依赖
+python>=3.10
+
+# Pavo Harness 调度器依赖
+# 内置模块，无需额外依赖
+
+# AGNES 客户端依赖（如果使用官方 SDK）
+# agnes-ai @ AGNES API client
+# 暂时用我们的自定义客户端
+
+# 网络请求
+requests>=2.25.0
+
+# 视频处理（ffmpeg 需单独安装）
+moviepy>=1.0.0
+
+# 语音生成（开发验证层）
+edge-tts>=6.1.0
+
+# 音频处理
+pydub>=0.25.0
+
+# 配置文件管理
+pyyaml>=6.0
+
+# 进度显示（可选）
+tqdm>=4.65.0
+
+# 日志增强
+colorlog>=6.7.0
+
+# 测试相关
+pytest>=7.0.0
