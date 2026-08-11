@@ -166,11 +166,12 @@ function chip(k, val, hp) {
 }
 function vname(v) { return v.name || v.variant || v.id || '变体'; }
 
-function variantCard(v) {
+function variantCard(v, project) {
   const d = v.metrics || v.diagnosis || {};
   const hp = v.hard_detail || {};
   const hpB = k => hp[k] === true ? '<span class="hp hp-pass">✔ 达标</span>' : (hp[k] === false ? '<span class="hp hp-fail">✘ 未达标</span>' : '');
   const idl = v.identity_last || {};
+  const ic = v.internal_consistency || {};
   const an = v.analysis || {};
   const rows = [
     ['🔍 问题', an.problem],
@@ -201,7 +202,7 @@ function variantCard(v) {
     const kfHtml = p.keyframes.map(k => {
       const src = k.src || '';
       const url = src.startsWith('http') ? src
-        : (src.startsWith('assets/') ? '/projects/' + (EXPS.find(e=>(e.variants||[]).includes(v))||{}).project + '/' + src.replace('assets/','assets/') : '');
+        : (src.startsWith('assets/') ? '/projects/' + (project || '') + '/' + src : '');
       return '<div style="text-align:center"><div style="font-size:10px;color:#64748b;margin-bottom:2px">' + k.role + '</div>' +
         (url ? '<img src="' + url + '" class="kfimg" onclick="openLb(\'' + url + '\',\'' + k.role + '\')" onerror="this.style.display=\'none\'">' : '') + '</div>';
     }).join('');
@@ -262,7 +263,7 @@ function expCard(e) {
       (e.key_finding ? '<div class="concl"><b>💡 关键机制发现</b>：' + e.key_finding + '</div>' : '') +
       (e.candidate_note ? '<div class="concl"><b>🏆 候选方案</b>：' + e.candidate_note + '</div>' : '') +
       '<div style="font-size:11px;color:#64748b;margin:6px 0">▼ 各变体的来龙去脉（点开看完整故事线）</div>' +
-      (e.variants||[]).map(variantCard).join('') +
+      (e.variants||[]).map(v => variantCard(v, e.project)).join('') +
       ((e.rules_draft||[]).length ? '<div style="margin-top:10px">' + e.rules_draft.map(r => '<div class="rule">📌 <b>规则草案</b> ' + r + '</div>').join('') + '</div>' : '') +
       (e.qc_lesson ? '<div class="concl"><b>📋 质检教训</b>：' + e.qc_lesson + '</div>' : '') +
       '<div class="actions">' +
@@ -284,7 +285,9 @@ function render() {
     '<div class="stat">候选待审 <b style="color:#fbbf24">' + cnt.candidate + '</b></div>' +
     '<div class="stat">已采纳 <b style="color:#34d399">' + cnt.adopted + '</b></div>' +
     '<div class="stat">已拒绝 <b style="color:#f87171">' + cnt.rejected + '</b></div>';
-  document.getElementById('list').innerHTML = list.length ? list.map(expCard).join('') : '<div class="note">暂无实验。</div>';
+  document.getElementById('list').innerHTML = list.length
+    ? list.map(e => { try { return expCard(e); } catch(err) { return '<div class="note" style="color:#f87171">⚠ 实验渲染错误: ' + (err.message || err) + '</div>'; } }).join('')
+    : '<div class="note">暂无实验。</div>';
 }
 
 function toggle(head) { head.parentElement.classList.toggle('open'); }
