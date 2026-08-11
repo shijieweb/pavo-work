@@ -508,7 +508,18 @@
                 <option v-for="(a,i) in refOptions" :key="i" :value="a.ref">{{ a.label }}</option>
               </select>
             </div>
-            <label class="block text-[10px] text-slate-400">首针提示词（参考图缺失时自动文生图兜底）</label>
+            <!-- 运镜徽标 + 手动标注（老板 0811：运镜镜头首帧=运镜起点画面，资产图+提示词 i2i 生成） -->
+            <div class="flex items-center gap-1.5 text-[10px] pt-1">
+              <span :class="['px-1.5 py-0.5 rounded border', isCameraMove(sh) ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-700/50 text-slate-400 border-slate-700']">🎥 {{ isCameraMove(sh) ? '运镜镜头' : '固定镜头' }}</span>
+              <span class="text-slate-500 shrink-0">运镜:</span>
+              <select v-model="sh.camera_move" @change="putSpec().catch(()=>{})" class="bg-slate-800 border border-slate-700 rounded px-1 py-0.5 text-[10px]">
+                <option value="auto">自动判定</option>
+                <option value="yes">是（首帧=运镜起点）</option>
+                <option value="no">否（固定机位）</option>
+              </select>
+              <span v-if="isCameraMove(sh)" class="text-amber-400/80">首针生成将按起点画面</span>
+            </div>
+            <label class="block text-[10px] text-slate-400">{{ isCameraMove(sh) ? '首针提示词（运镜起点画面，必填：镜头开始时的画面，如门口/过道/全景）' : '首针提示词（参考图缺失时自动文生图兜底）' }}</label>
             <textarea v-model="sh.first_frame_prompt" rows="1" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-[11px] font-mono" placeholder="首针画面描述，留空则用拍摄剧本"></textarea>
             <div class="flex items-center gap-1 text-[10px] text-slate-400 pt-1 border-t border-slate-800">
               <span class="shrink-0 text-violet-300">尾针参考[{{ sh.ref || '同首针' }}]</span>
@@ -1963,6 +1974,17 @@ createApp({
       } else {
         this.notify('返工失败: ' + ((d && (d.error || d.note)) || '未知错误'));
       }
+    },
+    isCameraMove(sh) {
+      // 运镜镜头判定（与后端 _is_camera_move 同一套关键词，老板 0811）：手动标注优先
+      if (!sh) return false;
+      const cm = (sh.camera_move || 'auto').toString().toLowerCase();
+      if (cm === 'yes') return true;
+      if (cm === 'no') return false;
+      const KWS = ['推','拉远','拉全','摇','移','环绕','跟拍','跟移','横移','穿越','穿过','推进','后拉','上摇','下摇','扫视','巡览','升降','甩镜','从','进入','推向',
+        'push-in','push in','pushin','tracking','dolly','pan','tilt','crane','zoom','orbit','pull-back','pull back','pullback','through','enter','into','sweep','follow','glide','drift'];
+      const t = ((sh.camera||'') + ' ' + (sh.video_prompt||'') + ' ' + (sh.cn_story||'')).toLowerCase();
+      return KWS.some(k => t.includes(k));
     },
     firstFrameUrl(sh) {
       // 【0810 夜修】reference 空镜（无首尾针，场景图单图驱动）：首帧显示对应场景图，
