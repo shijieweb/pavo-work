@@ -93,41 +93,45 @@ async function load() {
   } catch(e) { document.getElementById('list').innerHTML = '<div class="note">加载失败: ' + e.message + '</div>'; }
 }
 
-function sc(v) { if (v==='-'||v===null||v===undefined) return ['-','-']; v=Number(v); if (v>=8) return ['s-good',v]; if (v>=5) return ['s-mid',v]; return ['s-bad',v]; }
+function sc(v) { if (v==='-'||v===null||v===undefined) return ['s-mid','未检测']; v=Number(v); if (v>=8) return ['s-good',v]; if (v>=5) return ['s-mid',v]; return ['s-bad',v]; }
 function chip(k, val, hp) {
   const [c, show] = sc(val);
-  return '<span class="m">' + k + ' <b class="' + c + '">' + (show==='-'?'-':show) + '</b>' +
+  return '<span class="m">' + k + ' <b class="' + c + '">' + show + '</b>' +
     (hp !== undefined ? ' <span class="' + (hp ? 'hp-pass' : 'hp-fail') + '" style="font-size:9px">' + (hp?'✔':'✘') + '</span>' : '') + '</span>';
 }
+function vname(v) { return v.name || v.variant || v.id || '变体'; }
 
 function variantCard(v) {
-  const d = v.metrics || {};
+  const d = v.metrics || v.diagnosis || {};
   const hp = v.hard_detail || {};
   const hpB = k => hp[k] === true ? '<span class="hp hp-pass">✔ 达标</span>' : (hp[k] === false ? '<span class="hp hp-fail">✘ 未达标</span>' : '');
   const idl = v.identity_last || {};
   const rows = [
     ['🎯 解决什么', v.goal],
-    ['💡 为什么', v.hypothesis],
+    ['💡 为什么', v.hypothesis || v.hyp],
     ['📚 依据', v.reference],
     ['⚙️ 怎么改', v.implement],
     ['🔍 发现问题', v.finding],
     ['⏭ 下一步', v.next]
   ].filter(r => r[1]);
+  const vText = v.verdict==='pass' ? '通过' : (v.verdict==='fail' ? '未通过' : (v.verdict==='warn' ? '需关注' : (v.verdict || '未检测')));
+  const vCls = v.verdict==='pass' ? 's-good' : (v.verdict==='fail' ? 's-bad' : 's-mid');
   const metrics = [
     chip('连贯', d.continuity), chip('物理', d.physical), chip('角色', d.character, hp.character),
-    chip('首尾', d.first_last), chip('face', d.face, hp.face), chip('quality', d.quality),
-    chip('verdict', v.verdict==='pass'?10:(v.verdict==='fail'?2:5), hp.verdict)
+    chip('首尾', d.first_last), chip('人脸', d.face, hp.face), chip('画质', d.quality),
+    '<span class="m">判定 <b class="' + vCls + '">' + vText + '</b>' + (hp.verdict ? ' <span class="' + (hp.verdict ? 'hp-pass' : 'hp-fail') + '" style="font-size:9px">' + (hp.verdict?'✔':'✘') + '</span>' : '') + '</span>'
   ].join('');
-  return '<div class="vcard ' + (v.name === (EXPS.find(e=>(e.variants||[]).includes(v))||{}).candidate ? 'win' : '') + '">' +
+  return '<div class="vcard ' + (vname(v) === (EXPS.find(e=>(e.variants||[]).includes(v))||{}).candidate ? 'win' : '') + '">' +
     '<div class="vhead">' +
-      '<span class="vname">变体 ' + v.name + '</span>' +
-      (v.name === (EXPS.find(e=>(e.variants||[]).includes(v))||{}).candidate ? '<span class="hp hp-pass">🏆 候选</span>' : '') +
+      '<span class="vname">变体 ' + vname(v) + '</span>' +
+      (vname(v) === (EXPS.find(e=>(e.variants||[]).includes(v))||{}).candidate ? '<span class="hp hp-pass">🏆 候选</span>' : '') +
       '<span style="margin-left:auto;display:flex;gap:4px">' + hpB('verdict') + hpB('character') + hpB('face') + '</span>' +
     '</div>' +
     '<div class="metrics">' + metrics + '</div>' +
     '<div class="story">' + rows.map(r => '<div class="row"><span class="ic">' + r[0] + '</span><span class="tx">' + r[1] + '</span></div>').join('') + '</div>' +
     (idl.verdict ? '<div class="metrics" style="margin-top:6px">' +
-      '<span class="m">尾帧脸型 <b class="' + (idl.verdict==='pass'?'s-good':idl.verdict==='fail'?'s-bad':'s-mid') + '">' + idl.verdict.toUpperCase() + '</b></span>' +
+      '<span class="m">尾帧脸型 <b class="' + (idl.verdict==='pass'?'s-good':idl.verdict==='fail'?'s-bad':'s-mid') + '">' +
+      (idl.verdict==='pass'?'一致 ✅':idl.verdict==='fail'?'不一致 ❌':idl.verdict==='warn'?'轻微差异 ⚠':'未检测') + '</b></span>' +
       (idl.issues ? '<span class="m" style="color:#f87171">' + idl.issues + ' 个问题</span>' : '') + '</div>' : '') +
     (v.video ? '<div class="vids"><video controls preload="none" src="/training/video/' + v.video.replace(/^experiments\//,'') + '"></video></div>' : '') +
     '</div>';
@@ -139,7 +143,7 @@ function expCard(e) {
   return '<div class="exp ' + (e.status==='candidate'?'open':'') + '" id="' + e.id + '">' +
     '<div class="exp-head" onclick="toggle(this)">' +
       '<span class="arrow">▶</span><span class="exp-id">' + e.id + '</span>' +
-      '<span class="exp-meta">' + (e.type||'') + ' · ' + (e.sample||'').slice(0,44) + ' · ' + e.ts + '</span>' +
+      '<span class="exp-meta">' + (e.type||'') + ' · ' + (e.sample||'').slice(0,44) + ' · ' + (e.ts||'') + '</span>' +
       '<span class="badge ' + stCls + '">' + stLabel + '</span>' +
       (e.candidate ? '<span class="badge b-candidate">候选: ' + e.candidate + '</span>' : '') +
     '</div>' +

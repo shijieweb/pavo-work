@@ -56,7 +56,8 @@
       "reference": "",
       "implement": "",
       "finding": "",
-      "next": ""
+      "next": "",
+      "name": "v0"
     },
     {
       "variant": "v1",
@@ -96,7 +97,8 @@
       "reference": "",
       "implement": "",
       "finding": "",
-      "next": ""
+      "next": "",
+      "name": "v1"
     },
     {
       "variant": "v4",
@@ -131,7 +133,8 @@
       "reference": "",
       "implement": "",
       "finding": "",
-      "next": ""
+      "next": "",
+      "name": "v4"
     },
     {
       "variant": "v5",
@@ -160,7 +163,8 @@
       "reference": "",
       "implement": "",
       "finding": "",
-      "next": ""
+      "next": "",
+      "name": "v5"
     }
   ],
   "progress": "运镜类训练：样本 1 完成 2 轮（第一轮 v1 pass / 第二轮 v0 pass——随机性矛盾，待重复实验定论）",

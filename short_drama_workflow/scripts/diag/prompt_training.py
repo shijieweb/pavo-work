@@ -180,7 +180,7 @@ def main():
             print("  视频就绪: %s (%.0f KB)" % (fp, os.path.getsize(fp) // 1024))
         except Exception as e:
             print("  ❌ 变体 %s 生成失败: %s" % (name, str(e)[:150]))
-            report.append({"variant": name, "hyp": v["hyp"], "ok": False, "error": str(e)[:150]})
+            report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": False, "error": str(e)[:150]})
             continue
         # 质检：AGNES 4 维诊断 + face
         try:
@@ -209,7 +209,7 @@ def main():
                 vr = review([anchor, frame], kind="identity")
                 print("  identity 审查(尾帧):", vr.get("verdict"), "| issues:", len(vr.get("issues") or []),
                       "|", (vr.get("issues") or [{}])[0].get("desc", "")[:50] if vr.get("issues") else "")
-                report.append({"variant": name, "hyp": v["hyp"], "ok": True,
+                report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": True,
                                "diagnosis": scores, "verdict": (d or {}).get("verdict"),
                                "identity_review": vr.get("verdict"),
                                "identity_issues": (vr.get("issues") or [])[:3],
@@ -218,7 +218,7 @@ def main():
         except Exception as e:
             print("  identity 审查失败: %s" % str(e)[:100])
         if not vid_ok:
-            report.append({"variant": name, "hyp": v["hyp"], "ok": True,
+            report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": True,
                            "diagnosis": scores, "verdict": (d or {}).get("verdict")})
 
     # 对比表
