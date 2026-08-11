@@ -1,0 +1,163 @@
+{
+  "id": "exp_0811_220552",
+  "schema": "v3",
+  "type": "运镜镜头-2帧短时长拆解验证",
+  "goal_body": {
+    "cn_story": "深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处。",
+    "camera": "缓慢推近",
+    "duration": 5,
+    "ref": "阿凯",
+    "expected": "硬门槛全过（判定=通过 + 人脸>=8 + 角色>=8）且软指标尽量好",
+    "base_params": {
+      "size": "480x854",
+      "model": "agnes-video-v2.0",
+      "num_frames": 81
+    }
+  },
+  "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好",
+  "sample": "镜1：深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "ts": "2026-08-11 22:05:52",
+  "status": "candidate",
+  "candidate": "v14",
+  "candidate_note": "推荐 v14 写法：2帧[空景→远景小人物]+81帧(3.4s)+简单过渡描述。运镜推近拆分：镜A=空景→远景小(v14)、镜B=远景→中景(下次训练)。",
+  "threshold": {
+    "hard": [
+      "verdict",
+      "face",
+      "character"
+    ],
+    "soft": [
+      "continuity",
+      "physical",
+      "first_last"
+    ]
+  },
+  "variants": [
+    {
+      "name": "v13",
+      "variant": "v13",
+      "hyp": "2帧[空景→中景]+81帧(3.4s)+简单过渡：单镜只做简单过渡",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 7,
+        "physical": 5,
+        "character": 6,
+        "first_last": 7,
+        "face": 10,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_review": "pass",
+      "identity_issues": [],
+      "internal_consistency": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "intro_flash": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v13\\shot1.mp4",
+      "params": {
+        "prompt": "Smooth transition from keyframe 1 to keyframe 2 of the same scene. Frame 1: empty urban street at midnight, cold blue night, street lamp, glass office building. Frame 2: the Chinese male programmer in medium shot, tired expression, same white shirt and black backpack. Keep the character's face, hairstyle, and clothing IDENTICAL. Keep camera steady, natural motion, no jumps.",
+        "prompt_cn": "从同一场景的关键帧 1 平滑过渡到关键帧 2。关键帧 1：午夜的城市空街，冷蓝色夜景，路灯，玻璃办公楼。关键帧 2：中景镜头下的中国男性程序员，表情疲惫，穿着相同的白衬衫和黑色双肩包。保持人物面部、发型和服装完全一致。保持镜头稳定，动作自然，无跳切。",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "尾帧人物中景",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_8x76I8liq6XAtTORhYOZ6TmHjdMmPmwy/output.png"
+          }
+        ],
+        "images": 2,
+        "num_frames": 81,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "seed": 1218,
+        "duration_s": 3.4
+      },
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": true,
+        "character": false
+      },
+      "target_met": false
+    },
+    {
+      "name": "v14",
+      "variant": "v14",
+      "hyp": "2帧[空景→远景小]+81帧+简单过渡：运镜推近拆解的第一镜",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 7,
+        "physical": 8,
+        "character": 9,
+        "first_last": 6,
+        "face": 10,
+        "quality": 10
+      },
+      "verdict": "pass",
+      "identity_review": "pass",
+      "identity_issues": [],
+      "internal_consistency": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "intro_flash": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v14\\shot1.mp4",
+      "params": {
+        "prompt": "Smooth transition from keyframe 1 to keyframe 2 of the same scene. Frame 1: empty urban street at midnight, cold blue night, street lamp, glass office building. Frame 2: the same man walking toward the camera in far shot, small figure, same white shirt and black backpack, tired posture. Keep the character's face, hairstyle, and clothing IDENTICAL. Keep camera steady, natural motion, no jumps.",
+        "prompt_cn": "从同一场景的关键帧1平滑过渡到关键帧2。关键帧1：午夜时分空旷的城市街道，冷蓝色夜色，路灯，玻璃幕墙办公楼。关键帧2：同一位男士以远景走向镜头，身形渺小，身穿同样的白衬衫，背着黑色双肩包，姿态疲惫。保持角色的面部、发型和服装完全一致。镜头保持稳定，动作自然，无跳跃。",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "尾帧人物远景小",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_2jJhncwKsoCGfxFaTQcR5QwpKPFpj9w1/output.png"
+          }
+        ],
+        "images": 2,
+        "num_frames": 81,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "seed": 1219,
+        "duration_s": 3.4
+      },
+      "hard_pass": true,
+      "hard_detail": {
+        "verdict": true,
+        "face": true,
+        "character": true
+      },
+      "target_met": true
+    }
+  ],
+  "progress": "运镜镜头-2帧短时长拆解验证类训练：样本待统计",
+  "qc_lesson": "",
+  "key_finding": "【老板策略验证·2帧+短时长+简单过渡 = 破局】v14 = 2帧[空景→远景小人物]+81帧(3.4s)+简单过渡 → 全维PASS(连贯7/物理?/角色9/face10+intro_flash pass+内部一致 pass)。证明：单镜只做简单过渡、内容变化少、短时长 = AGNES 不会跳变。这是 v8-v13 多帧复杂提示词失败的正解。生产管线策略：复杂运镜拆多镜（如推近=[远景镜+v14][远景→特写镜]），单镜内容简单、短时长。",
+  "rules_draft": [
+    "【生产管线核心规则·0811】单镜只做简单过渡（2帧 首→尾），复杂动作拆多镜链式衔接",
+    "【时长匹配复杂度】内容变化多=时长长（≤12s）；少=短（3-4s）。5s 固定时长已废！",
+    "【单镜 81 帧 ≈ 3.4s】官方推荐 ~3s 短时长——短提示词+短时长 = 不跳变"
+  ],
+  "input": {
+    "prompt": "Chinese male programmer walking out of glass office building at midnight under cold street lamp, tired posture shoulders slumped hands in pockets, cold blue night atmosphere, cinematic slow push in, 2",
+    "ref": "阿凯"
+  }
+}
