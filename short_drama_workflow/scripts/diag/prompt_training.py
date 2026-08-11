@@ -246,6 +246,48 @@ def build_variants(shot, ref, template="camera_move_v2"):
                     "prompt": v17_prompt, "num_frames": 81,
                     "hyp": "镜B拆解：人物中景→人物微变（同人同机位，姿态微动）"},
         }
+    if template == "camera_move_v7":
+        # 【第七轮·老板修正】首尾帧图本身必须符合物理/空间规律（图1状态→图2状态可衔接）
+        # v18 = 镜A：真空景双帧（文生图无人物 + i2i微变无人物）——验证真空景过渡
+        # v19 = 镜B：人物由远走近（远景小→走近中景，同机位同场景，物理连贯）
+        anchor_far = anchor
+        _af7 = os.path.join(HERE, "experiments", "anchor_far.txt")
+        if os.path.isfile(_af7):
+            anchor_far = open(_af7, encoding="utf-8").read().strip()
+        empty1 = ""
+        _e1 = os.path.join(HERE, "experiments", "sceneA_empty1.txt")
+        if os.path.isfile(_e1):
+            empty1 = open(_e1, encoding="utf-8").read().strip()
+        empty2 = ""
+        _e2 = os.path.join(HERE, "experiments", "sceneA_empty2.txt")
+        if os.path.isfile(_e2):
+            empty2 = open(_e2, encoding="utf-8").read().strip()
+        close1 = ""
+        _c1 = os.path.join(HERE, "experiments", "sceneB_close.txt")
+        if os.path.isfile(_c1):
+            close1 = open(_c1, encoding="utf-8").read().strip()
+        v18_prompt = ("Smooth transition between the two keyframes of the same empty street. "
+                      "Animate: thin mist drifting slowly across the wet asphalt, streetlight glow gently "
+                      "pulsing, distant window lights flickering softly. "
+                      "Keep stable: no people, same building, same lamp position, same camera angle, "
+                      "same cold blue night, no jumps.")
+        v19_prompt = ("Smooth transition of the same man walking closer to the camera in the same street. "
+                      "Animate: he walks forward with natural gait, growing larger in frame, subtle breathing, "
+                      "hair moving gently in night wind. "
+                      "Keep stable: same face, white shirt, black trousers, black backpack, same building and "
+                      "lamp behind, same camera position, no jumps, no morphing.")
+        kfA2 = [{"role": "镜A首帧·真空景", "src": empty1},
+                {"role": "镜A尾帧·空景微变", "src": empty2}]
+        kfB2 = [{"role": "镜B首帧·人物远景小", "src": anchor_far},
+                {"role": "镜B尾帧·人物走近中景", "src": close1}]
+        return {
+            "v18": {"images": [empty1, empty2], "keyframes": kfA2,
+                    "prompt": v18_prompt, "num_frames": 81,
+                    "hyp": "镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）"},
+            "v19": {"images": [anchor_far, close1], "keyframes": kfB2,
+                    "prompt": v19_prompt, "num_frames": 81,
+                    "hyp": "镜B物理走近：远景小→走近中景（同机位同场景，距离缩短）"},
+        }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
                "goal": "量化基线：验证现状写法的真实水平（对照组）", "reference": "基线=生产默认写法",
