@@ -50,7 +50,13 @@
         "verdict": false,
         "face": false,
         "character": true
-      }
+      },
+      "goal": "",
+      "hypothesis": "基准：现状 2 帧 + 原 prompt（对照）",
+      "reference": "",
+      "implement": "",
+      "finding": "",
+      "next": ""
     },
     {
       "variant": "v1",
@@ -84,7 +90,13 @@
         "verdict": false,
         "face": false,
         "character": false
-      }
+      },
+      "goal": "",
+      "hypothesis": "锚点帧：3 帧插值经过锚点脸（第一轮视觉唯一 pass）",
+      "reference": "",
+      "implement": "",
+      "finding": "",
+      "next": ""
     },
     {
       "variant": "v4",
@@ -113,7 +125,13 @@
         "verdict": false,
         "face": false,
         "character": true
-      }
+      },
+      "goal": "",
+      "hypothesis": "锚点+软词：图锚锁脸 + 服装软锁（期望硬门槛全过）",
+      "reference": "",
+      "implement": "",
+      "finding": "",
+      "next": ""
     },
     {
       "variant": "v5",
@@ -136,7 +154,13 @@
         "verdict": false,
         "face": false,
         "character": true
-      }
+      },
+      "goal": "",
+      "hypothesis": "软词：仅服装/配饰软锁，脸交给参考图",
+      "reference": "",
+      "implement": "",
+      "finding": "",
+      "next": ""
     }
   ],
   "progress": "运镜类训练：样本 1 完成 2 轮（第一轮 v1 pass / 第二轮 v0 pass——随机性矛盾，待重复实验定论）",
