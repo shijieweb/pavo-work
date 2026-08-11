@@ -165,6 +165,7 @@ STORYBOARD_SYS = (
     "     \"shot_size\": \"\u7279\u5199|\u8fd1\u666f|\u4e2d\u666f|\u5168\u666f\", \"beat\": \"\u94a9\u5b50|\u94fa\u57ab|\u51b2\u7a81|\u8f6c\u6298|\u7559\u60ac\u5ff5\",\n"
     "     \"gen_strategy\": \"keyframes|reference|text2video|ui\",\n"
     "     \"scene_type\": str(action|monologue|dialogue_2|dialogue_multi),\n"
+    "     \"first_frame_prompt\": \"English STARTING-frame image prompt for the keyframes (MANDATORY for camera-move shots: what the frame shows when the shot BEGINS, e.g. the café entrance/aisle before the push-in reaches the character; leave empty only for fixed static shots)\",\n"
     "     \"last_frame_prompt\": \"English end-state image prompt for the last keyframe (only needed when gen_strategy=keyframes)\",\n"
     "     \"transition_in\": \"fade\", \"transition_out\": \"fade\",\n"
     "     \"status\": \"pending\", \"asset_image\":\"\", \"asset_video\":\"\", \"asset_audio\":\"\"\n"
@@ -185,6 +186,7 @@ STORYBOARD_SYS = (
     "   - \"ui\": UI screen / interface shot (ui_shot=true).\n"
     "   Shots with a ref key must be 'keyframes'; only genuinely character-free shots may be 'reference'.\n"
     "8. LAST_FRAME_PROMPT (keyframes only): describes the ENDING composition and MUST differ from the opening state so the clip actually moves. Same character, same clothing, different posture/expression/position.\n"
+    "8.5 FIRST_FRAME_PROMPT (camera-move keyframes, MANDATORY): if the shot's 'camera' contains a camera MOVE (推/拉/摇/移/环绕/穿过/跟拍/push-in/tracking/dolly/pan/tilt/crane/orbit/through/enter), the opening frame is NOT the character close-up \u2014 it is where the camera starts (e.g. scene entrance, aisle, wide establishing). You MUST output first_frame_prompt describing that STARTING frame (a scene/environment view, possibly with the character small in the distance). Fixed static shots (固定/无运镜) may leave it empty.\n"
     "9. SCENES & PROPS: include 2-4 'scenes' and 1-3 'props' with English image prompts, reused across shots for visual coherence. Every shot must carry a scene_key pointing to one of the scenes.\n"
     "10. CONTINUITY: continuity_note must describe how this shot continues the previous one (same position/props/lighting) so keyframes can chain; first shot writes \u5f00\u7bc7\u65e0\u524d\u7f6e.\n"
     "11. ASSET CN_PROMPT (MANDATORY): EVERY references entry and EVERY scene/prop MUST include the 'cn_prompt' object with the listed Chinese fields (style/content/basic_req plus per-type fields), describing the asset in Chinese for the asset-design panel. The Chinese content MUST semantically match the English img_prompt (same costume/age/environment). Output these fields directly with the storyboard \u2014 do NOT omit them.\n"
@@ -611,6 +613,7 @@ def load_spec(project_id=None):
                 _migrated_kf = True
         s.setdefault("first_frame_prompt", "")
         s.setdefault("last_frame_prompt", "")
+        s.setdefault("camera_move", "auto")  # 运镜手动标注：auto/yes/no（0811 运镜首帧）
         # 中文拍摄剧本字段契约（分镜模块）：旧项目载入时兜底
         s.setdefault("cn_story", "")
         s.setdefault("camera_angle", "")
@@ -1286,6 +1289,111 @@ def _scene_family(key):
     return k.split("_")[0] if "_" in k else k
 
 
+# =====================================================================
+# 【运镜镜头首帧·老板 0811】有运镜的镜头，首帧 = 运镜起点画面（场景入口/过道/全景），
+# 不再贴角色锚点特写（否则关键帧动画与提示词"从门口推入"矛盾，运镜感全丢）。
+# 生成方式：资产图（场景图优先，否则角色锚点）+ first_frame_prompt → img2img 生成起点画面。
+# =====================================================================
+_CAMERA_MOVE_KW = [
+    # 中文运镜
+    "推", "拉远", "拉全", "摇", "移", "环绕", "跟拍", "跟移", "横移", "穿越", "穿过",
+    "推进", "后拉", "上摇", "下摇", "扫视", "巡览", "升降", "甩镜", "从", "进入", "推向",
+    # 英文运镜
+    "push-in", "push in", "pushin", "tracking", "dolly", "pan", "tilt", "crane", "zoom",
+    "orbit", "pull-back", "pull back", "pullback", "through", "enter", "into", "sweep",
+    "follow", "glide", "drift", "camera moves", "camera moves toward",
+]
+
+
+def _is_camera_move(shot):
+    """判定该镜是否为「运镜镜头」：shot.camera_move 手动三态（auto/yes/no）优先，
+    否则关键词匹配 camera / video_prompt / cn_story。返回 bool。"""
+    cm = (shot.get("camera_move") or "auto").strip().lower()
+    if cm == "yes":
+        return True
+    if cm == "no":
+        return False
+    texts = " ".join([
+        str(shot.get("camera") or ""),
+        str(shot.get("video_prompt") or ""),
+        str(shot.get("cn_story") or ""),
+    ]).lower()
+    return any(k in texts for k in _CAMERA_MOVE_KW)
+
+
+def _gen_camera_start(shot):
+    """【运镜镜头·老板 0811】生成「运镜起点」首帧图：资产图(场景图优先→角色锚点) +
+    first_frame_prompt → img2img 生成起点画面（如咖啡店门口/过道），落盘 kf_start。
+    返回本地 rel，失败返回 None（调用方回退锚点/文生兜底）。"""
+    try:
+        sys.path.insert(0, os.path.expanduser("~/.workbuddy/skills/agnes-ai/scripts"))
+        prompt = (shot.get("first_frame_prompt") or "").strip()
+        if not prompt:
+            return None
+        # 底图：场景图优先（运镜起点多为场景环境）；无则角色锚点
+        base = None
+        sk = shot.get("scene_key") or ""
+        for sc in SPEC.get("scenes", []) or []:
+            if (sc.get("key") or sc.get("name") or "") == sk and sc.get("asset_image"):
+                base = sc["asset_image"]
+                break
+        if not base:
+            ref_key = shot.get("ref")
+            ref = SPEC.get("references", {}).get(ref_key) if ref_key else None
+            if isinstance(ref, dict):
+                base = ref.get("remote_url") or ref.get("asset_image") or ""
+        # 底图归一：http 直接用；本地 rel/data → data URI（AGNES 只收 URL 或 data URI）
+        img_input = None
+        if base:
+            bs = str(base)
+            if bs.startswith("http"):
+                img_input = bs
+            else:
+                du = _to_agnes_image(bs) if (bs.startswith("assets/") or os.path.exists(asset_abs(bs))) else None
+                if du:
+                    img_input = du
+        gs = _clean_global_style()
+        if gs and gs not in prompt:
+            prompt = prompt + ", " + gs
+        cine = _cinema_clause(shot)
+        if cine:
+            prompt = prompt + ", " + cine
+        prompt = prompt + ", " + _OFF_STATIC_STOP
+        from agnes_client import generate_image, image_to_image
+        _log.info("[keyframes] shot#%s 运镜镜头 → 起点首帧（底图=%s）",
+                  shot.get("id"), ("有" if img_input else "无·纯文生"))
+        url = None
+        _fb_ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            if img_input:
+                fut = _fb_ex.submit(image_to_image, prompt, img_input)
+            else:
+                fut = _fb_ex.submit(generate_image, prompt)  # 无底图：纯文生起点画面（老板：必须符合标准）
+            url = fut.result(timeout=180)
+        except Exception as _fe:
+            _log.error("[keyframes] 运镜起点生成失败 shot#%s: %s", shot.get("id"), _fe)
+        finally:
+            _fb_ex.shutdown(wait=False)
+        if not url:
+            return None
+        sid = int(shot.get("id", 0))
+        sp = os.path.join(asset_abs("assets/references"), f"kf_start_{sid:03d}.png")
+        try:
+            import urllib.request as _ur
+            with _ur.urlopen(url, timeout=60) as r:
+                data = r.read()
+            with open(sp, "wb") as f:
+                f.write(data)
+            shot["asset_frame_start"] = f"assets/references/kf_start_{sid:03d}.png"
+        except Exception:
+            shot["asset_frame_start"] = url
+        shot["frame_start_source"] = "camera-start"
+        return shot["asset_frame_start"]
+    except Exception as e:
+        _log.error("[keyframes] 运镜起点首帧生成异常 shot#%s: %s", shot.get("id"), e)
+        return None
+
+
 def _first_frame_source(shot, allow_chain=True):
     """返回该镜「首帧图」可用来源：(url_or_datauri, is_public_url)。
 
@@ -1501,7 +1609,16 @@ def generate_keyframes_real(shot_id, force=False):
                 shot["frame_start_source"] = f"chain:shot{prev.get('id')}"
                 chained = True
     if not chained:
-        first_src, is_url = _first_frame_source(shot, allow_chain=False)
+        # 【运镜镜头首帧·老板 0811】有运镜且首帧描述非空 → 先按「运镜起点画面」生成
+        # （资产图+first_frame_prompt → img2img），不再直接贴角色锚点特写；失败回退旧来源链。
+        if _is_camera_move(shot) and (shot.get("first_frame_prompt") or "").strip():
+            cam_start = _gen_camera_start(shot)
+            if cam_start:
+                first_src, is_url = cam_start, str(cam_start).startswith("http")
+            else:
+                first_src, is_url = _first_frame_source(shot, allow_chain=False)
+        else:
+            first_src, is_url = _first_frame_source(shot, allow_chain=False)
         if not first_src:
             generate_references_real()
             first_src, is_url = _first_frame_source(shot, allow_chain=False)
@@ -1531,7 +1648,8 @@ def generate_keyframes_real(shot_id, force=False):
                     with open(sp, "wb") as f:
                         f.write(_b64.b64decode(b))
                 shot["asset_frame_start"] = f"assets/references/kf_start_{shot_id:03d}.png"
-            shot["frame_start_source"] = "anchor"  # 锚点/参考图
+            if shot.get("frame_start_source") != "camera-start":
+                shot["frame_start_source"] = "anchor"  # 锚点/参考图（camera-start 保留运镜起点标签）
         else:
             # reference：首帧直接用场景图/锚点（不额外落盘，视频管线会读 asset_image/ref）
             shot["asset_frame_start"] = first_src if str(first_src).startswith("http") else (
