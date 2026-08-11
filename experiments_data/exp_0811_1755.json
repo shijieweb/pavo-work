@@ -1,106 +1,80 @@
 {
   "id": "exp_0811_1755",
-  "project": "ep_0811_145935",
-  "shot": 1,
-  "ts": "2026-08-11 17:55:00",
+  "schema": "v2",
+  "type": "运镜镜头（推近）",
+  "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好，不设死线",
+  "sample": "镜1：阿凯深夜走出写字楼（缓慢推近，首帧为空景起点，尾帧人物中景）——来自 ep_0811_145935",
   "status": "candidate",
   "candidate": "v1",
-  "candidate_note": "关键帧序列插入角色锚点图（3帧：起点空景→锚点脸→尾帧），prompt 避免写死面部细节让参考图锁脸。V1 视觉脸型一致 pass(0问题)，V2/V3 身份词过重反而破坏脸型（AGNES prompt 描述覆盖参考图）",
-  "hypothesis": "运镜镜头角色一致性：①插锚点帧给模型早脸锚 ②身份强化词写死外貌 ③两者组合。",
-  "key_finding": "AGNES keyframes 中 prompt 角色描述优先级高于参考图——写死面部细节会覆盖参考图脸型；插入锚点帧让图主导才是真锁脸。",
+  "candidate_note": "关键帧序列插入角色锚点图（3帧：起点空景→锚点脸→尾帧），prompt 避免写死面部细节让参考图锁脸。V1 视觉脸型唯一 pass；V2/V3 身份词过重反破坏脸型（AGNES prompt 描述覆盖参考图）",
+  "threshold": {
+    "hard": ["verdict", "face", "character"],
+    "soft": ["continuity", "physical", "first_last"]
+  },
   "variants": [
     {
       "name": "v0",
-      "hyp": "基准：2帧+原prompt",
-      "diagnosis": {
-        "continuity": 3,
-        "physical": 6,
-        "character": 2,
-        "first_last": 1,
-        "face": 4,
-        "quality": 10
-      },
+      "goal": "量化当前基线（对照组）：验证现有写法到底差在哪",
+      "hypothesis": "现状 2 帧（空景→尾帧）+ 原 prompt = 中间帧无脸锚，角色自由发挥",
+      "implement": "关键帧 images=[起点空景, 尾帧中景] 2 帧；video_prompt 原样；其余参数不动",
+      "reference": "基线 = 生产当前默认写法（无任何增强）",
+      "finding": "角色 2/face 4 全维最差；视觉脸型(尾帧) fail 5 问题——脸型瘦长 vs 圆润，确认基线缺陷在角色锁定",
+      "next": "作为负样本基准，所有变体必须超越它",
+      "metrics": {"continuity": 3, "physical": 6, "character": 2, "first_last": 1, "face": 4, "quality": 10},
       "verdict": "fail",
-      "identity_first": {
-        "verdict": "fail",
-        "note": "首帧空景剪影 vs 锚点（运镜起点预期）"
-      },
-      "identity_last": {
-        "verdict": "fail",
-        "issues": 5,
-        "note": "脸型瘦长 vs 圆润"
-      },
-      "video": "experiments/ep_0811_145935/shot1/v0/shot1.mp4"
+      "identity_last": {"verdict": "fail", "issues": 5},
+      "hard_pass": false,
+      "hard_detail": {"verdict": false, "face": false, "character": false}
     },
     {
       "name": "v1",
-      "hyp": "中间锚点：3帧(空景→锚点脸→尾帧)",
-      "diagnosis": {
-        "continuity": 4,
-        "physical": 7,
-        "character": 5,
-        "first_last": 4,
-        "face": 0,
-        "quality": 10
-      },
+      "goal": "解决角色一致 <6：给模型更早的脸锚",
+      "hypothesis": "AGNES keyframes 多图=插值控制点：中间插入锚点脸 → 生成路径经过清晰人脸 → 早锚定防漂移",
+      "implement": "关键帧 images 2帧→3帧：[起点空景, 角色锚点图, 尾帧中景]；video_prompt 原样",
+      "reference": "AGNES keyframes 官方语义（extra_body.image=[图1..N] 首尾平滑插值）；上轮 V2 发现 prompt 描述会覆盖参考图",
+      "finding": "视觉脸型(尾帧 vs 锚点) PASS 0 问题——唯一真锁脸方案；但诊断 face=0（首帧无脸误报，见质检教训）；character 5 语义分不高",
+      "next": "① 与身份词低配版组合（只锁服装不锁脸）② 解决 face 误报口径（运镜镜取尾帧评 face）",
+      "metrics": {"continuity": 4, "physical": 7, "character": 5, "first_last": 4, "face": 0, "quality": 10},
       "verdict": "fail",
-      "identity_first": {
-        "verdict": "fail",
-        "note": "首帧空景（运镜起点预期）"
-      },
-      "identity_last": {
-        "verdict": "pass",
-        "issues": 0,
-        "note": "脸型一致 ✅"
-      },
-      "video": "experiments/ep_0811_145935/shot1/v1/shot1.mp4"
+      "identity_last": {"verdict": "pass", "issues": 0},
+      "hard_pass": false,
+      "hard_detail": {"verdict": false, "face": false, "character": false}
     },
     {
       "name": "v2",
-      "hyp": "身份强化：2帧+写死外貌词",
-      "diagnosis": {
-        "continuity": 9,
-        "physical": 9,
-        "character": 9,
-        "first_last": 8,
-        "face": 10,
-        "quality": 10
-      },
+      "goal": "用文本写死外貌，验证描述锁定是否足够",
+      "hypothesis": "prompt 写死与锚点一致的外貌（年龄/发型/服装/背包 + identical to reference）→ 模型按描述生成锁定",
+      "implement": "2 帧不变；video_prompt 追加 IDENTITY_BOOST 段（8 项外貌细节 + identical/keep exactly the same）",
+      "reference": "prompt_engine.py 角色锚定（char_part 身份令牌注入）思路；AGNES 文本引导生成",
+      "finding": "诊断 character 9/face 10 全维最高（verdict pass）——文本锁定提升语义一致；但视觉脸型(尾帧) FAIL 4 问题——脸型仍与锚点不同，说明 prompt 描述≠实际参考图",
+      "next": "身份词降级为'软锁'（只锁服装/配饰不锁脸型），让参考图主导脸",
+      "metrics": {"continuity": 9, "physical": 9, "character": 9, "first_last": 8, "face": 10, "quality": 10},
       "verdict": "pass",
-      "identity_first": {
-        "verdict": "fail",
-        "note": "首帧空景"
-      },
-      "identity_last": {
-        "verdict": "fail",
-        "issues": 4,
-        "note": "脸型瘦长 vs 圆润"
-      },
-      "video": "experiments/ep_0811_145935/shot1/v2/shot1.mp4"
+      "identity_last": {"verdict": "fail", "issues": 4},
+      "hard_pass": false,
+      "hard_detail": {"verdict": true, "face": true, "character": true}
     },
     {
       "name": "v3",
-      "hyp": "双管齐下：3帧+身份词",
-      "diagnosis": {
-        "continuity": 8,
-        "physical": 9,
-        "character": 9,
-        "first_last": 8,
-        "face": 0,
-        "quality": 10
-      },
+      "goal": "验证图锚+词锁双保险是否最优组合",
+      "hypothesis": "3帧锚点 + 身份强化词 = 图锚定脸 + 词锁细节，理论上最强",
+      "implement": "3 帧（含锚点）+ video_prompt 追加 IDENTITY_BOOST",
+      "reference": "V1 + V2 组合；基于两者各自成功假设",
+      "finding": "诊断 character 9 高；但视觉脸型(尾帧) FAIL 4 问题——身份词覆盖了锚点图的锁脸效果（词与图冲突时词赢）",
+      "next": "关键机制确认：prompt 描述优先级 > 参考图——锚点帧与身份词同用时词覆盖图；后续只用锚点帧或只用软身份词",
+      "metrics": {"continuity": 8, "physical": 9, "character": 9, "first_last": 8, "face": 0, "quality": 10},
       "verdict": "fail",
-      "identity_first": {
-        "verdict": "warn",
-        "note": "首帧空景"
-      },
-      "identity_last": {
-        "verdict": "fail",
-        "issues": 4,
-        "note": "脸型瘦长 vs 圆润"
-      },
-      "video": "experiments/ep_0811_145935/shot1/v3/shot1.mp4"
+      "identity_last": {"verdict": "fail", "issues": 4},
+      "hard_pass": false,
+      "hard_detail": {"verdict": false, "face": false, "character": true}
     }
   ],
-  "qc_lesson": "质检要分层：诊断(语义) + 视觉尾帧 vs 锚点(实际脸型)——两者互补；运镜镜头首帧空景不算服装/脸型不一致（设计内），对比应取尾帧。"
+  "progress": "运镜类训练：样本 1/3（本样本未完全达标，v1 视觉锁脸有效但 face 口径需修，继续下一轮）",
+  "qc_lesson": "① 质检取样：运镜镜头首帧是空景（设计内），服装/脸型对比必须取尾帧 ② face=0 误报：首帧无脸的运镜镜，face 维度应按尾帧评估 ③ 诊断(语义)与视觉(实际脸型)互补，两者都要看 ④ 单变量原则：v2 vs v3 只差锚点帧，归因清楚",
+  "key_finding": "AGNES keyframes 中 prompt 角色描述优先级高于参考图——写死面部细节会覆盖参考图脸型（v2/v3 脸型 fail）；插入锚点帧让图主导才是真锁脸（v1 pass）",
+  "rules_draft": [
+    "运镜镜头关键帧序列：插入角色锚点图作中间控制点（3帧：起点→锚点脸→尾帧），避免 prompt 写死面部细节",
+    "身份锁定词应'软锁'（服装/配饰/整体气质），不写死脸型细节——让参考图主导脸"
+  ],
+  "reviewed_ts": ""
 }
