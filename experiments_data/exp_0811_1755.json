@@ -46,7 +46,15 @@
         "verdict": false,
         "face": false,
         "character": false
-      }
+      },
+      "params": {
+        "prompt": "（见实现说明）",
+        "images": 2,
+        "num_frames": 121,
+        "size": "448x832",
+        "model": "agnes-video-v2.0"
+      },
+      "target_met": false
     },
     {
       "name": "v1",
@@ -74,7 +82,15 @@
         "verdict": false,
         "face": false,
         "character": false
-      }
+      },
+      "params": {
+        "prompt": "（见实现说明）",
+        "images": 3,
+        "num_frames": 121,
+        "size": "448x832",
+        "model": "agnes-video-v2.0"
+      },
+      "target_met": false
     },
     {
       "name": "v2",
@@ -102,7 +118,15 @@
         "verdict": true,
         "face": true,
         "character": true
-      }
+      },
+      "params": {
+        "prompt": "（见实现说明）",
+        "images": 2,
+        "num_frames": 121,
+        "size": "448x832",
+        "model": "agnes-video-v2.0"
+      },
+      "target_met": false
     },
     {
       "name": "v3",
@@ -130,7 +154,15 @@
         "verdict": false,
         "face": false,
         "character": true
-      }
+      },
+      "params": {
+        "prompt": "（见实现说明）",
+        "images": 2,
+        "num_frames": 121,
+        "size": "448x832",
+        "model": "agnes-video-v2.0"
+      },
+      "target_met": false
     }
   ],
   "progress": "运镜类训练：样本 1/3（本样本未完全达标，v1 视觉锁脸有效但 face 口径需修，继续下一轮）",
@@ -141,5 +173,17 @@
     "身份锁定词应'软锁'（服装/配饰/整体气质），不写死脸型细节——让参考图主导脸"
   ],
   "reviewed_ts": "",
-  "ts": "2026-08-11 17:55:00"
+  "ts": "2026-08-11 17:55:00",
+  "goal_body": {
+    "cn_story": "阿凯深夜走出写字楼（缓慢推近，首帧空景起点，尾帧人物中景）",
+    "camera": "缓慢推近",
+    "duration": 5,
+    "ref": "阿凯",
+    "expected": "硬门槛全过（判定=通过 + 人脸>=8 + 角色>=8）且软指标尽量好",
+    "base_params": {
+      "size": "448x832",
+      "model": "agnes-video-v2.0",
+      "num_frames": 121
+    }
+  }
 }
