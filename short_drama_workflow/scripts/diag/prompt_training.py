@@ -121,6 +121,41 @@ def verdict_report(report, etype):
     return "\n".join(lines)
 
 
+    # camera_move_v3（第三轮·老板方向）：多帧控制点 + 官方过渡关系 prompt
+    # 官方 images_to_video 推荐：prompt 描述"从第几帧过渡到第几帧 + 保持什么"（smooth transition, keep identity and camera）
+    halfbody = ""
+    _hb = os.path.join(HERE, "experiments", "frame3_halfbody.txt")
+    if os.path.isfile(_hb):
+        halfbody = open(_hb, encoding="utf-8").read().strip()
+    kf4 = [{"role": "起点空景", "src": first}, {"role": "角色脸锚", "src": anchor},
+           {"role": "角色半身", "src": halfbody}, {"role": "尾帧", "src": last}]
+    imgs4 = [first_img, anchor, halfbody, last]
+    # 过渡关系 prompt（官方风格：逐帧描述 + 保持身份/机位/服装，防跳变）
+    trans4 = ("Smooth continuous camera push-in across 4 keyframes of the same character and scene, "
+              "with NO jumps and NO clothing or identity changes between frames: "
+              "Frame 1: empty urban street at midnight, glass office building, cold street lamp. "
+              "Frame 2: the Chinese male programmer appears, front view, same face and clothing as the reference "
+              "(white button-up shirt with rolled sleeves, black trousers, worn black backpack). "
+              "Frame 3: same man in full body standing under the street lamp, same face, hairstyle and clothing, tired posture. "
+              "Frame 4: same man in medium shot, same face and clothing, tired expression, cold blue night. "
+              "Keep the character's face, hairstyle, and clothing IDENTICAL across all frames. "
+              "Keep camera and scene consistent. Photorealistic, cinematic, 24fps.")
+    trans3 = ("Smooth continuous camera push-in across 3 keyframes of the same character and scene, "
+              "with NO jumps and NO clothing or identity changes: "
+              "Frame 1: empty urban street at midnight, glass office building, cold street lamp. "
+              "Frame 2: the Chinese male programmer, same face and clothing as the reference "
+              "(white button-up shirt with rolled sleeves, black trousers, worn black backpack). "
+              "Frame 3: same man in medium shot, same face and clothing, tired expression. "
+              "Keep the character's face, hairstyle, and clothing IDENTICAL across all frames. "
+              "Keep camera and scene consistent. Photorealistic, cinematic, 24fps.")
+    return {
+        "v6": {"images": imgs4, "keyframes": kf4, "prompt": trans4, "hyp": "4帧+过渡prompt：官方推荐写法（逐帧描述+保持身份服装）"},
+        "v7": {"images": imgs4, "keyframes": kf4, "prompt": base_p + " Keep the same character face and clothing across all four frames, smooth transition, no jumps.",
+               "hyp": "4帧+场景prompt：对比——图数同 v6 但 prompt 仍是场景描述"},
+        "v8": {"images": imgs3, "keyframes": kf3, "prompt": trans3, "hyp": "3帧+过渡prompt：对比——同过渡写法但少一个控制点"},
+    }
+
+
 def _cn_translate(prompt_en, timeout=60):
     """把英文视频 prompt 翻成中文（老板看板看中文，执行仍用英文原版）。失败返回空。"""
     try:
