@@ -68,7 +68,12 @@
         "mode": "keyframes",
         "negative": "文字/水印/畸形"
       },
-      "target_met": false
+      "target_met": false,
+      "analysis": {
+        "problem": "角色一致 2-3 分 + 尾帧脸型 fail（脸型瘦长 vs 圆润，5 个问题）——基线角色锁定最弱",
+        "cause": "关键帧只有起点空景→尾帧 2 帧，中间帧无角色脸锚，模型自由发挥；prompt 无身份约束",
+        "fix": "① 关键帧序列插入角色锚点图（→v1）② prompt 加身份软锁（→v5）③ 至少二选一"
+      }
     },
     {
       "name": "v1",
@@ -122,7 +127,12 @@
         "mode": "keyframes",
         "negative": "文字/水印/畸形"
       },
-      "target_met": false
+      "target_met": false,
+      "analysis": {
+        "problem": "视觉脸型锁住了（尾帧 vs 锚点 pass/0 问题）但诊断 face 误报 0、character 语义分 5 不高",
+        "cause": "① face 检测抽到首帧空景剪影（无脸）→ 误报 ② 锚点帧锁了实际脸型但诊断模型按语义描述评分，两者口径不同",
+        "fix": "① face 质检改按尾帧评估（修口径，AGNES 视觉已证脸型一致）② 诊断 character 需配合视觉脸型综合判定，不能只看诊断"
+      }
     },
     {
       "name": "v2",
@@ -172,7 +182,12 @@
         "mode": "keyframes",
         "negative": "文字/水印/畸形"
       },
-      "target_met": false
+      "target_met": false,
+      "analysis": {
+        "problem": "诊断 character 9/face 10 全维高（verdict pass）但尾帧脸型 fail（4 个问题）",
+        "cause": "身份词写死面部细节 → AGNES prompt 文本覆盖参考图脸型（词优先于图），生成的脸与锚点实际图不一致",
+        "fix": "身份词降级为软锁（只锁服装/配饰/气质，不写死脸型）→ 让参考图主导脸（即 SOFT_IDENTITY_BOOST）"
+      }
     },
     {
       "name": "v3",
@@ -222,7 +237,12 @@
         "mode": "keyframes",
         "negative": "文字/水印/畸形"
       },
-      "target_met": false
+      "target_met": false,
+      "analysis": {
+        "problem": "锚点帧+身份词组合仍尾帧脸型 fail，且 face 误报 0",
+        "cause": "身份词覆盖了锚点帧的锁脸效果（词与图冲突时词赢）；首帧空景剪影又导致 face 误报",
+        "fix": "弃用硬身份词；只用锚点帧（v1）或软身份词（v5），不同时用硬词"
+      }
     }
   ],
   "progress": "运镜类训练：样本 1/3（本样本未完全达标，v1 视觉锁脸有效但 face 口径需修，继续下一轮）",
