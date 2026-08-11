@@ -1,0 +1,108 @@
+{
+  "id": "exp_0812_013144",
+  "schema": "v3",
+  "type": "运镜镜头-v19修复prompt图一致",
+  "goal_body": {
+    "cn_story": "深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处。",
+    "camera": "缓慢推近",
+    "duration": 5,
+    "ref": "阿凯",
+    "expected": "硬门槛全过（判定=通过 + 人脸>=8 + 角色>=8）且软指标尽量好",
+    "base_params": {
+      "size": "480x854",
+      "model": "agnes-video-v2.0",
+      "num_frames": 81
+    }
+  },
+  "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好",
+  "sample": "镜1：深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "ts": "2026-08-12 01:31:44",
+  "status": "candidate",
+  "candidate": "v19修复",
+  "candidate_note": "v19 修复版=首尾帧图实际人物变大+prompt描述一致=AGNES 不再困惑。固化规则：prompt-图必须一致。",
+  "threshold": {
+    "hard": [
+      "verdict",
+      "face",
+      "character"
+    ],
+    "soft": [
+      "continuity",
+      "physical",
+      "first_last"
+    ]
+  },
+  "variants": [
+    {
+      "name": "v19",
+      "variant": "v19",
+      "hyp": "镜B走近修复：远景→中近景（prompt与图一致，真走近）",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 8,
+        "physical": 9,
+        "character": 9,
+        "first_last": 8,
+        "face": 7,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_review": "pass",
+      "identity_issues": [],
+      "internal_consistency": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "intro_flash": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v19\\shot1.mp4",
+      "params": {
+        "prompt": "Smooth transition of the same man in the same street. Animate: he takes a few steps forward (camera moves closer), subtle breathing, hair moving gently in night wind, backpack straps shifting slightly. Keep stable: same face, white shirt, black trousers, black backpack, same building and lamp behind, same camera angle, no jumps, no morphing.",
+        "prompt_cn": "同一男子在同一条街道上的平滑过渡。动态部分：他向前迈出几步（镜头缓缓推进），带有轻微的呼吸起伏，头发在夜风中轻柔飘动，背包肩带微微晃动。稳定部分：面部特征保持一致，白色衬衫、黑色长裤、黑色背包，背景中的建筑物和路灯相同，镜头角度不变，无跳跃，无形变。",
+        "keyframes": [
+          {
+            "role": "镜B首帧·人物远景",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_2jJhncwKsoCGfxFaTQcR5QwpKPFpj9w1/output.png"
+          },
+          {
+            "role": "镜B尾帧·人物中近景（明显变大）",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_lHKsM8OvF4dpUpQFJVvZaTYdPATMArS9/output.png"
+          }
+        ],
+        "images": 2,
+        "num_frames": 81,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "seed": 1224,
+        "duration_s": 3.4
+      },
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": true
+      },
+      "target_met": false
+    }
+  ],
+  "progress": "运镜镜头-v19修复prompt图一致类训练：样本待统计",
+  "qc_lesson": "",
+  "key_finding": "老板修正完整落地。v19 修复版：图1远景全身→图2真中近景（同机位物理走近），prompt 描述与图实际差异一致（camera moves closer）。连贯8/物理9/角色9/首尾8+intro_flash pass+内部一致 pass+尾帧脸型 pass。face 7 诊断严但视觉 pass。经验：i2i 默认生成同大小全身图，需强约束（\"人物占画面60-70%\"）才能得到真正走近；每生成首尾帧后看图实际差异，prompt 描述必须与图一致。",
+  "rules_draft": [
+    "【prompt-图必须一致·0812 老板修正】v19 隐患：prompt 写\"走近变大\"但 i2i 生成的 close1 人物和 far 几乎一样大——图和文矛盾 AI 只能按图生成。",
+    "【固化规则】每次生成首尾帧后用 AGNES 视觉对比首尾图差异（人物大小/位置/姿态变化），prompt 描述必须与图实际差异一致。",
+    "【i2i 强约束】要人物明显变大需 prompt 写\"人物占画面 60-70% 中近景\"等强约束，否则默认生成同大小全身图。",
+    "v19 修复版连通 physical 9/character 9/first_last 8+intro_flash pass+内部一致 pass+尾帧脸型 pass。"
+  ],
+  "input": {
+    "prompt": "Chinese male programmer walking out of glass office building at midnight under cold street lamp, tired posture shoulders slumped hands in pockets, cold blue night atmosphere, cinematic slow push in, 2",
+    "ref": "阿凯"
+  }
+}

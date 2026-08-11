@@ -262,31 +262,33 @@ def build_variants(shot, ref, template="camera_move_v2"):
         _e2 = os.path.join(HERE, "experiments", "sceneA_empty2.txt")
         if os.path.isfile(_e2):
             empty2 = open(_e2, encoding="utf-8").read().strip()
+        # v19 修复：用 close2（真中近景，强制人物变大）而非 close1（人物没变）
         close1 = ""
-        _c1 = os.path.join(HERE, "experiments", "sceneB_close.txt")
-        if os.path.isfile(_c1):
-            close1 = open(_c1, encoding="utf-8").read().strip()
+        _c2 = os.path.join(HERE, "experiments", "sceneB_close2.txt")
+        if os.path.isfile(_c2):
+            close1 = open(_c2, encoding="utf-8").read().strip()
         v18_prompt = ("Smooth transition between the two keyframes of the same empty street. "
                       "Animate: thin mist drifting slowly across the wet asphalt, streetlight glow gently "
                       "pulsing, distant window lights flickering softly. "
                       "Keep stable: no people, same building, same lamp position, same camera angle, "
                       "same cold blue night, no jumps.")
-        v19_prompt = ("Smooth transition of the same man walking closer to the camera in the same street. "
-                      "Animate: he walks forward with natural gait, growing larger in frame, subtle breathing, "
-                      "hair moving gently in night wind. "
+        # v19 prompt 与图实际一致（人物全身→中近景，prompt 描述"走近"对应图的人物变大）
+        v19_prompt = ("Smooth transition of the same man in the same street. "
+                      "Animate: he takes a few steps forward (camera moves closer), subtle breathing, "
+                      "hair moving gently in night wind, backpack straps shifting slightly. "
                       "Keep stable: same face, white shirt, black trousers, black backpack, same building and "
-                      "lamp behind, same camera position, no jumps, no morphing.")
+                      "lamp behind, same camera angle, no jumps, no morphing.")
         kfA2 = [{"role": "镜A首帧·真空景", "src": empty1},
                 {"role": "镜A尾帧·空景微变", "src": empty2}]
-        kfB2 = [{"role": "镜B首帧·人物远景小", "src": anchor_far},
-                {"role": "镜B尾帧·人物走近中景", "src": close1}]
+        kfB2 = [{"role": "镜B首帧·人物远景", "src": anchor_far},
+                {"role": "镜B尾帧·人物中近景（明显变大）", "src": close1}]
         return {
             "v18": {"images": [empty1, empty2], "keyframes": kfA2,
                     "prompt": v18_prompt, "num_frames": 81,
                     "hyp": "镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）"},
             "v19": {"images": [anchor_far, close1], "keyframes": kfB2,
                     "prompt": v19_prompt, "num_frames": 81,
-                    "hyp": "镜B物理走近：远景小→走近中景（同机位同场景，距离缩短）"},
+                    "hyp": "镜B走近修复：远景→中近景（prompt与图一致，真走近）"},
         }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
