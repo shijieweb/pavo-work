@@ -158,6 +158,16 @@ def build_variants(shot, ref, template="camera_move_v2"):
             "v11": {"images": imgs3, "keyframes": kf3,
                     "prompt": v11_prompt,
                     "hyp": "3帧+空景约束prompt：明示Frame 1无人物，人物从Frame 2出现"},
+            "v12": {"images": [first_img, anchor_far, last],
+                    "keyframes": [{"role": "起点空景", "src": first},
+                                  {"role": "角色远景小(非特写)", "src": anchor_far},
+                                  {"role": "尾帧", "src": last}],
+                    "prompt": v9_prompt.replace("two keyframes", "three keyframes").replace(
+                        "Frame 1: empty urban street at midnight, cold blue night, street lamp. ",
+                        "Frame 1: empty urban street at midnight, cold blue night, street lamp. "
+                        "Frame 2: the same man in a small far figure, walking towards the camera. "),
+                    "frame_rate": 30,
+                    "hyp": "v10写法+30fps：官方更流畅运动（对比24fps）"},
         }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
@@ -212,18 +222,19 @@ def _cn_translate(prompt_en, timeout=60):
         return ""
 
 
-def gen_video(prompt, images, out_dir, sid, shot, seed=None):
+def gen_video(prompt, images, out_dir, sid, shot, seed=None, frame_rate=24):
     """提交 keyframes 视频 → 轮询 → 下载到 out_dir/shot<sid>.mp4。返回本地路径。
-    seed: 固定随机种子（官方推荐可复现；训练实验传 seed 可对照排除随机性）。"""
+    seed: 固定随机种子（官方推荐可复现；训练实验传 seed 可对照排除随机性）。
+    frame_rate: 帧率（官方：更流畅运动用 24 或 30）。"""
     os.makedirs(out_dir, exist_ok=True)
     w, h = server._video_size()
     from agnes_client import wait_for_video
     nf = server._shot_nf(shot)
     task = _submit_video(prompt, images=images, width=w, height=h, num_frames=nf,
-                         frame_rate=24, negative_prompt=NEG_PROMPT, seed=seed)
+                         frame_rate=frame_rate, negative_prompt=NEG_PROMPT, seed=seed)
     vid = task.get("video_id") or task.get("id") or task.get("task_id")
-    print("  提交 video_id=%s 轮询中（%d 帧 ≈ %.1f 秒，seed=%s）…" % (
-        str(vid)[:20], nf, nf / 24.0, seed if seed is not None else "随机"))
+    print("  提交 video_id=%s 轮询中（%d 帧 ≈ %.1f 秒 @%dfps，seed=%s）…" % (
+        str(vid)[:20], nf, nf / float(frame_rate), frame_rate, seed if seed is not None else "随机"))
     url = wait_for_video(vid, timeout=900, interval=10)
     if not url:
         raise RuntimeError("视频生成超时/失败")
@@ -287,7 +298,8 @@ def main():
         seed = 1000 + sum(ord(c) for c in name) % 9000
         out_dir = os.path.join(out_root, name)
         try:
-            fp = gen_video(v["prompt"], v["images"], out_dir, sid, shot, seed=seed)
+            fp = gen_video(v["prompt"], v["images"], out_dir, sid, shot, seed=seed,
+                           frame_rate=v.get("frame_rate", 24))
             print("  视频就绪: %s (%.0f KB)" % (fp, os.path.getsize(fp) // 1024))
         except Exception as e:
             print("  ❌ 变体 %s 生成失败: %s" % (name, str(e)[:150]))
@@ -296,8 +308,8 @@ def main():
                            "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
                                       "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                       "num_frames": nf, "size": "%dx%d" % (w, h),
-                                      "frame_rate": 24, "mode": "keyframes",
-                                      "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / 24.0, 1)}})
+                                      "frame_rate": v.get("frame_rate", 24), "mode": "keyframes",
+                                      "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / float(v.get("frame_rate", 24)), 1)}})
             continue
         # 质检：AGNES 4 维诊断 + face
         try:
@@ -367,8 +379,8 @@ def main():
                                "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
                                           "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                           "num_frames": nf, "size": "%dx%d" % (w, h),
-                                          "frame_rate": 24, "mode": "keyframes",
-                                          "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / 24.0, 1)}})
+                                          "frame_rate": v.get("frame_rate", 24), "mode": "keyframes",
+                                          "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / float(v.get("frame_rate", 24)), 1)}})
                 vid_ok = True
         except Exception as e:
             print("  identity 审查失败: %s" % str(e)[:100])
@@ -378,8 +390,8 @@ def main():
                            "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
                                       "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                       "num_frames": nf, "size": "%dx%d" % (w, h),
-                                      "frame_rate": 24, "mode": "keyframes",
-                                      "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / 24.0, 1)}})
+                                      "frame_rate": v.get("frame_rate", 24), "mode": "keyframes",
+                                      "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / float(v.get("frame_rate", 24)), 1)}})
 
     # 对比表
     print("\n" + "=" * 70)
