@@ -1354,7 +1354,10 @@ createApp({
             this.activeModule = ws.active_module;
           }
           if (Array.isArray(ws.confirmed_steps) && ws.confirmed_steps.length === this.modules.length) {
-            this.confirmedSteps = ws.confirmed_steps;
+            // 【0811 修复】闸门「只进不退」：与服务端逐位 OR，不覆盖已解锁步骤。
+            // 曾因生成分镜后 loadSpec 刷新，内存刚解锁的步骤被服务端旧值(竞态中间态)覆盖回锁，
+            // 导致老板打开项目时分镜/后续模块全部不可点。
+            this.confirmedSteps = this.confirmedSteps.map((v, i) => v || !!ws.confirmed_steps[i]);
           }
           // 模块内操控状态一并还原（入口/资产tab/素材筛选/转场/选中镜），无效值回退默认
           if (ws.source_mode === 'novel' || ws.source_mode === 'theme') this.sourceMode = ws.source_mode;
