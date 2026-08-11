@@ -130,7 +130,11 @@ def verdict_report(report, etype):
     kf4 = [{"role": "起点空景", "src": first}, {"role": "角色脸锚", "src": anchor},
            {"role": "角色半身", "src": halfbody}, {"role": "尾帧", "src": last}]
     imgs4 = [first_img, anchor, halfbody, last]
-    # 过渡关系 prompt（官方风格：逐帧描述 + 保持身份/机位/服装，防跳变）
+    # 过渡关系 prompt（官方模板固化：0811 官方推荐句——"在第一个关键帧与第二个关键帧之间生成流畅过渡，
+    # 保持角色形象不变、摄像机视角统一，同时实现场景间自然的运动效果"——防人物变脸/镜头乱晃/画面跳切）
+    _OFFICIAL = (" Generate a smooth transition between the keyframes: keep the character's appearance "
+                 "unchanged (no face morphing), keep the camera angle consistent (no shaking), "
+                 "achieve natural motion between scenes (no jumps).")
     trans4 = ("Smooth continuous camera push-in across 4 keyframes of the same character and scene, "
               "with NO jumps and NO clothing or identity changes between frames: "
               "Frame 1: empty urban street at midnight, glass office building, cold street lamp. "
@@ -139,7 +143,7 @@ def verdict_report(report, etype):
               "Frame 3: same man in full body standing under the street lamp, same face, hairstyle and clothing, tired posture. "
               "Frame 4: same man in medium shot, same face and clothing, tired expression, cold blue night. "
               "Keep the character's face, hairstyle, and clothing IDENTICAL across all frames. "
-              "Keep camera and scene consistent. Photorealistic, cinematic, 24fps.")
+              "Keep camera and scene consistent. Photorealistic, cinematic, 24fps." + _OFFICIAL)
     trans3 = ("Smooth continuous camera push-in across 3 keyframes of the same character and scene, "
               "with NO jumps and NO clothing or identity changes: "
               "Frame 1: empty urban street at midnight, glass office building, cold street lamp. "
@@ -147,7 +151,7 @@ def verdict_report(report, etype):
               "(white button-up shirt with rolled sleeves, black trousers, worn black backpack). "
               "Frame 3: same man in medium shot, same face and clothing, tired expression. "
               "Keep the character's face, hairstyle, and clothing IDENTICAL across all frames. "
-              "Keep camera and scene consistent. Photorealistic, cinematic, 24fps.")
+              "Keep camera and scene consistent. Photorealistic, cinematic, 24fps." + _OFFICIAL)
     return {
         "v6": {"images": imgs4, "keyframes": kf4, "prompt": trans4, "hyp": "4帧+过渡prompt：官方推荐写法（逐帧描述+保持身份服装）"},
         "v7": {"images": imgs4, "keyframes": kf4, "prompt": base_p + " Keep the same character face and clothing across all four frames, smooth transition, no jumps.",
