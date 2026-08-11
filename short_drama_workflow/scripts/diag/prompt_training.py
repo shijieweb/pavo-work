@@ -172,16 +172,34 @@ def main():
         s = sum(v for v in sc.values() if isinstance(v, (int, float)))
         if r0.get("ok") and s > best:
             best, winner = s, r0.get("variant")
+    # 【v2 训练科学】分层达标：硬门槛 verdict=pass + face>=8 + character>=8 必须全过
+    for r0 in report:
+        sc = r0.get("diagnosis") or {}
+        hp = {"verdict": r0.get("verdict") == "pass",
+              "face": (sc.get("face") is not None and sc.get("face") >= 8),
+              "character": (sc.get("character") is not None and sc.get("character") >= 8)}
+        r0["hard_pass"] = all(hp.values())
+        r0["hard_detail"] = hp
+    etype = ""
+    if "--type" in args:
+        etype = args[args.index("--type") + 1]
     out = {
         "id": "exp_%s" % time.strftime("%m%d_%H%M%S"),
+        "schema": "v2",
+        "type": etype or "未分类镜头",
+        "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好",
+        "sample": "镜%d：%s" % (sid, (shot.get("cn_story") or "")[:60]),
         "project": pid, "shot": sid, "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
         "status": "done",                 # running/done/candidate/adopted/rejected（看板状态流）
         "candidate": winner,              # 我标记的候选赢家变体（待老板审查）
         "candidate_note": "",             # 候选方案说明（由分析补充）
+        "threshold": {"hard": ["verdict", "face", "character"], "soft": ["continuity", "physical", "first_last"]},
         "variants": report,
-        "input": {"prompt": shot.get("video_prompt", "")[:200], "ref": shot.get("ref"),
-                  "first_frame_prompt": shot.get("first_frame_prompt", "")[:100],
-                  "last_frame_prompt": shot.get("last_frame_prompt", "")[:100]},
+        "progress": "%s类训练：样本待统计" % etype,
+        "qc_lesson": "",
+        "key_finding": "",
+        "rules_draft": [],
+        "input": {"prompt": shot.get("video_prompt", "")[:200], "ref": shot.get("ref")},
     }
     os.makedirs(EXPDIR, exist_ok=True)
     with open(os.path.join(EXPDIR, "learned_experiments.json"), "w", encoding="utf-8") as f:
