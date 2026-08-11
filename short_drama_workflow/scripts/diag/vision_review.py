@@ -62,10 +62,19 @@ PROMPTS = {
         "你是短剧表演审查员。结合给定的剧本情绪要求，检查画面人物表情/姿态是否匹配该情绪"
         "（如'疲惫'应看到倦容/低头/肩部下沉；'惊喜'应看到睁眼/张嘴/身体前倾）。"
         "明显不匹配记 issue，匹配则 pass。"),
+    "intro_flash": (
+        "你是视频【开头闪帧审查员】。这是同一段视频的连续几帧（0秒/0.4秒/1秒/2秒/最后一帧），"
+        "请判断视频开头是否出现异常闪现：① 开头帧是否出现与首帧设计意图不符的人物特写/画面突变"
+        "（如首帧是空景但第0/0.4秒突然出现人物特写）；② 开头几帧是否连贯平滑，"
+        "还是出现'人物闪现-消失-再现'的异常节奏；③ 人物出现时机是否符合镜头叙事"
+        "（如运镜镜头人物应从远景逐渐推近，不应一开始就是中近景）。"
+        "发现异常闪现记为 fail，问题记入 issues（severity high/low）。正常平滑记为 pass。"
+        "输出 JSON: verdict + issues + confidence。"),
 }
 
 _KIND_REQUIRE = {"quality": 1, "identity": 2, "continuity": 2, "layout": 1,
-                 "text": 1, "content": 1, "emotion": 1, "internal": 2}
+                 "text": 1, "content": 1, "emotion": 1, "internal": 2,
+                 "intro_flash": 3}
 
 
 def _datauri(path):

@@ -116,6 +116,45 @@ def build_variants(shot, ref, template="camera_move_v2"):
     # camera_move_v2（默认·第二轮）：软身份词方向
     base_ref = ("AGNES keyframes 官方语义（多图=插值控制点）；第一轮 exp_0811_1755 机制发现："
                 "prompt 角色描述优先级>参考图，锁脸靠锚点帧图主导")
+    if template == "camera_move_v4":
+        # 【第四轮·老板方向】验证开头闪帧根因
+        # v9: 回归官方 2 帧 [空景→尾帧]（无中间锚点帧，避免模型误解时间顺序）
+        # v10: 3 帧但锚点帧用远景人物（非特写脸，避免被误当起点）
+        # v11: 3 帧 + 强化空景约束 prompt（明示 Frame 1 无人物）
+        anchor_far = anchor
+        _af = os.path.join(HERE, "experiments", "anchor_far.txt")
+        if os.path.isfile(_af):
+            anchor_far = open(_af, encoding="utf-8").read().strip()
+        v9_prompt = ("Generate a smooth cinematic transition between the two keyframes, "
+                     "maintaining visual consistency and natural camera movement. "
+                     "Frame 1: empty urban street at midnight, cold blue night, street lamp. "
+                     "Frame 2: the Chinese male programmer in medium shot, tired expression. "
+                     "Keep camera slowly pushing in across the transition. "
+                     "Keep the character's face, hairstyle, and clothing IDENTICAL.")
+        v11_prompt = ("Smooth continuous camera push-in across 3 keyframes of the same scene. "
+                      "Frame 1 MUST BE empty urban street with NO person visible at all. "
+                      "The character appears starting from Frame 2. "
+                      "Frame 2: the Chinese male programmer appears, same face and clothing as reference. "
+                      "Frame 3: same man in medium shot, same face and clothing. "
+                      "Keep the character's face, hairstyle, and clothing IDENTICAL across frames. "
+                      "Keep camera consistent. NO jumps, NO clothing changes.")
+        return {
+            "v9": {"images": imgs2, "keyframes": kf2,
+                   "prompt": v9_prompt,
+                   "hyp": "2帧+过渡prompt：回归官方推荐[空景→尾帧]，无中间锚点帧"},
+            "v10": {"images": [first_img, anchor_far, last],
+                    "keyframes": [{"role": "起点空景", "src": first},
+                                  {"role": "角色远景小(非特写)", "src": anchor_far},
+                                  {"role": "尾帧", "src": last}],
+                    "prompt": v9_prompt.replace("two keyframes", "three keyframes").replace(
+                        "Frame 1: empty urban street at midnight, cold blue night, street lamp. ",
+                        "Frame 1: empty urban street at midnight, cold blue night, street lamp. "
+                        "Frame 2: the same man in a small far figure, walking towards the camera. "),
+                    "hyp": "3帧+过渡prompt：锚点帧用远景小人物（非特写脸）"},
+            "v11": {"images": imgs3, "keyframes": kf3,
+                    "prompt": v11_prompt,
+                    "hyp": "3帧+空景约束prompt：明示Frame 1无人物，人物从Frame 2出现"},
+        }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
                "goal": "量化基线：验证现状写法的真实水平（对照组）", "reference": "基线=生产默认写法",
@@ -290,11 +329,30 @@ def main():
                               (ic.get("issues") or [{}])[0].get("desc", "")[:44] if ic.get("issues") else "一致")
                 except Exception as _e:
                     print("  内部一致审查失败: %s" % str(_e)[:80])
+                # 【开头闪帧·0811 老板新盲区】抽视频前 0/0.4/1.0s + 尾帧，检查开头异常闪现
+                ifl = {"verdict": None, "issues": []}
+                try:
+                    ifl_imgs = []
+                    for t in ["0", "0.4", "1.0", "2.0"]:
+                        op = os.path.join(out_dir, "open_%s.png" % t.replace(".", "_"))
+                        subprocess.run(["ffmpeg", "-y", "-ss", t, "-i", vf, "-frames:v", "1", op],
+                                       capture_output=True, timeout=60)
+                        if os.path.isfile(op):
+                            ifl_imgs.append(op)
+                    ifl_imgs.append(frame)
+                    if len(ifl_imgs) >= 3:
+                        iflr = review(ifl_imgs, kind="intro_flash")
+                        ifl = {"verdict": iflr.get("verdict"), "issues": (iflr.get("issues") or [])[:2]}
+                        print("  开头闪帧:", ifl.get("verdict"), "|",
+                              (ifl.get("issues") or [{}])[0].get("desc", "")[:44] if ifl.get("issues") else "正常平滑")
+                except Exception as _e:
+                    print("  开头闪帧审查失败: %s" % str(_e)[:80])
                 report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": True,
                                "diagnosis": scores, "verdict": (d or {}).get("verdict"),
                                "identity_review": vr.get("verdict"),
                                "identity_issues": (vr.get("issues") or [])[:3],
                                "internal_consistency": ic,
+                               "intro_flash": ifl,
                                "video": vf,
                                "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
                                           "keyframes": v.get("keyframes", []), "images": len(v["images"]),
