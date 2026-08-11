@@ -90,6 +90,10 @@ def _board_token():
 PY_BIN = "C:/Users/67972/.workbuddy/binaries/python/versions/3.13.12/python.exe"
 STUDIO_SCRIPT = os.path.join(SCRIPT_DIR, "short_drama_workflow", "html_prototype", "server.py")
 BOARD_SCRIPT = os.path.join(SCRIPT_DIR, "shared_board", "server.py")
+# 【训练看板·老板 0811】提示词训练营：数据 experiments_data/*.json + 实验视频
+TRAIN_FILE = os.path.join(SCRIPT_DIR, "training.html")
+TRAIN_DATA = os.path.join(SCRIPT_DIR, "experiments_data")
+TRAIN_VIDEO = os.path.join(SCRIPT_DIR, "short_drama_workflow", "scripts", "diag", "experiments")
 LAUNCH_LOG_DIR = os.path.join(SCRIPT_DIR, "output", "launches")
 DETACH = 0x00000008  # DETACHED_PROCESS：无控制台窗口、脱离父进程
 
@@ -224,6 +228,18 @@ class H(BaseHTTPRequestHandler):
             return
         if path in ("/logs", "/logs.html"):
             self._serve_html(LOGS_FILE)         # 运行日志查看页
+            return
+        if path in ("/training", "/training.html"):
+            self._serve_html(TRAIN_FILE)        # 提示词训练营看板（实验过程/结果/方案审查）
+            return
+        if path == "/training/api/experiments":
+            self._train_experiments()
+            return
+        if path.startswith("/training/api/experiments/") and path.endswith("/status"):
+            self._train_status_update(path)
+            return
+        if path.startswith("/training/video/"):
+            self._serve_train_video(path[len("/training/video/"):])
             return
         if path == "/api/hub/status":
             self._hub_status()
@@ -442,6 +458,63 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(body)
         except Exception as e:
             self._send(500, json.dumps({"error": str(e)}), "application/json")
+
+    def _serve_train_video(self, rel):
+        """训练实验视频（experiments 目录内 .mp4，防止目录穿越）。"""
+        rel = rel.replace("\\", "/")
+        if ".." in rel or not rel.endswith(".mp4"):
+            self._send(403, json.dumps({"error": "forbidden"}))
+            return
+        fp = os.path.join(TRAIN_VIDEO, rel)
+        if not os.path.isfile(fp):
+            self._send(404, json.dumps({"error": "not found"}))
+            return
+        try:
+            with open(fp, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception:
+            pass
+
+    def _train_experiments(self):
+        """返回 experiments_data/ 下所有实验（倒序），含状态/候选/变体摘要。"""
+        out = []
+        if os.path.isdir(TRAIN_DATA):
+            for fn in sorted(os.listdir(TRAIN_DATA), reverse=True):
+                if fn.endswith(".json"):
+                    try:
+                        with open(os.path.join(TRAIN_DATA, fn), encoding="utf-8") as f:
+                            out.append(json.load(f))
+                    except Exception:
+                        pass
+        self._send(200, json.dumps({"ok": True, "experiments": out}, ensure_ascii=False))
+
+    def _train_status_update(self, path):
+        """老板看板操作：POST /training/api/experiments/<id>/status {status: adopted|rejected}"""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            data = json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
+            status = data.get("status")
+            if status not in ("adopted", "rejected", "candidate", "done"):
+                self._send(400, json.dumps({"ok": False, "error": "无效状态"})); return
+            eid = path.split("/")[4]
+            fp = os.path.join(TRAIN_DATA, eid + ".json")
+            if not os.path.isfile(fp):
+                self._send(404, json.dumps({"ok": False, "error": "实验不存在"})); return
+            with open(fp, encoding="utf-8") as f:
+                exp = json.load(f)
+            exp["status"] = status
+            exp["reviewed_ts"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            with open(fp, "w", encoding="utf-8") as f:
+                json.dump(exp, f, ensure_ascii=False, indent=2)
+            self._send(200, json.dumps({"ok": True, "status": status}))
+        except Exception as e:
+            self._send(500, json.dumps({"ok": False, "error": str(e)}))
 
     def _serve_file(self, name):
         name = os.path.basename(name)

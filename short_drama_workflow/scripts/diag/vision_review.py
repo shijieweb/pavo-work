@@ -71,6 +71,14 @@ def _datauri(path):
     return f"data:{mime};base64,{b64}"
 
 
+def _img_src(path):
+    """图片入参归一：http(s)/data URI 直接用（AGNES 支持 URL）；本地文件转 data URI。"""
+    s = str(path)
+    if s.startswith("http") or s.startswith("data:"):
+        return s
+    return _datauri(s)
+
+
 def _extract_json(text):
     """从模型输出提取 JSON（去 markdown 代码块，找 { ... } 主体）。"""
     if not text:
@@ -99,7 +107,8 @@ def review(paths, kind="quality", context="", model="agnes-2.5-flash", timeout=1
     need = _KIND_REQUIRE[kind]
     if len(paths) < need:
         return {"ok": False, "error": "%s 需要 %d 张图，给了 %d" % (kind, need, len(paths))}
-    bad = [p for p in paths if not os.path.exists(p)]
+    bad = [p for p in paths
+           if not (str(p).startswith("http") or str(p).startswith("data:") or os.path.exists(p))]
     if bad:
         return {"ok": False, "error": "图片不存在: %s" % bad[0]}
     prompt = PROMPTS[kind] + _JSON_REQ
@@ -107,7 +116,7 @@ def review(paths, kind="quality", context="", model="agnes-2.5-flash", timeout=1
         prompt += "\n剧本情绪/上下文：" + context
     try:
         import agnes_client as ac
-        raw = ac.chat(prompt, images=[_datauri(p) for p in paths],
+        raw = ac.chat(prompt, images=[_img_src(p) for p in paths],
                       model=model, temperature=0.2, max_tokens=1200, timeout=timeout)
     except Exception as e:
         return {"ok": False, "error": "AGNES 审查调用失败: %s" % str(e)[:200]}
