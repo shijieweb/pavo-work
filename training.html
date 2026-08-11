@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎓 提示词训练营 · 实验看板</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0f172a; color:#e2e8f0; font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif; padding:16px; }
+  h1 { font-size:18px; margin-bottom:4px; }
+  .sub { color:#64748b; font-size:12px; margin-bottom:16px; }
+  .stats { display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+  .stat { background:#1e293b; border:1px solid #334155; border-radius:10px; padding:8px 14px; font-size:12px; }
+  .stat b { color:#38bdf8; }
+  .exp { background:#1e293b; border:1px solid #334155; border-radius:12px; margin-bottom:16px; overflow:hidden; }
+  .exp-head { display:flex; align-items:center; gap:10px; padding:12px 16px; cursor:pointer; flex-wrap:wrap; }
+  .exp-head:hover { background:#243449; }
+  .exp-id { font-weight:700; font-size:14px; color:#38bdf8; }
+  .exp-meta { color:#94a3b8; font-size:11px; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight:600; }
+  .b-done { background:#334155; color:#94a3b8; }
+  .b-candidate { background:#f59e0b22; color:#fbbf24; border:1px solid #f59e0b55; }
+  .b-adopted { background:#10b98122; color:#34d399; border:1px solid #10b98155; }
+  .b-rejected { background:#ef444422; color:#f87171; border:1px solid #ef444455; }
+  .exp-body { padding:0 16px 16px; display:none; }
+  .exp.open .exp-body { display:block; }
+  .exp.open .arrow { transform:rotate(90deg); }
+  .arrow { transition:.2s; color:#64748b; }
+  .finding { background:#0f172a; border:1px solid #38bdf855; border-radius:8px; padding:10px 12px; font-size:12px; margin:8px 0; color:#bae6fd; }
+  .note { color:#94a3b8; font-size:11px; margin-bottom:10px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin:8px 0; }
+  th { background:#243449; color:#94a3b8; padding:6px 8px; text-align:left; font-weight:600; }
+  td { padding:6px 8px; border-bottom:1px solid #1e293b; vertical-align:top; }
+  .score { font-weight:700; }
+  .s-good { color:#34d399; } .s-mid { color:#fbbf24; } .s-bad { color:#f87171; }
+  .win { background:#10b98114; }
+  .btn { font-size:11px; padding:4px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600; }
+  .btn-adopt { background:#10b981; color:#052e22; }
+  .btn-reject { background:#334155; color:#94a3b8; }
+  .btn:hover { opacity:.85; }
+  .actions { margin-top:10px; display:flex; gap:8px; align-items:center; }
+  video { width:100%; max-width:220px; border-radius:8px; background:#000; }
+  .vid-wrap { display:flex; gap:12px; flex-wrap:wrap; }
+  .vid-card { width:220px; }
+  .vid-card .vh { font-size:11px; color:#94a3b8; margin-bottom:4px; text-align:center; }
+  .issues { font-size:11px; color:#f87171; }
+  .toolbar { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
+  .filter { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:4px 10px; font-size:12px; }
+  .legend { font-size:11px; color:#64748b; }
+</style>
+</head>
+<body>
+<h1>🎓 提示词训练营 · 实验看板</h1>
+<div class="sub">AGNES 2.5-flash 视觉审查驱动的提示词方法训练 · 阿编标记候选 → 老板审查采纳 → 固化进工作台</div>
+
+<div class="stats" id="stats"></div>
+<div class="toolbar">
+  <select class="filter" id="fstatus">
+    <option value="">全部状态</option>
+    <option value="candidate">候选待审</option>
+    <option value="adopted">已采纳</option>
+    <option value="rejected">已拒绝</option>
+    <option value="done">已完成</option>
+  </select>
+  <span class="legend">点实验卡片展开细节 · 候选方案需老板确认后才可固化</span>
+</div>
+<div id="list"></div>
+
+<script>
+const ST = {done:['已完成','b-done'], candidate:['候选待审','b-candidate'], adopted:['已采纳','b-adopted'], rejected:['已拒绝','b-rejected']};
+let EXPS = [];
+
+async function load() {
+  try {
+    const r = await fetch('/training/api/experiments');
+    const d = await r.json();
+    EXPS = d.experiments || [];
+    render();
+  } catch(e) { document.getElementById('list').innerHTML = '<div class="note">加载失败: ' + e.message + '</div>'; }
+}
+
+function scoreClass(v) { if (v === '-' || v === null || v === undefined) return '-'; v = Number(v); if (v >= 8) return ['s-good', v]; if (v >= 5) return ['s-mid', v]; return ['s-bad', v]; }
+
+function render() {
+  const f = document.getElementById('fstatus').value;
+  const list = f ? EXPS.filter(e => e.status === f) : EXPS;
+  const cnt = {done:0, candidate:0, adopted:0, rejected:0};
+  EXPS.forEach(e => cnt[e.status] = (cnt[e.status]||0) + 1);
+  document.getElementById('stats').innerHTML =
+    '<div class="stat">实验总数 <b>' + EXPS.length + '</b></div>' +
+    '<div class="stat">候选待审 <b style="color:#fbbf24">' + cnt.candidate + '</b></div>' +
+    '<div class="stat">已采纳 <b style="color:#34d399">' + cnt.adopted + '</b></div>' +
+    '<div class="stat">已拒绝 <b style="color:#f87171">' + cnt.rejected + '</b></div>';
+  if (!list.length) { document.getElementById('list').innerHTML = '<div class="note">暂无实验。阿编跑提示词实验后数据自动出现在这里。</div>'; return; }
+  document.getElementById('list').innerHTML = list.map(expCard).join('');
+}
+
+function expCard(e) {
+  const [stLabel, stCls] = ST[e.status] || ST.done;
+  const cand = e.candidate;
+  const rows = (e.variants || []).map(v => {
+    const d = v.diagnosis || {};
+    const isWin = v.name === cand;
+    const sc = k => { const [c, val] = scoreClass(d[k]); return '<span class="score ' + c + '">' + (val === undefined ? '-' : val) + '</span>'; };
+    const idl = v.identity_last || {};
+    return '<tr class="' + (isWin ? 'win' : '') + '">' +
+      '<td><b>' + v.name + '</b>' + (isWin ? ' 🏆' : '') + '<br><span class="note">' + (v.hyp||'') + '</span></td>' +
+      '<td>' + sc('continuity') + '</td><td>' + sc('physical') + '</td><td>' + sc('character') + '</td>' +
+      '<td>' + sc('first_last') + '</td><td>' + sc('face') + '</td>' +
+      '<td>' + (v.verdict === 'pass' ? '<span class="s-good">PASS</span>' : v.verdict === 'fail' ? '<span class="s-bad">FAIL</span>' : '<span class="s-mid">' + (v.verdict||'-') + '</span>') + '</td>' +
+      '<td>' + (idl.verdict ? '<span class="' + (idl.verdict==='pass'?'s-good':idl.verdict==='fail'?'s-bad':'s-mid') + '">' + idl.verdict.toUpperCase() + '</span>' + (idl.issues ? '<br><span class="issues">' + idl.issues + ' 问题</span>' : '') : '-') + '</td>' +
+      '<td class="vid-wrap" style="display:flex;gap:6px">' + (v.video ? '<video controls preload="none" src="/training/video/' + v.video.replace(/^experiments\//,'') + '"></video>' : '') + '</td>' +
+      '</tr>';
+  }).join('');
+  return '<div class="exp ' + (e.status==='candidate'?'open':'') + '" id="' + e.id + '">' +
+    '<div class="exp-head" onclick="toggle(this)">' +
+      '<span class="arrow">▶</span><span class="exp-id">' + e.id + '</span>' +
+      '<span class="exp-meta">' + e.project + ' · 镜' + e.shot + ' · ' + e.ts + '</span>' +
+      '<span class="badge ' + stCls + '">' + stLabel + '</span>' +
+      (e.candidate ? '<span class="badge b-candidate">候选: ' + e.candidate + '</span>' : '') +
+    '</div>' +
+    '<div class="exp-body">' +
+      (e.hypothesis ? '<div class="finding">🎯 假设：' + e.hypothesis + '</div>' : '') +
+      (e.key_finding ? '<div class="finding">💡 关键发现：' + e.key_finding + '</div>' : '') +
+      (e.candidate_note ? '<div class="finding">🏆 候选方案：' + e.candidate_note + '</div>' : '') +
+      '<table><tr><th>变体</th><th>连贯</th><th>物理</th><th>角色</th><th>首尾</th><th>face</th><th>verdict</th><th>视觉脸型(尾帧)</th><th>视频</th></tr>' + rows + '</table>' +
+      (e.qc_lesson ? '<div class="note">📋 质检教训：' + e.qc_lesson + '</div>' : '') +
+      '<div class="actions">' +
+        (e.status === 'candidate' ?
+          '<button class="btn btn-adopt" onclick="setStatus(\'' + e.id + '\',\'adopted\')">✅ 采纳此方案（固化进工作台）</button>' +
+          '<button class="btn btn-reject" onclick="setStatus(\'' + e.id + '\',\'rejected\')">❌ 拒绝</button>' : '') +
+        '<span class="note">' + (e.reviewed_ts ? '老板已审查：' + e.reviewed_ts : '') + '</span>' +
+      '</div>' +
+    '</div></div>';
+}
+
+function toggle(head) { head.parentElement.classList.toggle('open'); }
+
+async function setStatus(id, status) {
+  if (status === 'adopted' && !confirm('确认采纳该候选方案，由阿编固化进工作台正式流程？')) return;
+  const r = await fetch('/training/api/experiments/' + id + '/status', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status})
+  });
+  const d = await r.json();
+  if (d.ok) { load(); } else { alert('操作失败: ' + (d.error||'')); }
+}
+
+document.getElementById('fstatus').addEventListener('change', render);
+load();
+</script>
+</body>
+</html>

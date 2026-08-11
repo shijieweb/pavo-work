@@ -1,0 +1,106 @@
+{
+  "id": "exp_0811_1755",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "ts": "2026-08-11 17:55:00",
+  "status": "candidate",
+  "candidate": "v1",
+  "candidate_note": "关键帧序列插入角色锚点图（3帧：起点空景→锚点脸→尾帧），prompt 避免写死面部细节让参考图锁脸。V1 视觉脸型一致 pass(0问题)，V2/V3 身份词过重反而破坏脸型（AGNES prompt 描述覆盖参考图）",
+  "hypothesis": "运镜镜头角色一致性：①插锚点帧给模型早脸锚 ②身份强化词写死外貌 ③两者组合。",
+  "key_finding": "AGNES keyframes 中 prompt 角色描述优先级高于参考图——写死面部细节会覆盖参考图脸型；插入锚点帧让图主导才是真锁脸。",
+  "variants": [
+    {
+      "name": "v0",
+      "hyp": "基准：2帧+原prompt",
+      "diagnosis": {
+        "continuity": 3,
+        "physical": 6,
+        "character": 2,
+        "first_last": 1,
+        "face": 4,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_first": {
+        "verdict": "fail",
+        "note": "首帧空景剪影 vs 锚点（运镜起点预期）"
+      },
+      "identity_last": {
+        "verdict": "fail",
+        "issues": 5,
+        "note": "脸型瘦长 vs 圆润"
+      },
+      "video": "experiments/ep_0811_145935/shot1/v0/shot1.mp4"
+    },
+    {
+      "name": "v1",
+      "hyp": "中间锚点：3帧(空景→锚点脸→尾帧)",
+      "diagnosis": {
+        "continuity": 4,
+        "physical": 7,
+        "character": 5,
+        "first_last": 4,
+        "face": 0,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_first": {
+        "verdict": "fail",
+        "note": "首帧空景（运镜起点预期）"
+      },
+      "identity_last": {
+        "verdict": "pass",
+        "issues": 0,
+        "note": "脸型一致 ✅"
+      },
+      "video": "experiments/ep_0811_145935/shot1/v1/shot1.mp4"
+    },
+    {
+      "name": "v2",
+      "hyp": "身份强化：2帧+写死外貌词",
+      "diagnosis": {
+        "continuity": 9,
+        "physical": 9,
+        "character": 9,
+        "first_last": 8,
+        "face": 10,
+        "quality": 10
+      },
+      "verdict": "pass",
+      "identity_first": {
+        "verdict": "fail",
+        "note": "首帧空景"
+      },
+      "identity_last": {
+        "verdict": "fail",
+        "issues": 4,
+        "note": "脸型瘦长 vs 圆润"
+      },
+      "video": "experiments/ep_0811_145935/shot1/v2/shot1.mp4"
+    },
+    {
+      "name": "v3",
+      "hyp": "双管齐下：3帧+身份词",
+      "diagnosis": {
+        "continuity": 8,
+        "physical": 9,
+        "character": 9,
+        "first_last": 8,
+        "face": 0,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_first": {
+        "verdict": "warn",
+        "note": "首帧空景"
+      },
+      "identity_last": {
+        "verdict": "fail",
+        "issues": 4,
+        "note": "脸型瘦长 vs 圆润"
+      },
+      "video": "experiments/ep_0811_145935/shot1/v3/shot1.mp4"
+    }
+  ],
+  "qc_lesson": "质检要分层：诊断(语义) + 视觉尾帧 vs 锚点(实际脸型)——两者互补；运镜镜头首帧空景不算服装/脸型不一致（设计内），对比应取尾帧。"
+}
