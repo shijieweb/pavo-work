@@ -72,6 +72,13 @@
   .toolbar { display:flex; gap:8px; margin-bottom:12px; align-items:center; flex-wrap:wrap; }
   .filter { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:4px 10px; font-size:12px; }
   .legend { font-size:11px; color:#64748b; }
+  /* 图片放大查看（lightbox） */
+  #lb { display:none; position:fixed; inset:0; z-index:999; background:rgba(2,6,23,.92); padding:24px; cursor:zoom-out; }
+  #lb.open { display:flex; align-items:center; justify-content:center; }
+  #lb img { max-width:92vw; max-height:88vh; border-radius:8px; box-shadow:0 10px 40px rgba(0,0,0,.6); }
+  #lb .lbl { position:absolute; top:14px; left:50%; transform:translateX(-50%); color:#94a3b8; font-size:12px; }
+  .kfimg { width:100%; height:56px; object-fit:cover; border-radius:6px; border:1px solid #334155; cursor:zoom-in; transition:.15s; }
+  .kfimg:hover { border-color:#38bdf8; transform:scale(1.03); }
 </style>
 </head>
 <body>
@@ -90,9 +97,18 @@
 </div>
 <div id="list"></div>
 
+<div id="lb" onclick="this.classList.remove('open')"><span class="lbl" id="lbl"></span><img id="lbi" src="" alt=""></div>
+
 <script>
 const ST = {done:['已完成','b-done'], candidate:['候选待审','b-candidate'], adopted:['已采纳','b-adopted'], rejected:['已拒绝','b-rejected']};
 let EXPS = [];
+
+function openLb(url, label) {
+  document.getElementById('lbi').src = url;
+  document.getElementById('lbl').textContent = label || '';
+  document.getElementById('lb').classList.add('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('lb').classList.remove('open'); });
 
 async function load() {
   try {
@@ -142,9 +158,9 @@ function variantCard(v) {
       const url = src.startsWith('http') ? src
         : (src.startsWith('assets/') ? '/projects/' + (EXPS.find(e=>(e.variants||[]).includes(v))||{}).project + '/' + src.replace('assets/','assets/') : '');
       return '<div style="text-align:center"><div style="font-size:10px;color:#64748b;margin-bottom:2px">' + k.role + '</div>' +
-        (url ? '<img src="' + url + '" style="width:100%;height:56px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=\'none\'">' : '') + '</div>';
+        (url ? '<img src="' + url + '" class="kfimg" onclick="openLb(\'' + url + '\',\'' + k.role + '\')" onerror="this.style.display=\'none\'">' : '') + '</div>';
     }).join('');
-    pRows.push(['关键帧图', '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px">' + kfHtml + '</div>']);
+    pRows.push(['关键帧图', '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px">' + kfHtml + '</div><div style="font-size:10px;color:#475569;margin-top:3px">点击图片放大查看</div>']);
   }
   if (p.images) pRows.push(['关键帧数', p.images + ' 张']);
   if (p.num_frames) pRows.push(['帧数', p.num_frames]);
