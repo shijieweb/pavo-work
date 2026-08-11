@@ -66,7 +66,9 @@
         "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
         "frame_rate": 24,
         "mode": "keyframes",
-        "negative": "文字/水印/畸形"
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "duration_s": 5.0,
+        "seed": 1166
       },
       "target_met": false,
       "analysis": {
@@ -129,7 +131,9 @@
         "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
         "frame_rate": 24,
         "mode": "keyframes",
-        "negative": "文字/水印/畸形"
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "duration_s": 5.0,
+        "seed": 1167
       },
       "target_met": false,
       "analysis": {
@@ -194,7 +198,9 @@
         "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
         "frame_rate": 24,
         "mode": "keyframes",
-        "negative": "文字/水印/畸形"
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "duration_s": 5.0,
+        "seed": 1168
       },
       "target_met": false,
       "analysis": {
@@ -259,7 +265,9 @@
         "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
         "frame_rate": 24,
         "mode": "keyframes",
-        "negative": "文字/水印/畸形"
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "duration_s": 5.0,
+        "seed": 1169
       },
       "target_met": false,
       "analysis": {

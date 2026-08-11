@@ -2104,6 +2104,7 @@ def generate_video_real(shot_id, force=False):
             frame_rate=SPEC.get("frame_rate", 24),
             negative_prompt="static, frozen frame, no motion, watermark, blurry, deformed face, "
                              "text, subtitles, captions, written words, on-screen text",
+            seed=shot.get("seed") or 1000 + int(shot.get("id") or 0),
         )
         video_id = task.get("video_id") or task.get("task_id") or task.get("id")
         if not video_id:
@@ -2198,6 +2199,7 @@ def generate_video_real(shot_id, force=False):
             num_frames=_shot_nf(shot),
             frame_rate=SPEC.get("frame_rate", 24),
             negative_prompt=(shot.get("negative_prompt") or _NEG_IDENTITY),
+            seed=shot.get("seed") or 1000 + int(shot.get("id") or 0),
         )
     elif strategy == "reference":  # 单图生视频（image=锚点/场景图），省一张尾帧图成本
         prompt = _clean_video_prompt(shot.get("video_prompt", ""))
@@ -2227,6 +2229,7 @@ def generate_video_real(shot_id, force=False):
             num_frames=_shot_nf(shot),
             frame_rate=SPEC.get("frame_rate", 24),
             negative_prompt=(shot.get("negative_prompt") or _NEG_IDENTITY),
+            seed=shot.get("seed") or 1000 + int(shot.get("id") or 0),
         )
     else:  # text2video：纯文生视频（无图输入），用于无角色纯场景/空镜
         prompt = shot.get("video_prompt", "")
@@ -2244,6 +2247,7 @@ def generate_video_real(shot_id, force=False):
             num_frames=_shot_nf(shot),
             frame_rate=SPEC.get("frame_rate", 24),
             negative_prompt=(shot.get("negative_prompt") or _NEG_IDENTITY),
+            seed=shot.get("seed") or 1000 + int(shot.get("id") or 0),
         )
 
     video_id = task.get("video_id") or task.get("task_id") or task.get("id")
