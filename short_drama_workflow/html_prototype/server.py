@@ -1708,12 +1708,28 @@ def generate_keyframes_real(shot_id, force=False):
         first_api = _to_agnes_image(shot["asset_frame_start"])
         # 尾帧：img2img 首帧 → 结束态（保持同一张脸/同一场景构图）
         last_prompt = _last_frame_prompt(shot)
+        # 【0811 改造·老板洞察：关键帧关系地基】尾帧必须双参考合成：
+        #   首帧(锁场景/构图) + 角色锚点(锁脸/服装)——否则首帧是空景时尾帧的脸自由发挥(角色漂移根源)。
+        #   AGNES image 支持 extra_body.image 多图合成（官方文档 6.4）。
+        _ref_key = shot.get("ref")
+        _ref = SPEC.get("references", {}).get(_ref_key) if _ref_key else None
+        _anchor_img = ""
+        if isinstance(_ref, dict):
+            _anchor_img = _ref.get("remote_url") or _ref.get("asset_image") or ""
+        _kf_imgs = [first_api]
+        if _anchor_img:
+            _anchor_api = _to_agnes_image(str(_anchor_img))
+            if _anchor_api:
+                _kf_imgs.append(_anchor_api)
+                last_prompt += (" Same character as the reference image: identical face, hairstyle and clothing. "
+                                "Stay in the scene of the first reference image, natural transition.")
+                _log.info("[keyframes] shot#%s 尾帧双参考合成（首帧锁场景 + 锚点锁角色）", shot_id)
         # 【防挂起】AGNES 偶发半开连接会无声挂死 → 线程池硬超时 180s，绝不无限阻塞（老板 0810 批量卡死修复）
         _kf_ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         try:
             for size in ("768x1344", "1024x1024"):
                 try:
-                    fut = _kf_ex.submit(generate_image, last_prompt, image_input=first_api, size=size)
+                    fut = _kf_ex.submit(generate_image, last_prompt, image_input=_kf_imgs, size=size)
                     last_url = fut.result(timeout=180)
                     if last_url:
                         break
