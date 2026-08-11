@@ -1,0 +1,65 @@
+[
+  {
+    "id": 1,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot001.mp4",
+    "duration": 6,
+    "subtitle": "",
+    "ui_shot": false
+  },
+  {
+    "id": 2,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot002.mp4",
+    "duration": 5,
+    "subtitle": "苏晴：你已经很久没有好好说过一句话了。",
+    "ui_shot": false
+  },
+  {
+    "id": 3,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot003.mp4",
+    "duration": 5,
+    "subtitle": "",
+    "ui_shot": false
+  },
+  {
+    "id": 4,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot004.mp4",
+    "duration": 7,
+    "subtitle": "苏念（内心独白）：有些话，说出来太沉，画下来刚刚好。",
+    "ui_shot": false
+  },
+  {
+    "id": 5,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot005.mp4",
+    "duration": 5,
+    "subtitle": "",
+    "ui_shot": false
+  },
+  {
+    "id": 6,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot006.mp4",
+    "duration": 6,
+    "subtitle": "",
+    "ui_shot": false
+  },
+  {
+    "id": 7,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot007.mp4",
+    "duration": 6,
+    "subtitle": "林夏：这杯叫晚安。苦后，会有回甘。",
+    "ui_shot": false
+  },
+  {
+    "id": 8,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot008.mp4",
+    "duration": 5,
+    "subtitle": "苏念：我会再来的。",
+    "ui_shot": false
+  },
+  {
+    "id": 9,
+    "path": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\html_prototype\\projects\\ep_0811_012147\\assets\\video\\shot009.mp4",
+    "duration": 6,
+    "subtitle": "林夏（内心独白）：原来有人，真的看见了。",
+    "ui_shot": false
+  }
+]
