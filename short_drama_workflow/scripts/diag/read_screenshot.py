@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-截图识别工具：把本地图片发送给 MiniMax 多模态模型，返回图片内容描述。
+截图识别工具：把本地图片发送给视觉模型，返回图片内容描述。
+引擎（老板 0811 实测对比）：AGNES agnes-2.5-flash 优先（免费 3000 次/天、输出 5 段结构化
++自带瑕疵/质量评估），失败自动回退 MiniMax M3。
 用途：老板截图发我排障时，我用它"看图"（本助手后端为纯文本模型，需借视觉模型识别）。
 
 用法：
-    python read_screenshot.py <图片路径> [追问提示词]
+    python read_screenshot.py <图片路径> [追问提示词] [--engine agnes|minimax|auto]
 示例：
     python read_screenshot.py /tmp/boss_screenshot.png "详细描述界面上的所有元素、文字、按钮和状态，用于排查问题"
 """
@@ -40,7 +42,20 @@ def _img_to_datauri(path):
     return f"data:{mime};base64,{b64}"
 
 
-def recognize(path, question="请详细描述这张图片的内容：界面元素、文字、按钮、状态、报错信息等，用于排查软件问题。"):
+def _agnes(path, question):
+    """AGNES agnes-2.5-flash 视觉识别（免费 3000 次/天）。失败返回 None（触发回退）。"""
+    try:
+        sys.path.insert(0, os.path.expanduser("~/.workbuddy/skills/agnes-ai/scripts"))
+        import agnes_client as ac
+        return ac.chat(question, images=[_img_to_datauri(path)], model="agnes-2.5-flash",
+                       temperature=0.2, max_tokens=1200, timeout=120)
+    except Exception as e:
+        print("AGNES 识别失败: %s" % str(e)[:150], file=sys.stderr)
+        return None
+
+
+def _minimax(path, question):
+    """MiniMax M3 视觉识别（兜底）。"""
     _load_env()
     key = os.environ.get("MINIMAX_API_KEY")
     gid = os.environ.get("MINIMAX_GROUP_ID")
@@ -86,12 +101,37 @@ def recognize(path, question="请详细描述这张图片的内容：界面元�
     return None
 
 
+def recognize(path, question="请详细描述这张图片的内容：界面元素、文字、按钮、状态、报错信息等，用于排查软件问题。",
+              engine="auto"):
+    """AGNES 优先（免费+结构化），失败回退 MiniMax。engine: agnes|minimax|auto"""
+    if not os.path.exists(path):
+        print(f"图片不存在: {path}", file=sys.stderr)
+        return None
+    if engine in ("agnes", "auto"):
+        try:
+            out = _agnes(path, question)
+            if out:
+                return out
+        except Exception as e:
+            print("AGNES 识别失败: %s" % e, file=sys.stderr)
+        if engine == "agnes":
+            return None
+    return _minimax(path, question)
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("用法: python read_screenshot.py <图片路径> [追问提示词]", file=sys.stderr)
+        print("用法: python read_screenshot.py <图片路径> [追问提示词] [--engine agnes|minimax|auto]", file=sys.stderr)
         sys.exit(1)
     path = sys.argv[1]
-    q = sys.argv[2] if len(sys.argv) > 2 else None
-    out = recognize(path, q) if q else recognize(path)
+    args = sys.argv[2:]
+    engine = "auto"
+    if "--engine" in args:
+        i = args.index("--engine")
+        if i + 1 < len(args):
+            engine = args[i + 1]
+        args = args[:i] + args[i + 2:]
+    q = " ".join(args) if args else None
+    out = recognize(path, q, engine) if q else recognize(path, engine=engine)
     if out:
         print(out)
