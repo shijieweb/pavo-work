@@ -282,6 +282,18 @@ def build_variants(shot, ref, template="camera_move_v2"):
                 {"role": "镜A尾帧·空景微变", "src": empty2}]
         kfB2 = [{"role": "镜B首帧·人物远景", "src": anchor_far},
                 {"role": "镜B尾帧·人物中近景（明显变大）", "src": close1}]
+        # v20 极值：远景小人物(占1/3) → 中近景特写（人物明显变大，物理规律显著）
+        distant_small = anchor_far
+        _ds = os.path.join(HERE, "experiments", "sceneB_distantsmall.txt")
+        if os.path.isfile(_ds):
+            distant_small = open(_ds, encoding="utf-8").read().strip()
+        v20_prompt = ("Smooth transition of the same man in the same street. "
+                      "Animate: he walks toward the camera filling more and more of the frame, "
+                      "subtle breathing, hair moving gently, backpack straps shifting. "
+                      "Keep stable: same face, white shirt, black trousers, black backpack, same building and "
+                      "lamp behind, same camera angle, no jumps, no morphing.")
+        kfB3 = [{"role": "镜B极值首帧·人物远景小(1/3)", "src": distant_small},
+                {"role": "镜B极值尾帧·人物中近景特写", "src": close1}]
         return {
             "v18": {"images": [empty1, empty2], "keyframes": kfA2,
                     "prompt": v18_prompt, "num_frames": 81,
@@ -289,6 +301,9 @@ def build_variants(shot, ref, template="camera_move_v2"):
             "v19": {"images": [anchor_far, close1], "keyframes": kfB2,
                     "prompt": v19_prompt, "num_frames": 81,
                     "hyp": "镜B走近修复：远景→中近景（prompt与图一致，真走近）"},
+            "v20": {"images": [distant_small, close1], "keyframes": kfB3,
+                    "prompt": v20_prompt, "num_frames": 81,
+                    "hyp": "镜B极值：远景小(1/3)→中近景特写（物理规律显著）"},
         }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
@@ -438,8 +453,11 @@ def main():
             continue
         # 质检：AGNES 4 维诊断 + face
         try:
+            # 【0812 修复】单镜诊断必须传"只含当前镜"的 storyboard——face_consistency 按时间线累计
+            # 抽帧，传完整 10 镜 storyboard 会让 scale≈0.067，抽帧点全挤在开头 0.34s → 人脸误检 intra_jump
+            _single_sb = {"shots": [{"id": sid, "duration": nf / float(v.get("frame_rate", 24))}]}
             d = diagnose_clip(fp, n_frames=4, face_check=True,
-                              storyboard=os.path.join(server.PROJECTS_ROOT, pid, "storyboard.json"),
+                              storyboard=_single_sb,
                               deep=False)
             scores = (d.get("scores") or {}) if isinstance(d, dict) else {}
             print("  诊断:", json.dumps(scores, ensure_ascii=False), "| verdict:", (d or {}).get("verdict"))

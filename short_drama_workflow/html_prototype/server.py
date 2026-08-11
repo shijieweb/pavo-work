@@ -4637,7 +4637,13 @@ class Handler(BaseHTTPRequestHandler):
                 runs = int(data.get("runs", 1))
                 fc = data.get("face_check", True)
                 dp = bool(data.get("deep", False))
-                sb_for_face = os.path.join(PROJECTS_ROOT, ACTIVE, "storyboard.json")
+                # 【0812 修复】单镜诊断传"只含当前镜"的 storyboard——face_consistency 按时间线累计抽帧，
+                # 传完整 storyboard 会让单镜视频 scale≈0.067 抽帧点挤在开头 → 人脸误检 intra_jump → face 虚低
+                if sid and shot is not None:
+                    _sdur = float(shot.get("duration") or 5)
+                    sb_for_face = {"shots": [{"id": sid, "duration": _sdur}]}
+                else:
+                    sb_for_face = os.path.join(PROJECTS_ROOT, ACTIVE, "storyboard.json")
                 if runs > 1:
                     # 诊断方差治理：手动诊断也支持多次聚合取均值
                     res = _diag_average(video_abs, runs=runs, face_check=fc, storyboard=sb_for_face, deep=dp)
