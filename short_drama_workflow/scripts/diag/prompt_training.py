@@ -171,6 +171,17 @@ def main():
     os.makedirs(out_root, exist_ok=True)
 
     report = []
+    # 基础参数（目标体·变体统一基底）——v4 结构化记录
+    w, h = server._video_size()
+    nf = server._shot_nf(shot)
+    goal_body = {
+        "cn_story": (shot.get("cn_story") or "")[:120],
+        "camera": shot.get("camera") or "",
+        "duration": shot.get("duration"),
+        "ref": shot.get("ref"),
+        "expected": "硬门槛全过（判定=通过 + 人脸>=8 + 角色>=8）且软指标尽量好",
+        "base_params": {"size": "%dx%d" % (w, h), "model": "agnes-video-v2.0", "num_frames": nf},
+    }
     for name in vset:
         v = variants[name]
         print("\n===== 变体 %s：%s =====" % (name, v["hyp"]))
@@ -180,7 +191,11 @@ def main():
             print("  视频就绪: %s (%.0f KB)" % (fp, os.path.getsize(fp) // 1024))
         except Exception as e:
             print("  ❌ 变体 %s 生成失败: %s" % (name, str(e)[:150]))
-            report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": False, "error": str(e)[:150]})
+            report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": False,
+                           "error": str(e)[:150],
+                           "params": {"prompt": v["prompt"][:400], "images": len(v["images"]),
+                                      "num_frames": nf, "size": "%dx%d" % (w, h),
+                                      "model": "agnes-video-v2.0"}})
             continue
         # 质检：AGNES 4 维诊断 + face
         try:
@@ -213,13 +228,19 @@ def main():
                                "diagnosis": scores, "verdict": (d or {}).get("verdict"),
                                "identity_review": vr.get("verdict"),
                                "identity_issues": (vr.get("issues") or [])[:3],
-                               "video": vf})
+                               "video": vf,
+                               "params": {"prompt": v["prompt"][:400], "images": len(v["images"]),
+                                          "num_frames": nf, "size": "%dx%d" % (w, h),
+                                          "model": "agnes-video-v2.0"}})
                 vid_ok = True
         except Exception as e:
             print("  identity 审查失败: %s" % str(e)[:100])
         if not vid_ok:
             report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": True,
-                           "diagnosis": scores, "verdict": (d or {}).get("verdict")})
+                           "diagnosis": scores, "verdict": (d or {}).get("verdict"),
+                           "params": {"prompt": v["prompt"][:400], "images": len(v["images"]),
+                                      "num_frames": nf, "size": "%dx%d" % (w, h),
+                                      "model": "agnes-video-v2.0"}})
 
     # 对比表
     print("\n" + "=" * 70)
@@ -246,15 +267,18 @@ def main():
               "character": (sc.get("character") is not None and sc.get("character") >= 8)}
         r0["hard_pass"] = all(hp.values())
         r0["hard_detail"] = hp
+        # 【v4 目标达成】对照 goal_body：硬门槛全过 + 视觉脸型 pass → 目标达成
+        r0["target_met"] = bool(r0.get("ok") and r0.get("hard_pass") and
+                                (r0.get("identity_review") == "pass" or r0.get("identity_last", {}).get("verdict") == "pass"))
     winner = None
     best = -1
     for r0 in report:
         sc = r0.get("diagnosis") or {}
         s = sum(v for v in sc.values() if isinstance(v, (int, float)))
-        if r0.get("ok") and r0.get("hard_pass") and s > best:
+        if r0.get("ok") and r0.get("target_met") and s > best:
             best, winner = s, r0.get("variant")
     if winner is None:
-        # 无达标变体：选总分最高（未达标样本也要有候选方向）
+        # 无目标达成变体：选总分最高（未达标样本也要有候选方向）
         for r0 in report:
             sc = r0.get("diagnosis") or {}
             s = sum(v for v in sc.values() if isinstance(v, (int, float)))
@@ -265,8 +289,9 @@ def main():
         etype = args[args.index("--type") + 1]
     out = {
         "id": "exp_%s" % time.strftime("%m%d_%H%M%S"),
-        "schema": "v2",
+        "schema": "v3",
         "type": etype or "未分类镜头",
+        "goal_body": goal_body,
         "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好",
         "sample": "镜%d：%s" % (sid, (shot.get("cn_story") or "")[:60]),
         "project": pid, "shot": sid, "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
