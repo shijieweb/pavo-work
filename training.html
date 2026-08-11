@@ -243,10 +243,10 @@ function variantCard(v, project) {
     '</div></div>';
 }
 
-function expCard(e) {
+function expCard(e, isNewest) {
   const [stLabel, stCls] = ST[e.status] || ST.done;
   const hardInfo = e.threshold ? '硬门槛：' + (e.threshold.hard||[]).join(' / ') + ' 必须达标；软指标（' + (e.threshold.soft||[]).join(' / ') + '）尽量好' : '';
-  return '<div class="exp ' + (e.status==='candidate'?'open':'') + '" id="' + e.id + '">' +
+  return '<div class="exp ' + (isNewest ? 'open' : '') + '" id="' + e.id + '">' +
     '<div class="exp-head" onclick="toggle(this)">' +
       '<span class="arrow">▶</span><span class="exp-id">' + e.id + '</span>' +
       '<span class="exp-meta">' + (e.type||'') + ' · ' + (e.sample||'').slice(0,44) + ' · ' + (e.ts||'') + '</span>' +
@@ -286,7 +286,7 @@ function render() {
     '<div class="stat">已采纳 <b style="color:#34d399">' + cnt.adopted + '</b></div>' +
     '<div class="stat">已拒绝 <b style="color:#f87171">' + cnt.rejected + '</b></div>';
   document.getElementById('list').innerHTML = list.length
-    ? list.map(e => { try { return expCard(e); } catch(err) { return '<div class="note" style="color:#f87171">⚠ 实验渲染错误: ' + (err.message || err) + '</div>'; } }).join('')
+    ? list.map((e, i) => { try { return expCard(e, i === 0); } catch(err) { return '<div class="note" style="color:#f87171">⚠ 实验渲染错误: ' + (err.message || err) + '</div>'; } }).join('')
     : '<div class="note">暂无实验。</div>';
 }
 
