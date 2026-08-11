@@ -32,6 +32,10 @@ SOFT_IDENTITY_BOOST = (" Keep the man's clothing and accessories consistent with
                        "white button-up shirt with rolled sleeves, black trousers, worn black backpack. "
                        "Same overall mood and body language. For the face, follow the reference image exactly.")
 
+# ---- 负面词（官方推荐：避免不需要的内容；精选有效项，冗余词无效）----
+NEG_PROMPT = ("text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, "
+              "blurry face, frame jump, identity change, clothing change")
+
 # ---- 身份强化词（V2/V3 用·第一轮已证伪：写死脸型反而破坏）：保留作对照 ----
 IDENTITY_BOOST = (" The man is IDENTICAL to the reference image: same 28-year-old Asian male face, "
                   "same messy short black hair, same white button-up shirt with rolled sleeves, "
@@ -208,14 +212,18 @@ def _cn_translate(prompt_en, timeout=60):
         return ""
 
 
-def gen_video(prompt, images, out_dir, sid, shot):
-    """提交 keyframes 视频 → 轮询 → 下载到 out_dir/shot<sid>.mp4。返回本地路径。"""
+def gen_video(prompt, images, out_dir, sid, shot, seed=None):
+    """提交 keyframes 视频 → 轮询 → 下载到 out_dir/shot<sid>.mp4。返回本地路径。
+    seed: 固定随机种子（官方推荐可复现；训练实验传 seed 可对照排除随机性）。"""
     os.makedirs(out_dir, exist_ok=True)
     w, h = server._video_size()
     from agnes_client import wait_for_video
-    task = _submit_video(prompt, images=images, width=w, height=h, num_frames=server._shot_nf(shot))
+    nf = server._shot_nf(shot)
+    task = _submit_video(prompt, images=images, width=w, height=h, num_frames=nf,
+                         frame_rate=24, negative_prompt=NEG_PROMPT, seed=seed)
     vid = task.get("video_id") or task.get("id") or task.get("task_id")
-    print("  提交 video_id=%s 轮询中（最长 15 分钟）…" % str(vid)[:20])
+    print("  提交 video_id=%s 轮询中（%d 帧 ≈ %.1f 秒，seed=%s）…" % (
+        str(vid)[:20], nf, nf / 24.0, seed if seed is not None else "随机"))
     url = wait_for_video(vid, timeout=900, interval=10)
     if not url:
         raise RuntimeError("视频生成超时/失败")
@@ -275,9 +283,11 @@ def main():
     for name in vset:
         v = variants[name]
         print("\n===== 变体 %s：%s =====" % (name, v["hyp"]))
+        # 每个变体固定 seed（官方推荐可复现；确定性算法，跨进程一致）
+        seed = 1000 + sum(ord(c) for c in name) % 9000
         out_dir = os.path.join(out_root, name)
         try:
-            fp = gen_video(v["prompt"], v["images"], out_dir, sid, shot)
+            fp = gen_video(v["prompt"], v["images"], out_dir, sid, shot, seed=seed)
             print("  视频就绪: %s (%.0f KB)" % (fp, os.path.getsize(fp) // 1024))
         except Exception as e:
             print("  ❌ 变体 %s 生成失败: %s" % (name, str(e)[:150]))
@@ -287,7 +297,7 @@ def main():
                                       "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                       "num_frames": nf, "size": "%dx%d" % (w, h),
                                       "frame_rate": 24, "mode": "keyframes",
-                                      "model": "agnes-video-v2.0", "negative": "文字/水印/畸形"}})
+                                      "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / 24.0, 1)}})
             continue
         # 质检：AGNES 4 维诊断 + face
         try:
@@ -358,7 +368,7 @@ def main():
                                           "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                           "num_frames": nf, "size": "%dx%d" % (w, h),
                                           "frame_rate": 24, "mode": "keyframes",
-                                          "model": "agnes-video-v2.0", "negative": "文字/水印/畸形"}})
+                                          "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / 24.0, 1)}})
                 vid_ok = True
         except Exception as e:
             print("  identity 审查失败: %s" % str(e)[:100])
@@ -369,7 +379,7 @@ def main():
                                       "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                       "num_frames": nf, "size": "%dx%d" % (w, h),
                                       "frame_rate": 24, "mode": "keyframes",
-                                      "model": "agnes-video-v2.0", "negative": "文字/水印/畸形"}})
+                                      "model": "agnes-video-v2.0", "negative": NEG_PROMPT, "seed": seed, "duration_s": round(nf / 24.0, 1)}})
 
     # 对比表
     print("\n" + "=" * 70)

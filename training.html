@@ -213,11 +213,15 @@ function variantCard(v, project) {
       '</div><div style="font-size:10px;color:#475569;margin-top:2px">点击图片放大查看</div>']);
   }
   if (p.images) pRows.push(['关键帧数', p.images + ' 张']);
-  if (p.num_frames) pRows.push(['帧数', p.num_frames]);
+  if (p.num_frames) {
+    const dur = (p.frame_rate ? (p.num_frames / p.frame_rate).toFixed(1) : null);
+    pRows.push(['时长', p.num_frames + ' 帧' + (dur ? ' ≈ ' + dur + ' 秒' : '')]);
+  }
   if (p.size) pRows.push(['尺寸', p.size]);
   if (p.frame_rate) pRows.push(['帧率', p.frame_rate + 'fps']);
   if (p.mode) pRows.push(['模式', p.mode === 'keyframes' ? '关键帧动画（首尾平滑插值）' : p.mode]);
   if (p.model) pRows.push(['模型', p.model]);
+  if (p.seed) pRows.push(['随机种子', p.seed + '（可复现）']);
   if (p.negative) pRows.push(['负面词', p.negative]);
   const idlText = idl.verdict ? (idl.verdict==='pass' ? '一致 ✅' : idl.verdict==='fail' ? '不一致 ❌' : '轻微差异 ⚠') : '';
   return '<div class="vcard ' + (vname(v) === (EXPS.find(e=>(e.variants||[]).includes(v))||{}).candidate ? 'win' : '') + '">' +

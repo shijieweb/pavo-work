@@ -68,7 +68,9 @@
         "frame_rate": 24,
         "mode": "keyframes",
         "model": "agnes-video-v2.0",
-        "negative": "文字/水印/畸形"
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "duration_s": 5.0,
+        "seed": 1172
       },
       "hard_pass": false,
       "hard_detail": {
@@ -111,7 +113,9 @@
         "frame_rate": 24,
         "mode": "keyframes",
         "model": "agnes-video-v2.0",
-        "negative": "文字/水印/畸形"
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "duration_s": 5.0,
+        "seed": 1173
       },
       "hard_pass": false,
       "hard_detail": {
@@ -165,7 +169,9 @@
         "frame_rate": 24,
         "mode": "keyframes",
         "model": "agnes-video-v2.0",
-        "negative": "文字/水印/畸形"
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "duration_s": 5.0,
+        "seed": 1174
       },
       "hard_pass": false,
       "hard_detail": {
