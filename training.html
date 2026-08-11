@@ -197,6 +197,7 @@ function variantCard(v) {
     pRows.push(['英文提示词', '<div class="promptbox">' + (p.prompt || '') + '</div>']);
   }
   if (p.keyframes && p.keyframes.length) {
+    const hasAnchor = p.keyframes.some(k => k.role === '角色锚点');
     const kfHtml = p.keyframes.map(k => {
       const src = k.src || '';
       const url = src.startsWith('http') ? src
@@ -204,7 +205,11 @@ function variantCard(v) {
       return '<div style="text-align:center"><div style="font-size:10px;color:#64748b;margin-bottom:2px">' + k.role + '</div>' +
         (url ? '<img src="' + url + '" class="kfimg" onclick="openLb(\'' + url + '\',\'' + k.role + '\')" onerror="this.style.display=\'none\'">' : '') + '</div>';
     }).join('');
-    pRows.push(['关键帧图', '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px">' + kfHtml + '</div><div style="font-size:10px;color:#475569;margin-top:3px">点击图片放大查看</div>']);
+    pRows.push(['关键帧图', '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px">' + kfHtml + '</div>' +
+      '<div style="font-size:10px;color:#475569;margin-top:3px">' +
+      (hasAnchor ? '关键帧动画：起点 → <b style="color:#fbbf24">角色锚点(脸锚)</b> → 尾帧，插值经过锚点脸锁定中间帧角色' :
+                  '关键帧动画：起点 → 尾帧（无锚点，中间帧角色自由发挥）') +
+      '</div><div style="font-size:10px;color:#475569;margin-top:2px">点击图片放大查看</div>']);
   }
   if (p.images) pRows.push(['关键帧数', p.images + ' 张']);
   if (p.num_frames) pRows.push(['帧数', p.num_frames]);
