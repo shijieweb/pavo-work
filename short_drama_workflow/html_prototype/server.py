@@ -4565,6 +4565,11 @@ class Handler(BaseHTTPRequestHandler):
                                         face_check=fc, storyboard=sb_for_face, deep=dp)
                 if res.get("ok") and sid and shot is not None:
                     shot["diagnosis"] = res  # 写回 SceneSpec.diagnosis
+                    # 【0811 修复】必须落盘！否则只写内存，前端 refreshSpec() 重载磁盘即丢（"诊断结果马上消失"）
+                    try:
+                        _save_spec()
+                    except Exception as _se:
+                        _log.error("[diagnose] 诊断结果落盘失败: %s", _se)
                 self._send(200, res)
             except Exception as e:
                 self._send(500, {"ok": False, "error": str(e)})
