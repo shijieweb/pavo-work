@@ -1907,11 +1907,22 @@ def build_agnes_payload(shot):
     if strategy == "keyframes":
         kf = [shot.get("asset_frame_start") or ref_prompt or "<首帧锚点>",
               shot.get("asset_frame_end") or "<待生成尾帧>"]
+    # 【0811 官方模板固化】keyframes 关键帧过渡约束句（官方推荐：约束过渡顺滑/角色不走样/镜头固定，
+    # 防人物变脸、镜头乱晃、画面跳切）。官方中文原句：
+    # "在第一个关键帧与第二个关键帧之间生成流畅过渡，保持角色形象不变、摄像机视角统一，
+    #  同时实现场景间自然的运动效果。"
+    video_prompt = shot.get("video_prompt", "")
+    if strategy == "keyframes":
+        _KF_TRANSITION = (" Generate a smooth transition between the first and last keyframes: "
+                          "keep the character's appearance unchanged (no face morphing), "
+                          "keep the camera angle consistent (no shaking), and achieve natural motion "
+                          "between scenes (no jumps).")
+        video_prompt = (video_prompt + _KF_TRANSITION).strip()
     return {
         "shot_id": shot.get("id"),
         "gen_strategy": strategy,
         "image": {"model": "agnes-image-2.1-flash", "prompt": ref_prompt, "seed": 42},
-        "video": {"model": "agnes-video-v2.0", "prompt": shot.get("video_prompt", ""),
+        "video": {"model": "agnes-video-v2.0", "prompt": video_prompt,
                    "mode": mode,
                    "keyframes": kf,
                    "num_frames": shot.get("num_frames", 145),
