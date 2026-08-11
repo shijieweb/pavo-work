@@ -1,0 +1,153 @@
+{
+  "id": "exp_0811_183616",
+  "schema": "v2",
+  "type": "运镜镜头",
+  "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好",
+  "sample": "镜1：深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "ts": "2026-08-11 18:36:16",
+  "status": "candidate",
+  "candidate": null,
+  "candidate_note": "",
+  "threshold": {
+    "hard": [
+      "verdict",
+      "face",
+      "character"
+    ],
+    "soft": [
+      "continuity",
+      "physical",
+      "first_last"
+    ]
+  },
+  "variants": [
+    {
+      "variant": "v0",
+      "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 9,
+        "physical": 9,
+        "character": 10,
+        "first_last": 8,
+        "face": 1,
+        "quality": 8
+      },
+      "verdict": "fail",
+      "identity_review": "fail",
+      "identity_issues": [
+        {
+          "type": "无法验证角色一致性",
+          "severity": "high",
+          "desc": "图一为清晰角色肖像（男性，黑短发，白衬衫，黑裤，背包），图二为远距离剪影，无法辨认任何面部特征、发型或服装细节，无法判定是否为同一角色"
+        }
+      ],
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v0\\shot1.mp4",
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": true
+      }
+    },
+    {
+      "variant": "v1",
+      "hyp": "锚点帧：3 帧插值经过锚点脸（第一轮视觉唯一 pass）",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 6,
+        "physical": 8,
+        "character": 7,
+        "first_last": 6,
+        "face": 4,
+        "quality": 9
+      },
+      "verdict": "fail",
+      "identity_review": "fail",
+      "identity_issues": [
+        {
+          "type": "服装差异",
+          "severity": "high",
+          "desc": "第一张图中角色穿白色衬衫，第二张图为剪影显示全身深色轮廓，无法确认白衬衫存在"
+        },
+        {
+          "type": "视角/姿势差异",
+          "severity": "medium",
+          "desc": "第一张图为正面站立姿态，清晰展示面部特征；第二张图为侧面行走剪影，无法对比脸型五官发型等关键特征"
+        }
+      ],
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v1\\shot1.mp4",
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": false
+      }
+    },
+    {
+      "variant": "v4",
+      "hyp": "锚点+软词：图锚锁脸 + 服装软锁（期望硬门槛全过）",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 9,
+        "physical": 9,
+        "character": 10,
+        "first_last": 9,
+        "face": 1,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_review": "fail",
+      "identity_issues": [
+        {
+          "type": "特征不可见",
+          "severity": "high",
+          "desc": "图2为远景剪影，无法辨识脸型、五官、发型发色、服装颜色款式及配饰等关键角色特征，与图1无法进行有效对比"
+        }
+      ],
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v4\\shot1.mp4",
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": true
+      }
+    },
+    {
+      "variant": "v5",
+      "hyp": "软词：仅服装/配饰软锁，脸交给参考图",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 5,
+        "physical": 8,
+        "character": 9,
+        "first_last": 4,
+        "face": 7,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_review": null,
+      "identity_issues": [],
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v5\\shot1.mp4",
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": true
+      }
+    }
+  ],
+  "progress": "运镜类训练：样本 1 完成 2 轮（第一轮 v1 pass / 第二轮 v0 pass——随机性矛盾，待重复实验定论）",
+  "qc_lesson": "质检口径：运镜镜头 face 维度必须排除首帧（起点空景剪影无脸必然误报），按尾帧/中后段评；identity 视觉审查同样取尾帧",
+  "key_finding": "AGNES 生成有随机性：同一变体两次实验结果相反（第一轮 v1 锚点帧视觉 pass，第二轮同写法 fail）——单次变体结论不可靠，必须重复实验（runs>=2 取多数）再定论",
+  "rules_draft": [
+    "训练方法论：变体实验 runs>=2 重复生成取多数投票（防 AGNES 随机性误判）",
+    "质检口径：运镜镜头 face/identity 一律取尾帧评估，首帧剪影不算不一致"
+  ],
+  "input": {
+    "prompt": "Chinese male programmer walking out of glass office building at midnight under cold street lamp, tired posture shoulders slumped hands in pockets, cold blue night atmosphere, cinematic slow push in, 2",
+    "ref": "阿凯"
+  }
+}
