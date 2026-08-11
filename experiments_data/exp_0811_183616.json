@@ -63,7 +63,21 @@
         "images": 2,
         "num_frames": 121,
         "size": "448x832",
-        "model": "agnes-video-v2.0"
+        "model": "agnes-video-v2.0",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "尾帧",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_f4scFrLAN6alr5eUvFGVVE4HXUpi752R/output.png"
+          }
+        ],
+        "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "negative": "文字/水印/畸形"
       },
       "target_met": false
     },
@@ -112,7 +126,25 @@
         "images": 3,
         "num_frames": 121,
         "size": "448x832",
-        "model": "agnes-video-v2.0"
+        "model": "agnes-video-v2.0",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "角色锚点",
+            "src": "https://platform-outputs.agnes-ai.space/images/t2i/55b3d553c24c446d879b18c873070b22.png"
+          },
+          {
+            "role": "尾帧",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_f4scFrLAN6alr5eUvFGVVE4HXUpi752R/output.png"
+          }
+        ],
+        "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "negative": "文字/水印/畸形"
       },
       "target_met": false
     },
@@ -156,7 +188,25 @@
         "images": 3,
         "num_frames": 121,
         "size": "448x832",
-        "model": "agnes-video-v2.0"
+        "model": "agnes-video-v2.0",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "角色锚点",
+            "src": "https://platform-outputs.agnes-ai.space/images/t2i/55b3d553c24c446d879b18c873070b22.png"
+          },
+          {
+            "role": "尾帧",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_f4scFrLAN6alr5eUvFGVVE4HXUpi752R/output.png"
+          }
+        ],
+        "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "negative": "文字/水印/畸形"
       },
       "target_met": false
     },
@@ -194,7 +244,21 @@
         "images": 2,
         "num_frames": 121,
         "size": "448x832",
-        "model": "agnes-video-v2.0"
+        "model": "agnes-video-v2.0",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "尾帧",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_f4scFrLAN6alr5eUvFGVVE4HXUpi752R/output.png"
+          }
+        ],
+        "prompt_cn": "一名中国男性程序员在午夜走出玻璃办公楼，站在冷色路灯下，姿态疲惫，双肩下垂，双手插在口袋里，冷蓝色的夜晚氛围，电影感缓慢推进镜头，24fps写实风格。",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "negative": "文字/水印/畸形"
       },
       "target_met": false
     }
