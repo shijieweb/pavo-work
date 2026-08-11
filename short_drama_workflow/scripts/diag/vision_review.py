@@ -114,6 +114,39 @@ def _extract_json(text):
             return None
 
 
+def prompt_frame_match(prompt_en, first_path, last_path, model="agnes-2.5-flash", timeout=150):
+    """【0812 老板方法论】提示词-帧匹配检查：
+    ① 提示词的开场场景描述 vs 首帧图（场景/光线/环境元素，人物可后出现）
+    ② 提示词的结束状态描述 vs 尾帧图（人物姿态/景别/场景）
+    返回 {ok, opening:{verdict,issues}, ending:{verdict,issues}, overall}。
+    场景元素缺→warn，完全冲突（如首帧有人但 prompt 写 no people）→fail。"""
+    P = (
+        "你是短剧【提示词-画面匹配审查员】。下面是一段视频的提示词（英文）+ 该视频的首帧图和尾帧图。\n"
+        "提示词：\n" + (prompt_en or "")[:1200] + "\n\n"
+        "请分别判断：\n"
+        "① 开场匹配：首帧图是否与提示词描述的开场场景元素一致（场景类型/建筑/光线/氛围/时间）？\n"
+        "   注意：运镜镜头首帧是空景属正常，人物不在首帧不算不匹配；但场景元素（如'玻璃幕墙''路灯''夜晚'）"
+        "缺失或冲突（如提示词写 no people 但首帧有人）要标记。\n"
+        "② 结束匹配：尾帧图是否与提示词描述的结束状态一致（人物姿态/景别/表情/场景）？\n"
+        "   注意：尾帧应该出现提示词描述的主要人物和关键元素；景别（远景/中景/近景）、姿态、服装应匹配。\n"
+        "输出 JSON：{\"opening\": {\"verdict\": \"pass|warn|fail\", "
+        "\"issues\": [{\"type\": \"场景缺失|场景冲突|其他\", \"severity\": \"high|low\", \"desc\": \"具体说明\"}]},\n"
+        "           \"ending\": {\"verdict\": \"pass|warn|fail\", "
+        "\"issues\": [{\"type\": \"人物缺失|景别不符|姿态不符|服装不符|场景冲突\", \"severity\": \"high|low\", \"desc\": \"具体说明\"}]},\n"
+        "           \"overall\": \"pass|warn|fail\"}")
+    try:
+        sys.path.insert(0, os.path.expanduser("~/.workbuddy/skills/agnes-ai/scripts"))
+        import agnes_client as ac
+        raw = ac.chat(P, images=[_img_src(first_path), _img_src(last_path)],
+                      model=model, temperature=0.2, max_tokens=1200, timeout=timeout)
+        j = _extract_json(raw or "")
+        if not j:
+            return {"ok": False, "error": "解析失败", "raw": (raw or "")[:200]}
+        return {"ok": True, **j}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+
 def review(paths, kind="quality", context="", model="agnes-2.5-flash", timeout=150):
     """执行一次视觉审查。paths: 图片路径列表；kind: 审查类型；context: 附加上下文（如情绪要求/剧本）。
     返回统一 dict（见模块 docstring）。失败时 ok=False + error。"""

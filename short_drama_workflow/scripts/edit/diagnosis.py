@@ -72,6 +72,43 @@ def extract_frames_even(video, n=4, out_dir=None, width=FRAME_W):
     return frames
 
 
+def extract_frames_smart(video, out_dir=None, width=FRAME_W, interval=0.5, tail_margin=0.2):
+    """【0812 老板方法论】智能抽帧：首帧(0s)必抽 + 尾帧(duration-tail_margin)必抽 + 中段按 interval 秒间隔。
+    相比 extract_frames_even 均匀抽帧：之前 3.4s 视频抽 4 帧=0.4/1.1/1.8/2.5s，首尾根本没抽到，
+    导致 intro_flash/尾帧脸型要单独抽帧。本函数保证两端覆盖 + 中段细节。返回 [(path, t), ...]。"""
+    ffprobe = FFMPEG.replace("ffmpeg.exe", "ffprobe.exe")
+    out_dir = out_dir or tempfile.mkdtemp(prefix="diag_")
+    os.makedirs(out_dir, exist_ok=True)
+    probe = run([ffprobe, "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", video])
+    dur_s = probe.stdout.strip()
+    try:
+        dur = float(dur_s)
+    except Exception:
+        dur = 0.0
+    if dur <= 0:
+        return []
+    # 时间点：首帧 0 必抽；尾帧 dur-tail_margin 必抽（避开 EOF 抽不出）；中段按 interval
+    times = [0.0]
+    t = interval
+    while t < dur - tail_margin - 1e-6:
+        times.append(t)
+        t += interval
+    if dur - tail_margin > 0:
+        times.append(max(dur - tail_margin, times[-1] + 0.05) if times else dur - tail_margin)
+    # 去重+排序
+    times = sorted(set(round(x, 2) for x in times))
+    frames = []
+    for i, t in enumerate(times):
+        out = os.path.join(out_dir, f"frame_{i:02d}.jpg")
+        cmd = [FFMPEG, "-y", "-ss", f"{t:.2f}", "-i", video,
+               "-frames:v", "1", "-vf", f"scale={width}:-1", "-q:v", "3", out]
+        run(cmd)
+        if os.path.isfile(out):
+            frames.append((out, t))
+    return frames
+
+
 def b64_image(path):
     with open(path, "rb") as f:
         return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode("utf-8", "ignore")
@@ -97,8 +134,11 @@ def _extract_json(text):
 
 def diagnose_clip(video, rubric=None, n_frames=4, model=DEFAULT_MODEL, out_dir=None,
                  face_check=False, storyboard=None, deep=False):
-    """端到端：抽帧 -> AGNES 多模态 -> 解析 4 维语义评分；可选 face_check 叠加人脸客观质检。返回 dict。"""
-    frames = extract_frames_even(video, n=n_frames, out_dir=out_dir)
+    """端到端：抽帧 -> AGNES 多模态 -> 解析 4 维语义评分；可选 face_check 叠加人脸客观质检。返回 dict。
+    0812 老板方法论：抽帧改 smart（首帧0s必抽 + 尾帧必抽 + 中段按0.5s间隔）——均匀抽帧漏首尾。"""
+    # smart 抽帧返回 [(path, t), ...]；兼容旧返回纯 path 列表
+    _smart = extract_frames_smart(video, out_dir=out_dir)
+    frames = [p for p, _t in _smart] if _smart else []
     if not frames:
         return {"ok": False, "error": "抽帧失败（ffmpeg/视频不可用）", "video": video}
     imgs = [b64_image(f) for f in frames]
