@@ -1,0 +1,11 @@
+# 统一行尾：消除 Windows CRLF 警告噪音（0811）
+* text=auto
+*.md text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
