@@ -464,6 +464,24 @@ def main():
         except Exception as e:
             scores = {}
             print("  诊断失败: %s" % str(e)[:100])
+        # 【0812 老板方法论】提示词-帧匹配检查：开场场景 vs 首帧 + 结束状态 vs 尾帧
+        pfm = {"overall": None, "opening": {}, "ending": {}}
+        try:
+            from vision_review import prompt_frame_match
+            _f0 = os.path.join(out_dir, "pfm_first.jpg")
+            _f1 = os.path.join(out_dir, "pfm_last.jpg")
+            subprocess.run(["ffmpeg", "-y", "-i", vf, "-frames:v", "1", _f0],
+                           capture_output=True, timeout=90)
+            subprocess.run(["ffmpeg", "-y", "-sseof", "-0.2", "-i", vf, "-frames:v", "1", _f1],
+                           capture_output=True, timeout=90)
+            if os.path.isfile(_f0) and os.path.isfile(_f1):
+                _pfm = prompt_frame_match(v["prompt"], _f0, _f1)
+                pfm = {"overall": _pfm.get("overall"), "opening": _pfm.get("opening") or {},
+                       "ending": _pfm.get("ending") or {}}
+                print("  提示词-帧匹配:", pfm.get("overall"), "| 开场:", (pfm["opening"] or {}).get("verdict"),
+                      "| 结束:", (pfm["ending"] or {}).get("verdict"))
+        except Exception as e:
+            print("  prompt-帧匹配失败: %s" % str(e)[:80])
         # identity 视觉审查（AGNES 2.5-flash 双图：锚点 vs 视频【尾帧】——0811 口径修正：
         # 运镜镜头首帧是起点空景剪影（设计内），对比必须取尾帧（人物清晰处））
         vid_ok = False
@@ -518,6 +536,7 @@ def main():
                                "identity_issues": (vr.get("issues") or [])[:3],
                                "internal_consistency": ic,
                                "intro_flash": ifl,
+                               "prompt_frame_match": pfm,
                                "video": vf,
                                "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
                                           "keyframes": v.get("keyframes", []), "images": len(v["images"]),
