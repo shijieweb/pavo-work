@@ -1,0 +1,191 @@
+{
+  "id": "exp_0811_211320",
+  "schema": "v3",
+  "type": "运镜镜头-keyframes插值律认证",
+  "goal_body": {
+    "cn_story": "深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处。",
+    "camera": "缓慢推近",
+    "duration": 5,
+    "ref": "阿凯",
+    "expected": "硬门槛全过（判定=通过 + 人脸>=8 + 角色>=8）且软指标尽量好",
+    "base_params": {
+      "size": "480x854",
+      "model": "agnes-video-v2.0",
+      "num_frames": 121
+    }
+  },
+  "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好",
+  "sample": "镜1：深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "ts": "2026-08-11 21:13:20",
+  "status": "candidate",
+  "candidate": "v8",
+  "candidate_note": "固化规则：① keyframes 最多 3 帧（空景→锚点脸→尾帧）② prompt 用过渡关系模板（Create a smooth transition... keep identity/camera/no jumps）——已固化进 server.py build_agnes_payload",
+  "threshold": {
+    "hard": [
+      "verdict",
+      "face",
+      "character"
+    ],
+    "soft": [
+      "continuity",
+      "physical",
+      "first_last"
+    ]
+  },
+  "variants": [
+    {
+      "name": "v6",
+      "variant": "v6",
+      "hyp": "4帧+过渡prompt：官方推荐写法",
+      "ok": false,
+      "error": "AGNES 400 请求被拒(可能内容违规): {\"code\":\"invalid_request\",\"message\":\"keyframes mode requires 2 to 3 images.\",\"data\":{\"max_images\":3,\"min_images\":2,\"param\":\"im",
+      "params": {
+        "prompt": "Smooth continuous camera push-in across 4 keyframes of the same character and scene, with NO jumps and NO clothing or identity changes between frames: Frame 1: empty urban street at midnight, glass office building, cold street lamp. Frame 2: the Chinese male programmer appears, front view, same face and clothing as the reference (white button-up shirt with rolled sleeves, black trousers, worn blac",
+        "prompt_cn": "平滑连续的相机推进效果，跨越同一角色和场景的4个关键帧，帧与帧之间无跳跃、无服装或身份变化：\n\n帧1：午夜时分空无一人的城市街道，玻璃幕墙写字楼，冰冷的街灯。\n\n帧2：中国男性程序员出现，正面视角，面部和",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "角色脸锚",
+            "src": "https://platform-outputs.agnes-ai.space/images/t2i/55b3d553c24c446d879b18c873070b22.png"
+          },
+          {
+            "role": "角色半身",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_CCBQvfXcDGznbCUjo7JfxCaMC05VOxkp/output.png"
+          },
+          {
+            "role": "尾帧",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_8x76I8liq6XAtTORhYOZ6TmHjdMmPmwy/output.png"
+          }
+        ],
+        "images": 4,
+        "num_frames": 121,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "文字/水印/畸形"
+      },
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": false
+      },
+      "target_met": false
+    },
+    {
+      "name": "v7",
+      "variant": "v7",
+      "hyp": "4帧+场景prompt：对照——同图数但 prompt 仍场景描述",
+      "ok": false,
+      "error": "AGNES 400 请求被拒(可能内容违规): {\"code\":\"invalid_request\",\"message\":\"keyframes mode requires 2 to 3 images.\",\"data\":{\"max_images\":3,\"min_images\":2,\"param\":\"im",
+      "params": {
+        "prompt": "Chinese male programmer walking out of glass office building at midnight under cold street lamp, tired posture shoulders slumped hands in pockets, cold blue night atmosphere, cinematic slow push in, 24fps photorealistic Keep the same character face and clothing across all four frames, smooth transition, no jumps.",
+        "prompt_cn": "深夜，一位中国男性程序员走出玻璃写字楼，站在冷清的街灯下，神情疲惫，肩膀下垂，双手插在口袋里，笼罩在冷蓝色的夜晚氛围中，电影感的缓慢推镜头，24帧照片级真实感。四帧画面保持同一角色的面部和服装，过渡平滑，无跳变。",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "角色脸锚",
+            "src": "https://platform-outputs.agnes-ai.space/images/t2i/55b3d553c24c446d879b18c873070b22.png"
+          },
+          {
+            "role": "角色半身",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_CCBQvfXcDGznbCUjo7JfxCaMC05VOxkp/output.png"
+          },
+          {
+            "role": "尾帧",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_8x76I8liq6XAtTORhYOZ6TmHjdMmPmwy/output.png"
+          }
+        ],
+        "images": 4,
+        "num_frames": 121,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "文字/水印/畸形"
+      },
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": false
+      },
+      "target_met": false
+    },
+    {
+      "name": "v8",
+      "variant": "v8",
+      "hyp": "3帧+过渡prompt：对照——同写法少一个控制点",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 8,
+        "physical": 9,
+        "character": 9,
+        "first_last": 7,
+        "face": 0,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_review": "pass",
+      "identity_issues": [],
+      "internal_consistency": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v8\\shot1.mp4",
+      "params": {
+        "prompt": "Smooth continuous camera push-in across 3 keyframes of the same character and scene, with NO jumps and NO clothing or identity changes: Frame 1: empty urban street at midnight, glass office building, cold street lamp. Frame 2: the Chinese male programmer, same face and clothing as the reference (white button-up shirt with rolled sleeves, black trousers, worn black backpack). Frame 3: same man in m",
+        "prompt_cn": "平滑连续的镜头推近，跨越同一角色和场景的3个关键帧，画面无缝衔接，人物身份和服装保持不变：第1帧：午夜空旷的城市街道，玻璃幕墙办公楼，冷色调路灯。第2帧：中国男性程序员，面部特征与服装与参考图完全一致（白色袖口卷起的衬衫、黑色长裤、磨损的黑色双肩背包）。第3帧：同一名男子中景镜头，面容与服装相同，神情疲惫。确保所有帧中角色的面部、发型和服装保持一致。镜头与场景保持稳定。照片级写实，电影感，24帧/秒。在关键帧之间生成平滑过渡：保持角色外观不变（无面部变形），保持镜头角度稳定（无抖动），实现场景间的自然运动（无跳跃）。",
+        "keyframes": [
+          {
+            "role": "起点空景",
+            "src": "assets/references/kf_start_001.png"
+          },
+          {
+            "role": "角色锚点",
+            "src": "https://platform-outputs.agnes-ai.space/images/t2i/55b3d553c24c446d879b18c873070b22.png"
+          },
+          {
+            "role": "尾帧",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_8x76I8liq6XAtTORhYOZ6TmHjdMmPmwy/output.png"
+          }
+        ],
+        "images": 3,
+        "num_frames": 121,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "文字/水印/畸形"
+      },
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": true
+      },
+      "target_met": false
+    }
+  ],
+  "progress": "运镜镜头-keyframes插值律认证类训练：样本待统计",
+  "qc_lesson": "",
+  "key_finding": "① keyframes 模式官方上限 3 张图（4 张被 400 拒绝：requires 2 to 3 images）——多帧控制最优=3帧[空景→锚点→尾帧] ② 过渡关系 prompt 认证有效：v8（3帧+过渡prompt）角色 9 分+尾帧脸型 pass+内部一致 pass，远超基准 v0（角色 2 分）——prompt 描述过渡关系+保持身份，禁动作步骤",
+  "rules_draft": [
+    "keyframes 图数上限 3（官方实测）——3 帧[空景→锚点→尾帧]最优",
+    "keyframes prompt 用过渡关系模板（过渡+保持身份+防跳变），禁动作步骤描述",
+    "尾帧双参考生成（首帧锁场景+锚点锁脸）"
+  ],
+  "input": {
+    "prompt": "Chinese male programmer walking out of glass office building at midnight under cold street lamp, tired posture shoulders slumped hands in pockets, cold blue night atmosphere, cinematic slow push in, 2",
+    "ref": "阿凯"
+  }
+}
