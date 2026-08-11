@@ -179,16 +179,20 @@ def build_variants(shot, ref, template="camera_move_v2"):
         if os.path.isfile(_af):
             anchor_far = open(_af, encoding="utf-8").read().strip()
         simple2 = ("Smooth transition from keyframe 1 to keyframe 2 of the same scene. "
+                   "Animate: the man walks forward with natural gait, subtle breathing, hair moving gently, "
+                   "background lights flickering softly. "
                    "Frame 1: empty urban street at midnight, cold blue night, street lamp, glass office building. "
                    "Frame 2: the Chinese male programmer in medium shot, tired expression, same white shirt and black backpack. "
-                   "Keep the character's face, hairstyle, and clothing IDENTICAL. "
-                   "Keep camera steady, natural motion, no jumps.")
+                   "Keep stable: character's face, hairstyle, and clothing fully consistent, "
+                   "consistent camera angle, natural motion, no jumps, no morphing.")
         simple2_far = ("Smooth transition from keyframe 1 to keyframe 2 of the same scene. "
+                       "Animate: the man walks toward the camera from the distance, getting slightly closer, "
+                       "hair moving gently in the night wind, background lights flickering softly. "
                        "Frame 1: empty urban street at midnight, cold blue night, street lamp, glass office building. "
                        "Frame 2: the same man walking toward the camera in far shot, small figure, "
                        "same white shirt and black backpack, tired posture. "
-                       "Keep the character's face, hairstyle, and clothing IDENTICAL. "
-                       "Keep camera steady, natural motion, no jumps.")
+                       "Keep stable: character's face, hairstyle, and clothing fully consistent, "
+                       "consistent camera angle, natural motion, no jumps, no morphing.")
         kf2b = [{"role": "起点空景", "src": first}, {"role": "尾帧人物中景", "src": last}]
         return {
             "v13": {"images": imgs2, "keyframes": kf2b,
@@ -198,6 +202,15 @@ def build_variants(shot, ref, template="camera_move_v2"):
                         {"role": "起点空景", "src": first}, {"role": "尾帧人物远景小", "src": anchor_far}],
                     "prompt": simple2_far, "num_frames": 81,
                     "hyp": "2帧[空景→远景小]+81帧+简单过渡：运镜推近拆解的第一镜"},
+            "v15": {"images": [first_img, anchor_far], "keyframes": [
+                        {"role": "起点空景", "src": first}, {"role": "尾帧人物远景小", "src": anchor_far}],
+                    "prompt": ("从第一个关键帧到第二个关键帧平滑过渡。"
+                               "运动：男人从远景缓慢走向镜头，脚步逐渐清晰靠近，"
+                               "头发被夜风轻轻吹动，背景路灯灯光微微闪烁，冷蓝夜色不变。"
+                               "保持稳定：角色面容、发型、白衬衫和背包完全一致，镜头角度不变，"
+                               "场景过渡自然，无跳变无变形。"),
+                    "num_frames": 81,
+                    "hyp": "2帧+中文官方格式：状态A→状态B+光效细节（知识库中文例子）"},
         }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",

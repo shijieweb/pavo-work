@@ -1929,11 +1929,17 @@ def build_agnes_payload(shot):
     #            同时实现场景间自然的运动效果。"
     video_prompt = shot.get("video_prompt", "")
     if strategy == "keyframes":
-        _KF_TRANSITION = (" Create a smooth transition between the first and last keyframes: "
-                          "keep the character's appearance unchanged (no face morphing, no identity change), "
-                          "keep the camera angle consistent (no shaking), "
-                          "achieve natural motion between scenes (no jumps). "
-                          "Keep face, hairstyle and clothing identical throughout the whole clip.")
+        # 【0811 官方双要素模板】①Animate=描述哪些内容运动 ②Keep stable=哪些主体保持稳定
+        # 官方示例1: "Animate the character with subtle breathing motion, hair moving gently in the wind,
+        #   background lights flickering softly, while keeping the face and outfit consistent"
+        # 官方示例2: "Create a smooth transition from the first keyframe to the second keyframe,
+        #   maintaining character identity, consistent camera angle, and natural motion between scenes"
+        _KF_TRANSITION = (" Create a smooth transition from the first keyframe to the second keyframe. "
+                          "Animate: the character moves with natural body motion, subtle breathing, "
+                          "hair moving gently, background lights flickering softly, environmental details "
+                          "shifting naturally. "
+                          "Keep stable: character's face, hairstyle and outfit fully consistent, "
+                          "consistent camera angle, natural motion between scenes, no jumps, no morphing.")
         video_prompt = (video_prompt + _KF_TRANSITION).strip()
     return {
         "shot_id": shot.get("id"),
