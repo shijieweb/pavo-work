@@ -1,0 +1,176 @@
+{
+  "id": "exp_0812_012028",
+  "schema": "v3",
+  "type": "运镜镜头-物理规律首尾帧验证",
+  "goal_body": {
+    "cn_story": "深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处。",
+    "camera": "缓慢推近",
+    "duration": 5,
+    "ref": "阿凯",
+    "expected": "硬门槛全过（判定=通过 + 人脸>=8 + 角色>=8）且软指标尽量好",
+    "base_params": {
+      "size": "480x854",
+      "model": "agnes-video-v2.0",
+      "num_frames": 81
+    }
+  },
+  "goal": "该类型训练目标：硬门槛全过 = verdict pass + face >=8 + 角色一致 >=8；软指标（连贯/物理/首尾）尽量好",
+  "sample": "镜1：深夜，阿凯从写字楼大门走出，冷白光路灯照亮他疲惫的身影。他抬头看天，深深呼出一口气，肩膀垮着，双手插兜，缓缓走向画面深处",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "ts": "2026-08-12 01:20:28",
+  "status": "candidate",
+  "candidate": "v18+v19",
+  "candidate_note": "首尾帧图必须自己按物理规律生成——镜A真空景(文生图/i2i明文 no people)；镜B远近人物(同机位距离缩短)。不能拿原图凑。",
+  "threshold": {
+    "hard": [
+      "verdict",
+      "face",
+      "character"
+    ],
+    "soft": [
+      "continuity",
+      "physical",
+      "first_last"
+    ]
+  },
+  "variants": [
+    {
+      "name": "v18",
+      "variant": "v18",
+      "hyp": "镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 9,
+        "physical": 10,
+        "character": 10,
+        "first_last": 8,
+        "face": 10,
+        "quality": 10
+      },
+      "verdict": "pass",
+      "identity_review": "fail",
+      "identity_issues": [
+        {
+          "type": "角色缺失",
+          "severity": "high",
+          "desc": "第二张图中未出现任何人物，无法进行角色一致性对比"
+        }
+      ],
+      "internal_consistency": {
+        "verdict": "warn",
+        "issues": [
+          {
+            "type": "no_character_visible",
+            "severity": "medium",
+            "desc": "两帧画面均为雨夜城市街道空镜，未出现任何人物角色，无法检查服装颜色和款式一致性。场景本身无突变，建筑布局、路灯位置、路面反光保持一致，符合连续拍摄逻辑。第二帧左侧路灯区域出现了一道光束/镜头光晕效果，但属于光线变化而非场景切换。"
+          }
+        ]
+      },
+      "intro_flash": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v18\\shot1.mp4",
+      "params": {
+        "prompt": "Smooth transition between the two keyframes of the same empty street. Animate: thin mist drifting slowly across the wet asphalt, streetlight glow gently pulsing, distant window lights flickering softly. Keep stable: no people, same building, same lamp position, same camera angle, same cold blue night, no jumps.",
+        "prompt_cn": "同一空旷街道的两个关键帧之间平滑过渡。动态效果：薄雾缓缓飘过湿润的沥青路面，路灯光芒轻柔脉动，远处窗户灯光微微闪烁。保持稳定：无人物出现，建筑相同，灯柱位置相同，镜头角度相同，相同的冷蓝色夜景，无跳帧。",
+        "keyframes": [
+          {
+            "role": "镜A首帧·真空景",
+            "src": "https://platform-outputs.agnes-ai.space/images/t2i/7d9ed776efee40d58b27ab36329f2c75.png"
+          },
+          {
+            "role": "镜A尾帧·空景微变",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_7FTvuTVsR68CO8KvXVlylGD7dycLjV5c/output.png"
+          }
+        ],
+        "images": 2,
+        "num_frames": 81,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "seed": 1223,
+        "duration_s": 3.4
+      },
+      "hard_pass": true,
+      "hard_detail": {
+        "verdict": true,
+        "face": true,
+        "character": true
+      },
+      "target_met": false
+    },
+    {
+      "name": "v19",
+      "variant": "v19",
+      "hyp": "镜B物理走近：远景小→走近中景（同机位同场景，距离缩短）",
+      "ok": true,
+      "diagnosis": {
+        "continuity": 9,
+        "physical": 8,
+        "character": 7,
+        "first_last": 9,
+        "face": 0,
+        "quality": 10
+      },
+      "verdict": "fail",
+      "identity_review": "pass",
+      "identity_issues": [],
+      "internal_consistency": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "intro_flash": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "video": "C:\\Users\\67972\\WorkBuddy\\workbuddy\\short_drama_workflow\\scripts\\diag\\experiments\\ep_0811_145935\\shot1\\v19\\shot1.mp4",
+      "params": {
+        "prompt": "Smooth transition of the same man walking closer to the camera in the same street. Animate: he walks forward with natural gait, growing larger in frame, subtle breathing, hair moving gently in night wind. Keep stable: same face, white shirt, black trousers, black backpack, same building and lamp behind, same camera position, no jumps, no morphing.",
+        "prompt_cn": "同一男子在同一条街道上向镜头走近的平滑过渡。动态部分：他向前行走，步伐自然，身形在画面中逐渐变大，呼吸微妙，头发在夜风中轻轻飘动。稳定要素：相同的面孔、白衬衫、黑裤、黑色背包，背景中的建筑和路灯不变，机位固定，无跳跃、无形变。",
+        "keyframes": [
+          {
+            "role": "镜B首帧·人物远景小",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_2jJhncwKsoCGfxFaTQcR5QwpKPFpj9w1/output.png"
+          },
+          {
+            "role": "镜B尾帧·人物走近中景",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_4MAP6dTe0iqy0hAJN1VEzOxNS0gmR43m/output.png"
+          }
+        ],
+        "images": 2,
+        "num_frames": 81,
+        "size": "480x854",
+        "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "seed": 1224,
+        "duration_s": 3.4
+      },
+      "hard_pass": false,
+      "hard_detail": {
+        "verdict": false,
+        "face": false,
+        "character": false
+      },
+      "target_met": false
+    }
+  ],
+  "progress": "运镜镜头-物理规律首尾帧验证类训练：样本待统计",
+  "qc_lesson": "",
+  "key_finding": "老板修正生效：首尾帧图必须自己按物理规律设计。v18 镜A真空景双帧(文生图+i2i) verdict PASS+物理10分+连贯9分+角色10分+intro_flash pass——全程真空景，雾气渐浓灯光微变。v19 镜B人物走进(远景小→走近中景，同机位) 内部一致pass+intro_flash pass+尾帧面部pass——人物明显走近，背景完全一致。v18+v19 拼起来就是完美的空镜建立→人物走近的完整运镜。",
+  "rules_draft": [
+    "【首尾帧物理规律·0812 老板修正】图1状态→图2状态必须可衔接：同场景/同机位/物理渐变。镜A空景双帧：干净空景+微变；镜B人物双帧：远景→中景同机位。",
+    "【空景必须文生图/i2i 明文 no people】—— 复用原含人物图欺骗AGNES空景必失败。",
+    "【人物镜必须 i2i 从锚点衍生】保持背景一致，人物大小变化=距离缩短。",
+    "画面质量：v18 物理10分、v19 连贯9分首尾9分（镜头叙事顺滑）。"
+  ],
+  "input": {
+    "prompt": "Chinese male programmer walking out of glass office building at midnight under cold street lamp, tired posture shoulders slumped hands in pockets, cold blue night atmosphere, cinematic slow push in, 2",
+    "ref": "阿凯"
+  }
+}
