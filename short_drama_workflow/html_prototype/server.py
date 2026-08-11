@@ -723,6 +723,10 @@ def _load_meta():
                 META = json.load(f)
         except Exception:
             META = {}
+    else:
+        # 【0811 修复】新项目无 meta.json → 必须清空全局 META，否则残留上一项目
+        # 的 req_card/outline/novel 等（曾致新建项目需求卡显示旧项目"深夜一碗面"）。
+        META = {}
     # 补缺以保证前端读取不报 undefined
     META.setdefault("source_mode", "")
     META.setdefault("source_text", "")
