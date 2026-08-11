@@ -212,6 +212,40 @@ def build_variants(shot, ref, template="camera_move_v2"):
                     "num_frames": 81,
                     "hyp": "2帧+中文官方格式：状态A→状态B+光效细节（知识库中文例子）"},
         }
+    if template == "camera_move_v6":
+        # 【第六轮·老板导演思维】首尾帧必须同场景/同光效/同机位才可过渡，差异大→拆镜
+        # v16 = 镜A：空景 → 空景微变（同场景双帧，雾气/灯光微动，无人物）
+        # v17 = 镜B：人物中景 → 人物微变（同人同场景同机位，姿态微变）
+        sceneA_2 = anchor_far if False else ""
+        _sa2 = os.path.join(HERE, "experiments", "sceneA_2.txt")
+        if os.path.isfile(_sa2):
+            sceneA_2 = open(_sa2, encoding="utf-8").read().strip()
+        _sb2 = os.path.join(HERE, "experiments", "sceneB_2.txt")
+        sceneB_2 = ""
+        if os.path.isfile(_sb2):
+            sceneB_2 = open(_sb2, encoding="utf-8").read().strip()
+        v16_prompt = ("Smooth transition from keyframe 1 to keyframe 2 of the same empty street scene. "
+                      "Animate: thin mist drifting slowly across the wet asphalt, streetlight glow gently "
+                      "brightening, distant building windows flickering softly. "
+                      "Keep stable: same glass office building, same street lamp position, same cold blue "
+                      "night tone, same camera angle, no people appearing, no jumps.")
+        v17_prompt = ("Smooth transition from keyframe 1 to keyframe 2 of the same man in the same scene. "
+                      "Animate: he raises his head slightly, shoulders relax, subtle breathing, hair moving "
+                      "gently in the night wind, a faint exhale visible. "
+                      "Keep stable: same face, same white shirt, same black trousers and backpack, same "
+                      "midnight street background, same camera angle, no jumps, no morphing.")
+        kfA = [{"role": "镜A首帧·空景", "src": first},
+               {"role": "镜A尾帧·空景微变", "src": sceneA_2}]
+        kfB = [{"role": "镜B首帧·人物中景", "src": last},
+               {"role": "镜B尾帧·人物微变", "src": sceneB_2}]
+        return {
+            "v16": {"images": [first_img, sceneA_2], "keyframes": kfA,
+                    "prompt": v16_prompt, "num_frames": 81,
+                    "hyp": "镜A拆解：空景→空景微变（同场景双帧，雾气/灯光微动）"},
+            "v17": {"images": [last, sceneB_2], "keyframes": kfB,
+                    "prompt": v17_prompt, "num_frames": 81,
+                    "hyp": "镜B拆解：人物中景→人物微变（同人同机位，姿态微动）"},
+        }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
                "goal": "量化基线：验证现状写法的真实水平（对照组）", "reference": "基线=生产默认写法",
