@@ -171,7 +171,11 @@ function variantCard(v) {
   const hp = v.hard_detail || {};
   const hpB = k => hp[k] === true ? '<span class="hp hp-pass">✔ 达标</span>' : (hp[k] === false ? '<span class="hp hp-fail">✘ 未达标</span>' : '');
   const idl = v.identity_last || {};
+  const an = v.analysis || {};
   const rows = [
+    ['🔍 问题', an.problem],
+    ['🧩 原因', an.cause],
+    ['💊 改进方案', an.fix],
     ['🎯 解决什么', v.goal],
     ['💡 为什么', v.hypothesis || v.hyp],
     ['📚 依据', v.reference],
