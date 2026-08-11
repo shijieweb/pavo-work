@@ -74,11 +74,21 @@ def build_variants(shot, ref, template="camera_move_v2"):
             "v3": {"images": imgs3, "prompt": base_p + IDENTITY_BOOST, "hyp": "双管齐下：锚点帧 + 身份强化词"},
         }
     # camera_move_v2（默认·第二轮）：软身份词方向
+    base_ref = ("AGNES keyframes 官方语义（多图=插值控制点）；第一轮 exp_0811_1755 机制发现："
+                "prompt 角色描述优先级>参考图，锁脸靠锚点帧图主导")
     return {
-        "v0": {"images": imgs2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）"},
-        "v1": {"images": imgs3, "prompt": base_p, "hyp": "锚点帧：3 帧插值经过锚点脸（第一轮视觉唯一 pass）"},
-        "v4": {"images": imgs3, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "锚点+软词：图锚锁脸 + 服装软锁（期望硬门槛全过）"},
-        "v5": {"images": imgs2, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "软词：仅服装/配饰软锁，脸交给参考图"},
+        "v0": {"images": imgs2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
+               "goal": "量化基线：验证现状写法的真实水平（对照组）", "reference": "基线=生产默认写法",
+               "implement": "关键帧 2 帧[起点空景,尾帧中景]+原 prompt，无任何增强"},
+        "v1": {"images": imgs3, "prompt": base_p, "hyp": "锚点帧：3 帧插值经过锚点脸（第一轮视觉唯一 pass）",
+               "goal": "验证锚点帧锁脸是否可重复（第一轮曾 pass）", "reference": "第一轮 exp_0811_1755 v1",
+               "implement": "关键帧 3 帧[起点空景,角色锚点图,尾帧中景]，prompt 不变"},
+        "v4": {"images": imgs3, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "锚点+软词：图锚锁脸 + 服装软锁",
+               "goal": "锚点帧+软身份词组合，期望硬门槛全过", "reference": base_ref,
+               "implement": "3 帧 + SOFT_IDENTITY_BOOST（服装/配饰/气质软锁，不写死脸型）"},
+        "v5": {"images": imgs2, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "软词：仅服装/配饰软锁",
+               "goal": "单独验证软身份词是否足够锁角色", "reference": base_ref,
+               "implement": "2 帧 + SOFT_IDENTITY_BOOST（无锚点帧）"},
     }
 
 
