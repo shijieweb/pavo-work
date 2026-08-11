@@ -564,6 +564,50 @@ def asset_abs(rel):
     return os.path.join(ASSET_BASE, rel)
 
 
+def _vr_to_local(src, video=False):
+    """【视觉审查·0811】把资产引用归一成本地图片路径供视觉审查：
+    - 本地 rel（assets/...）→ asset_abs 绝对路径
+    - http(s) 图片 → 下载到临时文件
+    - 视频 → ffmpeg 抽 1 帧到临时 png
+    返回本地绝对路径，失败返回 None。"""
+    try:
+        if not src:
+            return None
+        s = str(src)
+        if s.startswith("http") or s.startswith("data:"):
+            if s.startswith("data:"):
+                import base64 as _b
+                import tempfile as _tf
+                _, _, b = s.partition(",")
+                fd, fp = _tf.mkstemp(suffix=".png")
+                with os.fdopen(fd, "wb") as f:
+                    f.write(_b.b64decode(b))
+                return fp
+            import tempfile as _tf
+            import urllib.request as _ur
+            ext = ".png"
+            with _ur.urlopen(s, timeout=60) as r:
+                data = r.read()
+            fd, fp = _tf.mkstemp(suffix=ext)
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            return fp
+        ap = s if os.path.isabs(s) else asset_abs(s)
+        if video:
+            import tempfile as _tf
+            import subprocess as _sp
+            fd, fp = _tf.mkstemp(suffix=".png")
+            os.close(fd)
+            r = _sp.run(["ffmpeg", "-y", "-i", ap, "-frames:v", "1", fp],
+                        capture_output=True, timeout=90)
+            if r.returncode != 0 or not os.path.isfile(fp):
+                return None
+            return fp
+        return ap if os.path.isfile(ap) else None
+    except Exception:
+        return None
+
+
 def load_spec(project_id=None):
     global SPEC, ACTIVE, ASSET_BASE
     reg = load_registry()
@@ -4523,6 +4567,68 @@ class Handler(BaseHTTPRequestHandler):
                     shot["diagnosis"] = res  # 写回 SceneSpec.diagnosis
                 self._send(200, res)
             except Exception as e:
+                self._send(500, {"ok": False, "error": str(e)})
+
+        elif p.path == "/api/vision/review":
+            # 【视觉审查·老板 0811】AGNES 2.5-flash 多模态审查（免费 3000 次/天）：
+            # quality 单帧画质 / identity 角色一致性(锚点vs生成帧) / continuity 镜头连贯(上镜尾帧vs本镜首帧)
+            # / layout UI布局 / text 文字合规 / content 内容初审 / emotion 情绪表演。
+            # 结果写回 shot.vision_review（verdict/issues/confidence），前端徽标展示。
+            try:
+                sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "scripts", "diag")))
+                from vision_review import review as vr_review
+                pid = data.get("project_id") or ACTIVE
+                sid = data.get("shot_id")
+                kind = data.get("kind") or "quality"
+                ctx = data.get("context") or ""
+                if pid:
+                    load_spec(pid)
+                shot = find_shot(sid) if sid else None
+                if shot is None:
+                    self._send(404, {"ok": False, "error": "shot not found: %s" % sid})
+                    return
+                paths = []
+                if kind in ("quality", "text", "content"):
+                    # 单帧：首帧图优先，其次尾帧，其次视频抽帧（首帧即足够第一版）
+                    for f in ("asset_frame_start", "asset_frame_end"):
+                        v = shot.get(f) or ""
+                        if v:
+                            paths.append(_vr_to_local(v))
+                            break
+                    if not paths and shot.get("asset_video"):
+                        paths.append(_vr_to_local(shot["asset_video"], video=True))
+                elif kind == "identity":
+                    # 角色一致性：锚点(ref 图) vs 首帧生成图
+                    ref = SPEC.get("references", {}).get(shot.get("ref") or "") or {}
+                    anchor = ref.get("remote_url") or ref.get("asset_image") or shot.get("remote_image_ref") or ""
+                    if anchor:
+                        paths.append(_vr_to_local(anchor))
+                    ff = shot.get("asset_frame_start") or shot.get("asset_image") or ""
+                    if ff:
+                        paths.append(_vr_to_local(ff))
+                elif kind == "continuity":
+                    # 镜头连贯：上镜尾帧 vs 本镜首帧（同场景才审）
+                    prev = _prev_shot(shot)
+                    if prev and prev.get("asset_frame_end"):
+                        paths.append(_vr_to_local(prev["asset_frame_end"]))
+                    ff = shot.get("asset_frame_start") or ""
+                    if ff:
+                        paths.append(_vr_to_local(ff))
+                if len(paths) < 1:
+                    self._send(200, {"ok": False, "note": "该镜无可审查的图像资产（先生成首尾帧或视频）"})
+                    return
+                res = vr_review(paths, kind=kind, context=ctx)
+                if res.get("ok"):
+                    shot["vision_review"] = {"kind": kind, "verdict": res.get("verdict"),
+                                             "issues": res.get("issues"),
+                                             "confidence": res.get("confidence"),
+                                             "ts": now_iso()}
+                    _save_spec()
+                res["project_id"] = pid
+                res["shot_id"] = sid
+                self._send(200, res)
+            except Exception as e:
+                self._log.error("[vision] 审查失败: %s", e)
                 self._send(500, {"ok": False, "error": str(e)})
 
         elif p.path == "/api/faceqc":
