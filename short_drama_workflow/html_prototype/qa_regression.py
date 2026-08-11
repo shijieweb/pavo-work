@@ -9,7 +9,7 @@
 
 环境：服务须在线（8787）；real 层建议 AGNES_TEST_MODE=1 的测试服务（免费 key 无限额度）。
 """
-import json, os, re, subprocess, sys, time, urllib.request
+import json, os, re, subprocess, sys, tempfile, time, urllib.request
 
 BASE = os.environ.get("QA_BASE", "http://127.0.0.1:8787")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -83,6 +83,26 @@ def run_fast():
     apis = set(re.findall(r"api\(\s*['\"`](/api/[^'\"`?]{2,60})", html))
     miss = [a for a in apis if not any(a == w or a.startswith(w) for w in wl)]
     check("代理白名单全覆盖", not miss, str(miss[:3]) if miss else "%d 个 API" % len(apis))
+
+    # 5) F12 闸门只进不退（0811 老板实测回归）：loadSpec 恢复 confirmedSteps 必须 OR 合并
+    check("F12 闸门只进不退(OR 合并)", "v || !!ws.confirmed_steps[i]" in html,
+          "studio.html 含 OR 合并实现")
+
+    # 6) F13 服务端 META 无 meta.json 必须清空（0811 跨项目残留回归）
+    _tmp = tempfile.mkdtemp()
+    _old_root = server.PROJECTS_ROOT
+    _old_active = server.ACTIVE
+    server.PROJECTS_ROOT = _tmp
+    server.ACTIVE = "fake_proj_no_meta"
+    os.makedirs(os.path.join(_tmp, "fake_proj_no_meta"), exist_ok=True)
+    server.META = {"req_card": {"title": "残留"}, "outline": {"x": 1}}
+    server._load_meta()
+    # 断言：残留内容清空（req_card 不在、outline 恢复默认 None）——setdefault 补的默认键不算残留
+    check("F13 META 无 meta.json 清残留",
+          "req_card" not in server.META and server.META.get("outline") is None,
+          "META keys: %s" % list(server.META.keys())[:4])
+    server.PROJECTS_ROOT = _old_root
+    server.ACTIVE = _old_active
 
 # ============ REAL 层（真实 AGNES，用测试 key）============
 def run_real():
