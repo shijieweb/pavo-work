@@ -64,29 +64,32 @@ def build_variants(shot, ref, template="camera_move_v2"):
     first_img = _datauri(server.asset_abs(first)) if first.startswith("assets/") else first
     imgs2 = [first_img, last]                      # 两帧
     imgs3 = [first_img, anchor, last]              # 插入角色锚点脸（中间关键帧）
+    # 关键帧图明细（看板展示实际图：角色标签 + 可访问 src）
+    kf2 = [{"role": "起点空景", "src": first}, {"role": "尾帧", "src": last}]
+    kf3 = [{"role": "起点空景", "src": first}, {"role": "角色锚点", "src": anchor}, {"role": "尾帧", "src": last}]
 
     if template == "camera_move_v1":
         # 第一轮模板（硬身份词，已证伪保留对照）
         return {
-            "v0": {"images": imgs2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt"},
-            "v1": {"images": imgs3, "prompt": base_p, "hyp": "中间锚点：3 帧插值经过锚点脸 → 早锚定"},
-            "v2": {"images": imgs2, "prompt": base_p + IDENTITY_BOOST, "hyp": "身份强化：prompt 写死外貌细节"},
-            "v3": {"images": imgs3, "prompt": base_p + IDENTITY_BOOST, "hyp": "双管齐下：锚点帧 + 身份强化词"},
+            "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt"},
+            "v1": {"images": imgs3, "keyframes": kf3, "prompt": base_p, "hyp": "中间锚点：3 帧插值经过锚点脸 → 早锚定"},
+            "v2": {"images": imgs2, "keyframes": kf2, "prompt": base_p + IDENTITY_BOOST, "hyp": "身份强化：prompt 写死外貌细节"},
+            "v3": {"images": imgs3, "keyframes": kf3, "prompt": base_p + IDENTITY_BOOST, "hyp": "双管齐下：锚点帧 + 身份强化词"},
         }
     # camera_move_v2（默认·第二轮）：软身份词方向
     base_ref = ("AGNES keyframes 官方语义（多图=插值控制点）；第一轮 exp_0811_1755 机制发现："
                 "prompt 角色描述优先级>参考图，锁脸靠锚点帧图主导")
     return {
-        "v0": {"images": imgs2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
+        "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
                "goal": "量化基线：验证现状写法的真实水平（对照组）", "reference": "基线=生产默认写法",
                "implement": "关键帧 2 帧[起点空景,尾帧中景]+原 prompt，无任何增强"},
-        "v1": {"images": imgs3, "prompt": base_p, "hyp": "锚点帧：3 帧插值经过锚点脸（第一轮视觉唯一 pass）",
+        "v1": {"images": imgs3, "keyframes": kf3, "prompt": base_p, "hyp": "锚点帧：3 帧插值经过锚点脸（第一轮视觉唯一 pass）",
                "goal": "验证锚点帧锁脸是否可重复（第一轮曾 pass）", "reference": "第一轮 exp_0811_1755 v1",
                "implement": "关键帧 3 帧[起点空景,角色锚点图,尾帧中景]，prompt 不变"},
-        "v4": {"images": imgs3, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "锚点+软词：图锚锁脸 + 服装软锁",
+        "v4": {"images": imgs3, "keyframes": kf3, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "锚点+软词：图锚锁脸 + 服装软锁",
                "goal": "锚点帧+软身份词组合，期望硬门槛全过", "reference": base_ref,
                "implement": "3 帧 + SOFT_IDENTITY_BOOST（服装/配饰/气质软锁，不写死脸型）"},
-        "v5": {"images": imgs2, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "软词：仅服装/配饰软锁",
+        "v5": {"images": imgs2, "keyframes": kf2, "prompt": base_p + SOFT_IDENTITY_BOOST, "hyp": "软词：仅服装/配饰软锁",
                "goal": "单独验证软身份词是否足够锁角色", "reference": base_ref,
                "implement": "2 帧 + SOFT_IDENTITY_BOOST（无锚点帧）"},
     }
@@ -116,6 +119,17 @@ def verdict_report(report, etype):
         lines.append("\n⏭ 该样本未达标：硬门槛未全过 → 按最差维度设计下一轮变体"
                      + ("（参考 %s 的方向继续）" % worst["variant"] if worst else ""))
     return "\n".join(lines)
+
+
+def _cn_translate(prompt_en, timeout=60):
+    """把英文视频 prompt 翻成中文（老板看板看中文，执行仍用英文原版）。失败返回空。"""
+    try:
+        import agnes_client as ac
+        cn = ac.chat("把下面这段英文视频提示词翻译成流畅的中文，只输出翻译结果，不要解释：\n" + prompt_en,
+                     model="agnes-2.5-flash", temperature=0.1, max_tokens=600, timeout=timeout)
+        return (cn or "").strip()[:300]
+    except Exception:
+        return ""
 
 
 def gen_video(prompt, images, out_dir, sid, shot):
@@ -193,9 +207,11 @@ def main():
             print("  ❌ 变体 %s 生成失败: %s" % (name, str(e)[:150]))
             report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": False,
                            "error": str(e)[:150],
-                           "params": {"prompt": v["prompt"][:400], "images": len(v["images"]),
+                           "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
+                                      "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                       "num_frames": nf, "size": "%dx%d" % (w, h),
-                                      "model": "agnes-video-v2.0"}})
+                                      "frame_rate": 24, "mode": "keyframes",
+                                      "model": "agnes-video-v2.0", "negative": "文字/水印/畸形"}})
             continue
         # 质检：AGNES 4 维诊断 + face
         try:
@@ -229,18 +245,22 @@ def main():
                                "identity_review": vr.get("verdict"),
                                "identity_issues": (vr.get("issues") or [])[:3],
                                "video": vf,
-                               "params": {"prompt": v["prompt"][:400], "images": len(v["images"]),
+                               "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
+                                          "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                           "num_frames": nf, "size": "%dx%d" % (w, h),
-                                          "model": "agnes-video-v2.0"}})
+                                          "frame_rate": 24, "mode": "keyframes",
+                                          "model": "agnes-video-v2.0", "negative": "文字/水印/畸形"}})
                 vid_ok = True
         except Exception as e:
             print("  identity 审查失败: %s" % str(e)[:100])
         if not vid_ok:
             report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": True,
                            "diagnosis": scores, "verdict": (d or {}).get("verdict"),
-                           "params": {"prompt": v["prompt"][:400], "images": len(v["images"]),
+                           "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
+                                      "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                       "num_frames": nf, "size": "%dx%d" % (w, h),
-                                      "model": "agnes-video-v2.0"}})
+                                      "frame_rate": 24, "mode": "keyframes",
+                                      "model": "agnes-video-v2.0", "negative": "文字/水印/畸形"}})
 
     # 对比表
     print("\n" + "=" * 70)
