@@ -552,6 +552,7 @@
     <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
       <h2 class="text-base font-semibold">⑤ 分镜视频 · 分镜拆解与精控 · 第{{activeEpisode}}集</h2>
       <span class="text-[11px] text-slate-400">{{ spec.shots.length }} 镜</span>
+      <button @click="runVisionReviewAll" :disabled="loading" title="对所有已生成视频/首尾帧的镜做单帧画质审查（AGNES 免费视觉）" class="text-xs px-3 py-1.5 rounded-lg bg-teal-700 text-white disabled:opacity-50">🕵 批量视觉审查</button>
     </div>
     <p class="text-[11px] text-slate-500">先在此拆解校准每镜（台词/运镜/画面/引用素材，可多次修改），再逐镜生成视频；生成出的视频显示在每镜卡片下方（标注几秒、用什么方式）。</p>
 
@@ -693,6 +694,7 @@
           <button @click="genShot(sh.id, true)" :disabled="loading" class="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs disabled:opacity-50">保存并重渲</button>
           <button @click="optimizeVideoPrompt(sh)" :disabled="loading || optimizingKey==='vp'+sh.id" class="px-3 py-1.5 rounded-lg bg-fuchsia-600 text-white text-xs disabled:opacity-50">🤖 优化视频提示词</button>
           <button @click="runDiagnose(sh)" :disabled="loading || diagBusy[sh.id]" class="px-3 py-1.5 rounded-lg bg-cyan-700 text-white text-xs disabled:opacity-50">{{ diagBusy[sh.id] ? '诊断中…' : '🧠 AI 诊断' }}</button>
+          <button @click="runVisionReview(sh, 'quality')" :disabled="loading || vrBusy[sh.id]" class="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-xs disabled:opacity-50">{{ vrBusy[sh.id] ? '审查中…' : '🕵 视觉审查' }}</button>
           <button @click="saveShot" :disabled="loading||!dirty" class="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 text-xs disabled:opacity-40">保存修改</button>
           <button @click="toggleSatisfied(sh)" :class="['px-3 py-1.5 rounded-lg text-xs', sh.satisfied ? 'bg-emerald-600 text-white':'bg-slate-700 text-slate-200']">标记满意</button>
           <button @click="sh._reworkOpen = !sh._reworkOpen" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs">✎ 返工</button>
@@ -708,6 +710,21 @@
             <span v-for="(v,k) in sh.diagnosis.scores" :key="k" class="text-[10px]"><span class="text-slate-500">{{ diagLabel(k) }}:</span> <b :class="diagColor(v)">{{ v }}</b></span>
           </div>
           <p v-if="sh.diagnosis.summary" class="text-[10px] text-slate-400 mt-1 leading-snug">{{ sh.diagnosis.summary }}</p>
+        </div>
+        <!-- 视觉审查结果（AGNES 2.5-flash 多模态，写回 shot.vision_review） -->
+        <div v-if="sh.vision_review && sh.vision_review.verdict" class="mt-2 bg-slate-800/40 border border-teal-700/50 rounded-lg p-2">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-[10px] text-slate-400">🕵 视觉审查</span>
+            <span :class="sh.vision_review.verdict==='pass' ? 'text-emerald-400' : (sh.vision_review.verdict==='fail' ? 'text-rose-400' : 'text-amber-300')" class="text-[10px] font-semibold">{{ sh.vision_review.verdict==='pass' ? '✅ 通过' : (sh.vision_review.verdict==='fail' ? '❌ 发现问题' : '⚠ 需关注') }}</span>
+            <span class="ml-auto text-[9px] text-slate-500">AGNES 视觉 · {{ sh.vision_review.kind }}</span>
+          </div>
+          <ul v-if="(sh.vision_review.issues||[]).length" class="space-y-0.5">
+            <li v-for="(it,i) in sh.vision_review.issues" :key="i" class="text-[10px] flex gap-1">
+              <span :class="it.severity==='high' ? 'text-rose-400' : (it.severity==='medium' ? 'text-amber-300' : 'text-slate-400')" class="shrink-0">{{ it.severity==='high' ? '🔴' : (it.severity==='medium' ? '🟡' : '⚪') }}</span>
+              <span class="text-slate-300">{{ it.type || '' }}<template v-if="it.desc"> — {{ it.desc }}</template></span>
+            </li>
+          </ul>
+          <p v-else class="text-[10px] text-slate-400">未发现问题 ✓</p>
         </div>
         <div v-if="sh._reworkOpen" class="flex gap-2 items-center mt-2">
           <input v-model="sh._reworkNote" @keyup.enter="reworkShot(sh.id)" placeholder="描述这镜怎么改" class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs">
@@ -1012,7 +1029,7 @@ createApp({
       projects: [], projectId: '', spec: { shots: [] }, real: false,
       // P3 · 人脸一致性质检面板状态
       faceReport: null, faceLoading: false, faceOpen: true,
-      qualityReport: null, qualityLoading: false, diagBusy: {}, // 成片质检 / 单镜 AI 诊断（0811 挂 UI）
+      qualityReport: null, qualityLoading: false, diagBusy: {}, vrBusy: {}, // 成片质检 / 单镜 AI 诊断 / 视觉审查（0811 挂 UI）
       loading: false, log: [], showLog: false, errMsg: '',
       pipeRunning: false, pipeStage: '', pipePct: 0,
       // O2：长任务进度可见性——任何单个生成任务进行时显示「正在做什么+已耗时」，完成后给成功提示
@@ -1490,6 +1507,45 @@ createApp({
       } finally {
         this.diagBusy[sh.id] = false;
       }
+    },
+    // 【视觉审查·老板 0811】AGNES 2.5-flash 多模态审查（免费 3000 次/天），结果写回 shot.vision_review
+    async runVisionReview(sh, kind, ctx) {
+      if (!sh) return;
+      this.vrBusy[sh.id] = true;
+      try {
+        const d = await this.api('/api/vision/review', {
+          project_id: this.projectId, shot_id: sh.id, kind: kind || 'quality',
+          context: ctx || '',
+        });
+        if (d && d.ok) {
+          const v = (d.verdict === 'pass' ? '通过 ✅' : (d.verdict === 'fail' ? '发现问题 ❌' : '需关注 ⚠'));
+          this.pushLog('镜#' + sh.id + ' 视觉审查(' + (kind || 'quality') + ')：' + v + ' 问题 ' + ((d.issues || []).length) + ' 条');
+          this.notify('🕵 ' + (kind || 'quality') + ' 审查完成：' + v);
+          await this.refreshSpec();
+        } else {
+          this.notify('审查失败: ' + ((d && (d.error || d.note)) || '未知错误'));
+        }
+      } catch (e) {
+        this.notify('审查异常: ' + e.message);
+      } finally {
+        this.vrBusy[sh.id] = false;
+      }
+    },
+    // 一键批量审查全部镜（quality 单帧画质，免费额度内可批量）
+    async runVisionReviewAll() {
+      const shots = (this.spec.shots || []).filter(s => s.asset_video || s.asset_frame_start);
+      if (!shots.length) { this.notify('没有可审查的镜（需已生成视频或首尾帧）'); return; }
+      let done = 0, fail = 0;
+      this.notify('开始批量视觉审查 ' + shots.length + ' 镜…');
+      for (const sh of shots) {
+        try {
+          const d = await this.api('/api/vision/review', { project_id: this.projectId, shot_id: sh.id, kind: 'quality' });
+          if (d && d.ok) done++; else fail++;
+        } catch (e) { fail++; }
+        this.pushLog('批量审查进度 ' + done + '/' + shots.length);
+      }
+      await this.refreshSpec();
+      this.notify('批量审查完成：通过 ' + done + ' / 失败 ' + fail);
     },
     async genShot(id, rerender) {
       // 单镜视频生成：「提交+轮询」（视频 5-10 分钟，同步请求经 CF 必 524）

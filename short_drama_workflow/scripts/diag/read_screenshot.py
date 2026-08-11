@@ -121,7 +121,7 @@ def recognize(path, question="请详细描述这张图片的内容：界面元�
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("用法: python read_screenshot.py <图片路径> [追问提示词] [--engine agnes|minimax|auto]", file=sys.stderr)
+        print("用法: python read_screenshot.py <图片路径> [追问提示词] [--engine agnes|minimax|auto] [--kind quality|layout|text|content|emotion]", file=sys.stderr)
         sys.exit(1)
     path = sys.argv[1]
     args = sys.argv[2:]
@@ -131,7 +131,20 @@ if __name__ == "__main__":
         if i + 1 < len(args):
             engine = args[i + 1]
         args = args[:i] + args[i + 2:]
+    kind = None
+    if "--kind" in args:
+        i = args.index("--kind")
+        if i + 1 < len(args):
+            kind = args[i + 1]
+        args = args[:i] + args[i + 2:]
     q = " ".join(args) if args else None
-    out = recognize(path, q, engine) if q else recognize(path, engine=engine)
-    if out:
-        print(out)
+    if kind:
+        # 专项审查（布局/文字/内容/情绪）走 vision_review 引擎
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from vision_review import review as _vr
+        out = _vr([path], kind=kind)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        out = recognize(path, q, engine) if q else recognize(path, engine=engine)
+        if out:
+            print(out)
