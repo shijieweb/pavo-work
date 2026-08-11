@@ -228,6 +228,9 @@ function variantCard(v) {
         '<div class="metrics">' + metrics + '</div>' +
         (idlText ? '<div class="metrics"><span class="m">尾帧脸型 <b class="' + (idl.verdict==='pass'?'s-good':idl.verdict==='fail'?'s-bad':'s-mid') + '">' + idlText + '</b></span>' +
           (idl.issues ? '<span class="m" style="color:#f87171">' + idl.issues + ' 个问题</span>' : '') + '</div>' : '') +
+        (ic.verdict ? '<div class="metrics"><span class="m">内部一致(首帧vs尾帧) <b class="' + (ic.verdict==='pass'?'s-good':ic.verdict==='fail'?'s-bad':'s-mid') + '">' +
+          (ic.verdict==='pass' ? '一致 ✅' : ic.verdict==='fail' ? '不一致 ❌（服装/外观变化）' : '需关注 ⚠') + '</b></span>' +
+          ((ic.issues||[]).length ? '<span class="m" style="color:#f87171">' + ic.issues[0].desc.slice(0,46) + '</span>' : '') + '</div>' : '') +
         '<table class="ptable">' + pRows.map(r => '<tr><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>').join('') + '</table>' +
         '<div class="story">' + rows.map(r => '<div class="row"><span class="ic">' + r[0] + '</span><span class="tx">' + r[1] + '</span></div>').join('') + '</div>' +
       '</div>' +

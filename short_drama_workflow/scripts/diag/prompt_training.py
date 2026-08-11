@@ -240,10 +240,24 @@ def main():
                 vr = review([anchor, frame], kind="identity")
                 print("  identity 审查(尾帧):", vr.get("verdict"), "| issues:", len(vr.get("issues") or []),
                       "|", (vr.get("issues") or [{}])[0].get("desc", "")[:50] if vr.get("issues") else "")
+                # 【内部一致性·0811 老板实测盲区】视频首帧 vs 尾帧：查视频自身服装/外观变化
+                ic = {"verdict": None, "issues": []}
+                try:
+                    f1 = os.path.join(out_dir, "frame1.png")
+                    subprocess.run(["ffmpeg", "-y", "-i", vf, "-frames:v", "1", f1],
+                                   capture_output=True, timeout=90)
+                    if os.path.isfile(f1):
+                        icr = review([f1, frame], kind="internal")
+                        ic = {"verdict": icr.get("verdict"), "issues": (icr.get("issues") or [])[:2]}
+                        print("  内部一致(首帧vs尾帧):", ic.get("verdict"), "|",
+                              (ic.get("issues") or [{}])[0].get("desc", "")[:44] if ic.get("issues") else "一致")
+                except Exception as _e:
+                    print("  内部一致审查失败: %s" % str(_e)[:80])
                 report.append({"name": name, "variant": name, "hyp": v["hyp"], "ok": True,
                                "diagnosis": scores, "verdict": (d or {}).get("verdict"),
                                "identity_review": vr.get("verdict"),
                                "identity_issues": (vr.get("issues") or [])[:3],
+                               "internal_consistency": ic,
                                "video": vf,
                                "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
                                           "keyframes": v.get("keyframes", []), "images": len(v["images"]),
