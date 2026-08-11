@@ -169,6 +169,36 @@ def build_variants(shot, ref, template="camera_move_v2"):
                     "frame_rate": 30,
                     "hyp": "v10写法+30fps：官方更流畅运动（对比24fps）"},
         }
+    if template == "camera_move_v5":
+        # 【第五轮·老板拍板】2帧首尾帧 + 短时长（81帧≈3.4s）+ 简单过渡描述
+        # 单镜只做"首帧→尾帧简单过渡"，复杂运镜靠镜头拆解（多镜连接），不塞进单镜
+        # v13: 2帧[空景→人物中景] + 81帧 + 简单过渡
+        # v14: 2帧[空景→人物远景小] + 81帧 + 简单过渡（运镜推近拆成2镜：远景镜+中景镜）
+        anchor_far = anchor
+        _af = os.path.join(HERE, "experiments", "anchor_far.txt")
+        if os.path.isfile(_af):
+            anchor_far = open(_af, encoding="utf-8").read().strip()
+        simple2 = ("Smooth transition from keyframe 1 to keyframe 2 of the same scene. "
+                   "Frame 1: empty urban street at midnight, cold blue night, street lamp, glass office building. "
+                   "Frame 2: the Chinese male programmer in medium shot, tired expression, same white shirt and black backpack. "
+                   "Keep the character's face, hairstyle, and clothing IDENTICAL. "
+                   "Keep camera steady, natural motion, no jumps.")
+        simple2_far = ("Smooth transition from keyframe 1 to keyframe 2 of the same scene. "
+                       "Frame 1: empty urban street at midnight, cold blue night, street lamp, glass office building. "
+                       "Frame 2: the same man walking toward the camera in far shot, small figure, "
+                       "same white shirt and black backpack, tired posture. "
+                       "Keep the character's face, hairstyle, and clothing IDENTICAL. "
+                       "Keep camera steady, natural motion, no jumps.")
+        kf2b = [{"role": "起点空景", "src": first}, {"role": "尾帧人物中景", "src": last}]
+        return {
+            "v13": {"images": imgs2, "keyframes": kf2b,
+                    "prompt": simple2, "num_frames": 81,
+                    "hyp": "2帧[空景→中景]+81帧(3.4s)+简单过渡：单镜只做简单过渡"},
+            "v14": {"images": [first_img, anchor_far], "keyframes": [
+                        {"role": "起点空景", "src": first}, {"role": "尾帧人物远景小", "src": anchor_far}],
+                    "prompt": simple2_far, "num_frames": 81,
+                    "hyp": "2帧[空景→远景小]+81帧+简单过渡：运镜推近拆解的第一镜"},
+        }
     return {
         "v0": {"images": imgs2, "keyframes": kf2, "prompt": base_p, "hyp": "基准：现状 2 帧 + 原 prompt（对照）",
                "goal": "量化基线：验证现状写法的真实水平（对照组）", "reference": "基线=生产默认写法",
@@ -222,14 +252,15 @@ def _cn_translate(prompt_en, timeout=60):
         return ""
 
 
-def gen_video(prompt, images, out_dir, sid, shot, seed=None, frame_rate=24):
+def gen_video(prompt, images, out_dir, sid, shot, seed=None, frame_rate=24, num_frames=None):
     """提交 keyframes 视频 → 轮询 → 下载到 out_dir/shot<sid>.mp4。返回本地路径。
     seed: 固定随机种子（官方推荐可复现；训练实验传 seed 可对照排除随机性）。
-    frame_rate: 帧率（官方：更流畅运动用 24 或 30）。"""
+    frame_rate: 帧率（官方：更流畅运动用 24 或 30）。
+    num_frames: 覆盖帧数（官方：8n+1；短时长实验如 81=3.4s）；None 走 _shot_nf。"""
     os.makedirs(out_dir, exist_ok=True)
     w, h = server._video_size()
     from agnes_client import wait_for_video
-    nf = server._shot_nf(shot)
+    nf = num_frames or server._shot_nf(shot)
     task = _submit_video(prompt, images=images, width=w, height=h, num_frames=nf,
                          frame_rate=frame_rate, negative_prompt=NEG_PROMPT, seed=seed)
     vid = task.get("video_id") or task.get("id") or task.get("task_id")
@@ -283,6 +314,8 @@ def main():
     # 基础参数（目标体·变体统一基底）——v4 结构化记录
     w, h = server._video_size()
     nf = server._shot_nf(shot)
+    if vset and all(variants[x].get("num_frames") for x in vset):
+        nf = variants[vset[0]]["num_frames"]  # 短时长实验：变体级 num_frames 覆盖
     goal_body = {
         "cn_story": (shot.get("cn_story") or "")[:120],
         "camera": shot.get("camera") or "",
@@ -299,7 +332,8 @@ def main():
         out_dir = os.path.join(out_root, name)
         try:
             fp = gen_video(v["prompt"], v["images"], out_dir, sid, shot, seed=seed,
-                           frame_rate=v.get("frame_rate", 24))
+                           frame_rate=v.get("frame_rate", 24),
+                           num_frames=v.get("num_frames"))
             print("  视频就绪: %s (%.0f KB)" % (fp, os.path.getsize(fp) // 1024))
         except Exception as e:
             print("  ❌ 变体 %s 生成失败: %s" % (name, str(e)[:150]))

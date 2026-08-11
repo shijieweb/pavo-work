@@ -2050,6 +2050,47 @@ def _shot_nf(shot):
     return _snap_nf(shot.get("num_frames", 121))
 
 
+# 内容复杂度 → 单镜时长（秒）：变化点越多，时长越长——防止"长提示词塞进短视频"导致跳变
+# 老板 0811 洞察：提示词描述一堆内容（动作/运镜/状态变化），5s 塞不下必然跳跃。
+_COMPLEXITY_ACTIONS = [
+    "walk", "turn", "enter", "exit", "sit", "stand", "approach", "leave",
+    "step", "look", "push", "pull", "reach", "grab", "open", "close",
+    "raise", "nod", "shake", "smile", "move", "pick up", "put down",
+]
+_COMPLEXITY_CAMERA = ["推", "拉", "摇", "移", "跟", "升降", "环绕", "pan", "tilt",
+                      "push in", "pull back", "zoom", "track", "dolly", "crane"]
+
+
+def _shot_duration_by_complexity(shot):
+    """按内容复杂度给合理时长（秒）：变化点<=1→3s / 2→4s / 3→5s / 4-5→7s / >=6→10s。
+    变化点 = 动作动词数 + 运镜词数（词族去重：walking/walk out 只算 walk 一次）。
+    防止模型给 5s 塞下复杂动作导致跳变。"""
+    text = " ".join([
+        str(shot.get("video_prompt") or ""),
+        str(shot.get("cn_story") or ""),
+        str(shot.get("first_frame_prompt") or ""),
+        str(shot.get("last_frame_prompt") or ""),
+        str(shot.get("camera") or ""),
+    ]).lower()
+    n_act = sum(1 for w in _COMPLEXITY_ACTIONS if w in text)
+    n_cam = sum(1 for w in _COMPLEXITY_CAMERA if w in text)
+    changes = min(n_act + n_cam, 8)
+    # 变化点 0-1 → 3s；2 → 4s；3 → 5s；4-5 → 7s；6+ → 10s
+    table = {0: 3, 1: 3, 2: 4, 3: 5, 4: 7, 5: 7, 6: 10, 7: 10, 8: 10}
+    return table.get(changes, 5)
+
+
+def _ensure_duration(shot):
+    """单镜时长兜底：模型给过（duration 存在）就尊重；没给/给得太短按复杂度补足。
+    核心：内容变化点多 → 时长必须够，否则视频跳变。"""
+    d = shot.get("duration")
+    if not d:
+        return _shot_duration_by_complexity(shot)
+    need = _shot_duration_by_complexity(shot)
+    # 模型给的时长 < 复杂度所需 → 提升到所需（宁可慢一点也不要跳变）
+    return max(int(d), min(need, 12))
+
+
 def generate_video_real(shot_id, force=False):
     _log.info("[video] shot#%s 开始生成视频%s", shot_id, "（强制重渲）" if force else "")
     """REAL=1：按 gen_strategy 生成单镜真实动画，并写回 asset_video。
@@ -2763,8 +2804,11 @@ def generate_storyboard_from_novel(novel, title="", episode="", script_json=None
         s["gen_strategy"] = _gs
         s.setdefault("first_frame_prompt", "")   # 首针提示词（文生图兜底/锚点生成描述用）
         s.setdefault("last_frame_prompt", "")
+        # 【0811 老板洞察】时长必须匹配内容复杂度：变化点多 → 时长够（防"长提示词塞短视频"跳变）。
+        # 模型给的 duration 偏短时自动补足到复杂度所需（上限 12s，再长该拆镜）。
+        _dur = _ensure_duration(s)
+        s["duration"] = _dur
         # num_frames 必须 8*n+1（AGNES 硬性约束）：优先用时长换算，吸附到合法值。
-        _dur = int(s.get("duration") or 5)
         s["num_frames"] = _snap_nf(_dur * SPEC.get("frame_rate", 24))
         # 台词时长兜底：中文约 4 字/秒，超了配音念不完会被硬切在半句。
         # 提示词里已经写了规则，但模型经常超——这里按「宁可加时长也不砍台词」处理。
