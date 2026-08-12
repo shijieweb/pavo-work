@@ -1,6 +1,10 @@
 # dev-work · 开发/测试协作状态台
 
-> 主理人(阿编)与「开发」「测试」的共享状态目录。跨会话接力：开工先读、收工写回。
+> 主理人(阿编)与「开发」「测试」的共享状态目录。跨会话接力：开工先读、收工写回。  
+> **控制框架（2026-08-12 制度化）**：
+> - 宪法：`dev-work/运行手册.md`（阿编调度唯一操作宪法，含三道人闸/四文档/5态/证据铁律/分层测试 L0-L1-L2/DoD）
+> - 标准表单：`dev-work/templates/TEMPLATE_{PRD,DESIGN,TEST,ACCEPTANCE,BUG}.md`（派活强制按模板填）
+> - 每任务四文档：`dev-work/tasks/<T-ID>/{PRD,design,test,acceptance}.md`（拒绝全塞一文件→失控）
 > 参考《战队作战手册》(老师) 采纳：AC 验收锚点 / 状态机 / 双闸 / BUG 格式。
 
 ## 任务状态机（全中文，4 态）
@@ -43,9 +47,10 @@
 
 ## 当前任务
 
-| 任务 | 状态 | 开发 | 测试 | AC 进度 |
-|---|---|---|---|---|
+| 任务                         | 状态                    | 开发      | 测试      | AC 进度                       |
+| -------------------------- | --------------------- | ------- | ------- | --------------------------- |
 | T-20260812-01 P0-1 模板YAML化 | ✅ 完成(阿编把关·2026-08-12) | 开发Agent | 测试Agent | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ |
+| T-20260812-02 L1 真·管线冒烟(免费KEY验证P0-1) | ⏳ 待办·等闸1(老板签需求基线) | — | — | AC 待签 |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -57,6 +62,7 @@
   - 兼容已存在的 `templates/empty_scene_v1.yaml`（`text:/i2i:` 前缀 + `video_prompt/mode/negative/identity_check` 字段）
 
 ## 验收标准（AC 锚点）
+
 - [ ] AC-1.1 现有 7 套模板（camera_move_v1~v7，含 v2 为默认 fallthrough 分支）全部提取为独立 YAML，置于 `templates/`
 - [ ] AC-1.2 重构后 `build_variants` 改为 YAML 加载器（加载+渲染），核心逻辑 ≤40 行；`--template` 切换可用（v1~v7 + 新增模板机制）
 - [ ] AC-1.3 回归：用 fixture shot/ref 跑新旧 `build_variants`，变体数/keyframes/images/prompt/hyp 逐字段一致（**禁止调用 gen_video 烧 AGNES 额度，仅 dry-run 对比**）
@@ -64,6 +70,7 @@
 - [ ] AC-1.5 YAML 支持 `{{var}}` 变量替换 + `file:/text:/i2i:` 前缀（v6/v7 的 `experiments/*.txt` 文件读取逻辑保留在 Python 端，YAML 用 `file:` 标记）
 
 ## 已知坑（主理人提示，开发必须处理）
+
 1. **格式不一致**：`empty_scene_v1.yaml` 用 `keyframes:["text:..","i2i:.."]` + `video_prompt/mode/negative/identity_check`；教案 `camera_move_v2` 范例用 `keyframes:["{{first}}","{{last}}"]` + `prompt`。加载器必须同时兼容两种（或统一为一套并把 empty_scene_v1.yaml 迁移到统一格式——任选，但必须能加载已存在的 empty_scene_v1.yaml）。
 2. **v2 是默认 fallthrough**：代码里没有 `if template=="camera_move_v2"`，而是结尾默认 return。提取时把该默认分支存为 `camera_move_v2.yaml`，加载器默认 `template=camera_move_v2`。
 3. **文件读取**：v3/v4/v5/v6/v7 读 `experiments/*.txt`（anchor_far/sceneA_2/sceneB_2/sceneA_empty1/2/sceneB_close2/sceneB_distantsmall）。缺失时优雅 fallback（现有代码已做）。YAML 用 `file:experiments/xxx.txt` 标记，`_resolve_images` 识别 `file:` 走读取、`text:`/`i2i:` 走对应语义。
@@ -71,6 +78,7 @@
 5. **回归方法**：重构前先把当前 `build_variants` 逻辑快照为 `_legacy_build_variants.py`（或 git stash 对照），写 dry-run 对比脚本（fixture shot/ref → 新旧输出逐字段 assert），确保零额度消耗下验证一致。
 
 ## 证据要求
+
 - 开发：git diff 文件清单 + 7 个 YAML 内容摘要 + 回归对比脚本输出（新旧一致证据）+ 自测命令输出（无输出=未自测=不交付）
 - 测试：实跑命令输出 + pass/fail + 缺陷清单（`[BUG][S|P]` 格式 + 复现/期望/实际）
 
@@ -100,7 +108,7 @@
     - `REGRESS_NO_TMP=1 python dev-work/regress_build_variants.py` → 总检查项 116 | 失败 0（✅ 缺失 fallback 路径也全绿）。
     - 但 regress fixture 用 `/fixture/*.png` 路径，**未触发真实 shot 的 `assets/` 前缀分支**，故"116 全绿"不能完全证明生产一致（见 BUG-2）。
   - **逐条 AC**：
-    - **AC-1.1 PASS**：7 个 `camera_move_v1~v7.yaml` 均存在且可被 `build_variants` 加载（变体集 v0/v1/v2/v3、v0~v5、v6~v8、v9~v12、v13~v15、v16/v17、v18~v20 全部就位）。
+    - **AC-1.1 PASS**：7 个 `camera_move_v1~v7.yaml` 均存在且可被 `build_variants` 加载（变体集 v0/v1/v2/v3、v0~~v5、v6~~v8、v9~~v12、v13~~v15、v16/v17、v18~v20 全部就位）。
     - **AC-1.2 PASS**：`build_variants` 函数体 13 行（加载+渲染 ≤40 达标）；用 `pt.build_variants(shot,ref,t)` 调用验证 `--template` 可切换 v1/v3/v5/v7 + `dialogue_v1` + `empty_scene_v1` 均成功。
     - **AC-1.3 FAIL（部分）**：regress fixture 下新旧一致，但生产真实 `assets/` 路径下新 loader 丢失 data_uri 转换（见 BUG-2）。
     - **AC-1.4 PASS**：`dialogue_v1.yaml` 由新加载器直接加载、未改任何 Python（变体 v0/v1 就位，含 images/keyframes/prompt）。
@@ -131,7 +139,6 @@
   - 期望：`text:` 关键帧应被标记为"文生图（无源图）"、`:i2i` 关键帧应被标记为"图生图（基于上一帧）"，且 `images` 应是可传给 AGNES 的图引用/标记，而非裸 prompt 文本；至少应保留逐帧 `mode: text_to_image / image_to_image` 字段让下游 `gen_video` 区分。
   - 实际：`_resolve_images` 对 `text:`/`i2i:` 都只 `s[len(prefix):]` 剥前缀后返回字符串，二者无差别；`mode` 字段整组共用 `"keyframes"`，无逐帧区分；`role` 反被写成**未渲染的原始 token**（带 `text:` 前缀和 `{{...}}`），信息错误。下游 `gen_video(v["prompt"], v["images"], ...)` 会把这两段 prompt 文本当 keyframe 图片传给 AGNES，空镜生成逻辑整体失效。
   - 环境：python 3.13.12 / pyyaml 6.0.3 / 仓库 d50d0fa 后状态。
-
 - `[BUG][S2|P1] camera_move 关键帧丢失 data_uri 转换，真实 assets/ 路径下与旧版输出不一致 (AC-1.3)`
   - 严重度 S2（生产真实 shot 的 `asset_frame_start` 是 `assets/...` 前缀时，loader 产出原始相对路径而非 data URI，AGNES 无法解析→生成失败/行为漂移）；优先级 P1（AC-1.3 要求新旧逐字段一致）。
   - 复现：
@@ -145,16 +152,13 @@
   - 实际：camera_move YAML 的变量用**简单字符串**（`first: "asset_frame_start"`），`_resolve_variables` 走 `_get_by_path` 直出原始路径、永不触发 `data_uri` 分支；而旧 `_legacy_build_variants` 在 `first.startswith("assets/")` 时做 `_datauri(server.asset_abs(first))`。回归脚本 fixture 用 `/fixture/*.png`（非 `assets/` 前缀）**恰好两边都不 data_uri**，故"116 全绿"掩盖了该分支。
   - 影响面：所有 camera_move_v1~v7 关键帧图（首/尾/锚点）在生产真实数据下都会退化成裸相对路径。
   - 环境：同上；关键前提——真实 shot 的 `asset_frame_start` 是否为 `assets/` 前缀（旧代码 `startswith("assets/")` 分支强烈暗示是）；**建议开发用 1 个真实 shot 复核并补 regression 分支**。
-
-- `[BUG][S4|P3] 开发证据中 `_legacy_build_variants.py` 路径描述与实际不符（任务卡写 `scripts/diag/`，实际在 `dev-work/`）(证据一致性)`
+- `[BUG][S4|P3] 开发证据中 `\_legacy_build_variants.py`路径描述与实际不符（任务卡写`scripts/diag/`，实际在 `dev-work/`）(证据一致性)`
   - 严重度 S4；优先级 P3（不影响功能，但破坏"证据可追溯"要求）。
   - 复现：`current_state.md` 第 87 行写"新增 `scripts/diag/_legacy_build_variants.py`"，实际文件位于 `dev-work/_legacy_build_variants.py`（regress 脚本也是从 dev-work 导入，故能跑）。
   - 期望：任务卡/开发进度描述的文件路径与实际落盘一致，便于阿编核对。
   - 实际：路径不一致，按图索骥会找不到文件。
   - 环境：同上。
-
 - 观察项（非阻塞，不计入 BUG）：YAML 缺 `variants` 块或变体缺 `keyframes/prompt` 时加载器返回 `{}`/空列表，**不崩溃但静默**，建议至少打印 warning 便于排错（S4）。
-
 - 下一步：测试Agent 实跑验收（AC-1.1~1.5）→ 阿编把关标完成
 
 ---
@@ -164,6 +168,7 @@
 状态机：`已验证(测试验收过)·有2阻塞BUG` → `待验证(开发自检完)`（无 done 权，待测试复核）。
 
 ### 修了什么
+
 1. **[BUG-1 S2|P1] empty_scene_v1 text:/i2i: 未区分文生图/i2i 语义（AC-1.5）**
    - 根因：`_resolve_images` 对 `text:`/`i2i:` 一律只剥前缀返回裸 prompt 文本；`_render_variant` 又把未渲染的 token 直接当 `keyframes.role`（带 `text:` 前缀+`{{...}}` 未渲染）。
    - 修复（`prompt_training.py`）：
@@ -176,17 +181,20 @@
 3. **[BUG-3 S4|P3] 证据路径描述不符** — 开发进度中 `_legacy_build_variants.py` 路径由误写的 `scripts/diag/` 更正为实际落盘位置 `dev-work/`（见上方文件清单行）。
 
 ### 新回归分支（dev-work/regress_build_variants.py）
+
 - **BUG-2 分支（第 5 节）**：用真实 `asset_frame_start:"assets/first.png"`（非 `assets/` 的 `asset_frame_end` 保持与旧版「仅 first 帧 datauri」语义对齐）的 shot，对 camera_move_v1~v7 逐变体比对新/旧 `images`/`keyframes`/`prompt`，并断言新 loader 不产生裸 `assets/` 路径。覆盖此前被 fixture 掩盖的 data_uri 分支。
 - **empty_scene 语义校验（第 3 节）**：断言 v0 `images` 首帧 `mode==text_to_image`、尾帧 `mode==image_to_image` 且每帧含 `content`；`keyframes` 的 role/src 无 `text:`/`i2i:`/`{{` 残留，role 标明文生图/图生图，src 渲染为干净 prompt 文本。
 - `_datauri` 桩：`pt._datauri`/`legacy._datauri` 均替换为确定性伪 data URI（不读真实文件），保证新旧可比、零额度。
 
 ### 自测结果（零额度，仅 import + build_variants + 回归）
+
 - `python dev-work/regress_build_variants.py` → 总检查项 **200** | 失败 **0** ✅（含 7 模板×变体核心字段、empty_scene 语义、dialogue_v1、默认=camera_move_v2、新增 assets/ data_uri 分支）。
 - `REGRESS_NO_TMP=1 python dev-work/regress_build_variants.py` → 总检查项 **200** | 失败 **0** ✅（缺失 fallback 路径也全绿）。
 - 独立复现测试原始断言：BUG-1 `es["images"][0].mode=="text_to_image"` 且 `keyframes[0].role` 无前缀/`{{`；BUG-2 新 loader `images[0]==legacy images[0]==data:image/png;base64,...`（用伪 datauri 等价比对）→ 两 BUG 复现断言均不再触发。
 - 未调用 `gen_video`/`main()`，未烧 AGNES 额度。
 
 ### 遗留
+
 - 无功能遗留。说明一处语义取舍：BUG-2 修复按「旧版仅对 `asset_frame_start`（首帧）做 datauri」复刻，故回归 shot 的 `asset_frame_end` 用非 `assets/` 路径以与旧版逐字段相等；若生产真实 `asset_frame_end` 也带 `assets/` 前缀，新 loader 会一并转 data URI（比旧版更完整，但与该边缘情形下的旧版输出会有差异——属旧版自身不一致，不在本次 AC 范围内）。
 - 观察项（非阻塞，沿用测试建议）：YAML 缺 `variants` 块或变体缺字段时加载器返回 `{}`/空列表不崩溃但静默，建议后续加 warning 便于排错。
 
@@ -198,11 +206,13 @@
 - **环境**：python 3.13.12 / pyyaml 6.0.3；before 快照 `3946e95`，fix 提交 `9d0fb01`。
 
 ### 1) 重跑回归（不盲信开发输出）
+
 - `python dev-work/regress_build_variants.py` → **总检查项 200 | 失败 0** ✅。
 - `REGRESS_NO_TMP=1 python dev-work/regress_build_variants.py`（文件缺失 fallback 路径）→ **总检查项 200 | 失败 0** ✅。
 - 说明：本次 regression 第 5 节已用真实 `asset_frame_start="assets/first.png"` 触发 data_uri 分支（不再像首轮那样被 `/fixture` 路径掩盖），故"200 全绿"对生产真实 assets/ 路径有效。
 
 ### 2) BUG-1 复验（empty_scene text:/i2i: 语义）—— PASS（修复前 FAIL / 修复后 PASS）
+
 - 独立构造 `es = pt.build_variants(SHOT, REF, "empty_scene_v1")["v0"]`：
   - ✅ `images[0]` 为 dict 且 `mode=="text_to_image"`（首帧文生图）、`images[1]` 为 dict 且 `mode=="image_to_image"`（尾帧图生图），每帧含 `content`；
   - ✅ `keyframes[0].role=="文生图(无源图)"`、`keyframes[1].role=="图生图(基于上一帧)"`；
@@ -211,6 +221,7 @@
 - **分支真实性（修复前必失败）**：临时 `git checkout 3946e95 -- prompt_training.py` 后重跑回归，脚本在 empty_scene 语义校验处直接 `AttributeError: 'str' object has no attribute 'get'`（修复前 `images[0]` 是裸字符串）→ 证明第 3 节断言**真能抓到 bug**；恢复 `9d0fb01` 后复跑仍 200/0。
 
 ### 3) BUG-2 复验（camera_move assets/ data_uri）—— PASS（修复前 FAIL / 修复后 PASS）
+
 - 独立构造真实 `ASSET_SHOT={"asset_frame_start":"assets/first.png","asset_frame_end":"/fixture/last.png"}`，对 `camera_move_v1~v7` 调 `build_variants`，与 `_legacy_build_variants` 旧版逐字段比对：
   - ✅ 全部变体 `images`/`keyframes`/`prompt` 新旧**完全相等**；
   - ✅ `images` 中 `assets/` 开头的帧图均被转为 `data:image/...;base64,...`，**无裸 `assets/` 路径残留**；
@@ -219,22 +230,26 @@
 - 边缘观察（非 bug，沿用开发说明）：若生产 `asset_frame_end` 也带 `assets/` 前缀，新 loader 会一并转 data URI（比旧版"仅首帧转"更完整），与该边缘下的旧版输出会**不等**——属旧版自身不一致，不在 AC-1.3 逐字段相等范围内。
 
 ### 4) 新增回归分支真实性核查——通过
+
 - 第 3 节（empty_scene 语义）确有断言：`images[0].get("mode")=="text_to_image"`（L140）、`images[1].get("mode")=="image_to_image"`（L142）、`keyframes` 无 `text:/i2i:/{{` 残留、`role` 标明文生图/图生图。
 - 第 5 节（assets/ 分支）确有断言：逐变体 `nv==lv` 比对 + 循环断言"无裸 `assets/` 路径"（L199）。
 - 两者均在 `3946e95`（修复前）实际失败、在 `9d0fb01`（修复后）通过 → **分支有效，非空跑**。
 
 ### 5) AC 复扫（独立脚本逐条确认）
-- **AC-1.1 PASS**：`camera_move_v1~v7.yaml` 全部存在且可加载（变体集 v0/v1/v2/v3、v0~v5、v6~v8、v9~v12、v13~v15、v16/v17、v18~v20 就位）。
+
+- **AC-1.1 PASS**：`camera_move_v1~v7.yaml` 全部存在且可加载（变体集 v0/v1/v2/v3、v0~~v5、v6~~v8、v9~~v12、v13~~v15、v16/v17、v18~v20 就位）。
 - **AC-1.2 PASS**：`build_variants` 函数体约 12 行（≤40 达标）；`--template` 切换 `camera_move_v1/v3/v5/v7` + `dialogue_v1` + `empty_scene_v1` 均成功。
 - **AC-1.3 PASS**：真实 `assets/` 路径下新 loader 与旧版逐字段一致（200 项回归 + 独立逐变体比对双重确认）。
 - **AC-1.4 PASS**：`dialogue_v1.yaml` 由加载器直接加载、未改任何 Python（变体 v0/v1 含 images/keyframes/prompt）。
 - **AC-1.5 PASS**：`{{var}}` 渲染无 `{{` 残留；`text:/i2i:` 区分文生图/图生图语义；`file:` 标记正确读取 `experiments/*.txt` 且缺失优雅 fallback（独立抽查 `_resolve_images("file:experiments/xxx.txt")` 通过）。
 
 ### 6) 回归残留观察（S4 结论）
+
 - 独立确认：`build_variants` 对缺 `variants` 块返回 `{}`、变体缺 `keyframes/prompt` 时 `_render_variant` 返回空结构（`images:[]/keyframes:[]/prompt:""`），**不崩溃但静默**。
 - **判断**：功能不受影响（非阻塞），但该静默行为在 YAML 拼错字段名时会让 `main()` 静默产出 0 视频、难以排错。沿用此前建议，正式提 **S4 BUG**（见下方缺陷清单）。
 
 ### 7) 缺陷清单（测试专属，仅报告不改）
+
 - ~~`[BUG][S2|P1] empty_scene_v1 text:/i2i: 未区分文生图/i2i 语义`~~ **已修复（二轮复验 PASS）**——关闭。
 - ~~`[BUG][S2|P1] camera_move 关键帧丢失 data_uri 转换`~~ **已修复（二轮复验 PASS）**——关闭。
 - ~~`[BUG][S4|P3] 证据路径描述不符`~~ **已修复**——开发进度已更正为实际落盘位置 `dev-work/_legacy_build_variants.py`，复验确认文件确实在该路径且回归可正常导入——关闭。
@@ -246,6 +261,7 @@
   - 环境：python 3.13.12 / 仓库 9d0fb01。
 
 ### 8) 下一步
+
 - 阿编把关：对照本验收表逐条勾证据，确认无误后由阿编将状态机从「已验证(测试验收过)」推进到「完成」。
 - 可选：将上述 S4 warning 项交开发在后续迭代补上（非本次放行阻塞项）。
 
@@ -263,3 +279,11 @@
   3. `[已修] 开发证据路径描述不符`（S4）。
   4. `[遗留·S4·非阻塞] YAML 缺 variants/字段时加载器静默返回，建议加 warning`——建议后续迭代补，不阻塞本次。
 - **下一步建议**：S4 warning 项可开新任务卡交开发补；P0-1 完成后可推进 P0-2（图视冲突预检）/ P0-4（跨 seed 一致性），二者依赖 P0-1 的 YAML 模板机制。
+
+---
+
+## 待办 Backlog（跨任务，不丢）
+
+- **[S4·P3·非阻塞]** P0-1 遗留：YAML 缺 `variants`/字段时加载器静默返回 `{}`/空列表，建议加 warning 便于排错。→ 可开小任务卡交开发补（不阻塞主线）。
+- **[框架·2026-08-12 已建]** 控制框架制度化：运行手册 + 5 模板 + 四文档分离 + 分层测试 L0/L1/L2（L1 用免费KEY 真测）。首个示范任务 = `tasks/T-20260812-02`（待闸1）。
+- **[提醒·老板]** 免费KEY（`AGNES_TEST_API_KEY`）无限额度仅排队，真测必用、不占 VIP——已写入运行手册 §8，勿再忘。
