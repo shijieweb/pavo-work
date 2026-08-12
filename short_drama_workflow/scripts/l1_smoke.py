@@ -53,9 +53,9 @@ def load_env(path):
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS_DIR = os.path.dirname(HERE)                       # short_drama_workflow/scripts
+SCRIPTS_DIR = os.path.dirname(HERE)                       # 注：实际=short_drama_workflow(HERE 的父)，仅兼容保留
 AGNES_SCRIPTS = os.path.expanduser(r"~/.workbuddy/skills/agnes-ai/scripts")
-DIAG_DIR = os.path.join(SCRIPTS_DIR, "diag")
+DIAG_DIR = os.path.abspath(os.path.join(HERE, "diag"))   # HERE=scripts → scripts/diag
 HTML_PROTOTYPE = os.path.abspath(os.path.join(HERE, "..", "html_prototype"))
 
 load_env(os.path.expanduser(r"~/.workbuddy/.env"))
