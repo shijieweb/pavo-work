@@ -4651,6 +4651,31 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     res = diagnose_clip(video_abs, n_frames=int(data.get("frames", 4)),
                                         face_check=fc, storyboard=sb_for_face, deep=dp)
+                # 【0812 老板方法论】提示词-帧匹配检查：提示词开场场景 vs 首帧 + 结束状态 vs 尾帧
+                # 免费 3000 次/天额度充裕；失败不阻塞诊断
+                try:
+                    if res.get("ok") and sid and shot is not None:
+                        sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "scripts", "diag")))
+                        from vision_review import prompt_frame_match
+                        _vp_abs = video_abs  # 视频资产已在上面解析
+                        import tempfile as _tf
+                        _pfm0 = os.path.join(_tf.gettempdir(), "pfm_first_%s.jpg" % sid)
+                        _pfm1 = os.path.join(_tf.gettempdir(), "pfm_last_%s.jpg" % sid)
+                        subprocess.run(["ffmpeg", "-y", "-i", _vp_abs, "-frames:v", "1", _pfm0],
+                                       capture_output=True, timeout=90)
+                        subprocess.run(["ffmpeg", "-y", "-sseof", "-0.2", "-i", _vp_abs, "-frames:v", "1", _pfm1],
+                                       capture_output=True, timeout=90)
+                        if os.path.isfile(_pfm0) and os.path.isfile(_pfm1):
+                            _pv = shot.get("video_prompt") or shot.get("prompt") or ""
+                            if _pv:
+                                _pfm = prompt_frame_match(_pv, _pfm0, _pfm1)
+                                res["prompt_frame_match"] = {
+                                    "overall": _pfm.get("overall"),
+                                    "opening": _pfm.get("opening") or {},
+                                    "ending": _pfm.get("ending") or {},
+                                }
+                except Exception as _pe:
+                    _log.warning("[diagnose] prompt-帧匹配失败: %s", str(_pe)[:120])
                 if res.get("ok") and sid and shot is not None:
                     shot["diagnosis"] = res  # 写回 SceneSpec.diagnosis
                     # 【0811 修复】必须落盘！否则只写内存，前端 refreshSpec() 重载磁盘即丢（"诊断结果马上消失"）
