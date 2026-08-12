@@ -40,7 +40,7 @@
         },
         "overall": "warn"
       },
-      "video": "shot1.mp4",
+      "video": "ep_0811_145935/shot1/v18/shot1.mp4",
       "params": {
         "num_frames": 81,
         "frame_rate": 24,
@@ -76,7 +76,7 @@
         },
         "overall": "pass"
       },
-      "video": "shot1.mp4",
+      "video": "ep_0811_145935/shot1/v19/shot1.mp4",
       "params": {
         "num_frames": 81,
         "frame_rate": 24,
