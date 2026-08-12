@@ -47,7 +47,7 @@ $SERVICES = @(
         Name      = "studio(8777)"
         Port      = 8777
         # 主指纹：复刻 agnes_proxy 启动命令（脚本全路径含 html_prototype）
-        Match     = "CommandLine LIKE '%html_prototype%server.py%'"
+        Match     = "CommandLine LIKE '%html_prototype%server.py%' AND Name='python.exe'"
         # 补充指纹：仅捕获"python.exe server.py"（脚本名前无路径，即 cwd=html_prototype 的孤儿子进程）。
         # 用裸 script 形态精确限定，避免误杀其他带全路径的 server.py（如 jianying-mcp 等）。
         # board/proxy 均带全路径且非此形态，天然不命中。
@@ -59,7 +59,7 @@ $SERVICES = @(
     [PSCustomObject]@{
         Name      = "board(8788)"
         Port      = 8788
-        Match     = "CommandLine LIKE '%shared_board%server.py%'"
+        Match     = "CommandLine LIKE '%shared_board%server.py%' AND Name='python.exe'"
         MatchExtra = $null
         Script    = "shared_board/server.py"
         EnvExtra  = @{}                            # 复刻 _launch_board 的 {}
@@ -68,7 +68,7 @@ $SERVICES = @(
     [PSCustomObject]@{
         Name      = "proxy(8787)"
         Port      = 8787
-        Match     = "CommandLine LIKE '%agnes_proxy.py%'"
+        Match     = "CommandLine LIKE '%agnes_proxy.py%' AND Name='python.exe'"
         MatchExtra = $null
         Script    = "agnes_proxy.py"
         EnvExtra  = @{}                            # 复刻 _launch_service 默认 env
@@ -99,7 +99,7 @@ function Find-Procs($svc) {
     foreach ($p in $result) {
         if (-not $seen.ContainsKey($p.ProcessId)) { $seen[$p.ProcessId] = $true; $out += $p }
     }
-    return $out
+    return ,$out   # 逗号包裹：防止 PowerShell 管道把单元素数组拆包成裸对象
 }
 
 function Test-PortIdle($port) {
@@ -149,7 +149,7 @@ function Wait-HealthGreen($port, $timeoutSec = 40) {
 }
 
 function Get-ServicePid($svc) {
-    $procs = Find-Procs $svc
+    $procs = @(Find-Procs $svc)   # @() 包裹：即便返回单元素也保证是数组
     if ($procs.Count -eq 0) { return $null }
     $foundPid = ($procs | Sort-Object ProcessId -Descending | Select-Object -First 1).ProcessId
     return $foundPid
@@ -163,7 +163,7 @@ foreach ($svc in $targets) {
     Write-Host ("`n##### " + $svc.Name + " #####") -ForegroundColor Yellow
 
     # 1) 查残留（精确 CommandLine，主指纹 + 补充指纹并集）
-    $oldProcs = Find-Procs $svc
+    $oldProcs = @(Find-Procs $svc)   # @() 包裹：双重保险，防止单命中被管道拆包成裸对象
     if ($oldProcs.Count -gt 0) {
         Write-Step ("发现 " + $oldProcs.Count + " 个残留进程，精确杀除")
         $killed = @()
