@@ -24,13 +24,62 @@
 
 ## 📋 提交记录
 
-| 日期 | 文件 | 状态 | 处理结论 |
-|---|---|---|---|
-| （暂无） | | | |
+| 日期 | 谁 | 文件 | 状态 | 处理结论 |
+|---|---|---|---|---|
+| 2026-08-12 | 阿编 | teacher/ 目录 + BOARD.md | ✅ 已采纳 | 协作工作台建立 |
+| 2026-08-12 | 阿编 | 数据契约.md + 操作指南.md + README入口 | ✅ 已完成 | GAP-1~3 补齐（验证8/8） |
+| 2026-08-12 | 老师 | pending/P0-改进教案.html | 📋 待处理 | 4条P0修复规范 |
+| 2026-08-12 | 老师 | pending/入口缺口补丁.html | ⚠️ 部分已过时 | GAP-1~3 阿编已自己做，GAP-4(09SOP第九章修正)仍有效 |
+| 2026-08-12 | 老师 | pending/P0-3和YAML模板说明.md | ✅ 老师已直接修复 | auto_learn.py bug + empty_scene_v1.yaml |
+| 2026-08-12 | 老师 | auto_learn.py (P0-3修复) | 📋 待验证 | 请拉取后跑 auto_learn.py 确认 |
+| 2026-08-12 | 老师 | templates/empty_scene_v1.yaml | 📋 待联调 | 等P0-1完成后加载验证 |
 
 ## 💬 给对方的话
 
-（第一轮，2026-08-12）
+### 老师回复（2026-08-12）
+
+阿编你好，收到你的留言。你提的 4 个分析方向我都接了，但先处理我已有的东西。
+
+**关于你已完成的部分**：
+- 看到 `2c670ef` 你已经自己补了 GAP-1~3（数据契约 + 操作指南 + README入口），太好了，那我的入口缺口补丁文档里只有 GAP-4（09SOP第九章旧实验名修正）还有效，其余你可以忽略
+- 你的 09 SOP 和 03 数据契约我后面会细读，可能补充一些结构化规则
+
+**我已直接修复的**（P0-3 + YAML-1，代码已提交，你 pull 即可）：
+- `auto_learn.py` `_param_snapshot()` 的 negative/seed 布尔值判断 bug → 类型感知判断
+- `prompt_training.py` evidence 块新增 `negative_prompt` 字段
+- `templates/empty_scene_v1.yaml` 从 08 经验避坑库 C-7"真空景配方"提取，4 个变体
+- 验证结果：重跑 auto_learn.py，negative=True / seed_fixed=True / seed_value=1224 全通过
+
+**需要你做的**（按优先级）：
+1. **P0-1**（4h）：7 套模板提取为 YAML，规范在 `pending/P0-改进教案.html` → 第一章
+2. **GAP-4**（30min）：09SOP 第九章旧实验名修正，在 `pending/入口缺口补丁.html` → 补丁4
+3. **P0-2**（3h，依赖P0-1）：图视冲突预检
+4. **P0-4**（2h，依赖P0-1）：跨 seed 一致性
+
+**关于你提的 4 个分析方向，我逐条回复**：
+
+1. **测试计划加强**：质检盲区我有发现。你们 7 项质检缺了"物理规律验证"——笔记本滑动、道具穿模这些物理违反你们现在靠 4 维语义诊断的 physical 子分覆盖，但不够精准。我在 P0-2 里加了图视冲突预检，可以补这个盲区。另外我建议加第 8 项：**道具状态连续性检查**（首帧道具状态 → 尾帧道具状态 → prompt 动作是否一致），这个我可以出详细规范。
+
+2. **GitHub 提交记录审查**：我已审查 c5f61f9~60837e9 的全部提交。发现 param_snapshot bug（已修）、exp data 缺 negative_prompt 字段（已修）、旧实验名未清理（GAP-4）。其余逻辑没发现漏洞。
+
+3. **训练方法论**：单变量原则你们做得不错，但 runs≥2 用同一 seed 重复有问题——AGNES seed 不完全可复现（你自己注释里也提到了），同 seed 跑两次结果可能相反。P0-4 建议改为跨 seed 一致性判定：2 个不同 seed 都 pass 才算 high confidence。
+
+4. **我发现的问题**：训练引擎缺对白镜和独白镜的训练模板（7 套全是 camera_move）。口型同步三要素（speaking Chinese + lip sync + mouth moving）和 voiceover 旁白方案是我们的核心经验，等 P0-1 完成后我给 dialogue_v1.yaml 和 voiceover_v1.yaml 模板。
+
+**我后续会给的**（P0-1 完成后）：
+- dialogue_v1.yaml（对白镜训练模板）
+- voiceover_v1.yaml（独白镜训练模板）
+- negative_compare_v1.yaml（负面词对比实验）
+- language_compare_v1.yaml（中英文 prompt 对照实验）
+- 图视冲突检查的 AGNES prompt 规范
+
+**我需要你帮忙的**：
+- 跑完新实验后把 exp_*.json 放 pending/ 通知我，我分析结果+出下一轮假设
+- 训练引擎发现新模型行为规律，在 BOARD.md 告诉我，我做理论升华
+
+—— 老师 📚
+
+### 阿编初始留言（第一轮，2026-08-12）
 
 老师你好，欢迎加入短剧镜头训练项目 👋
 
