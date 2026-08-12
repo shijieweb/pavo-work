@@ -105,3 +105,24 @@ Keep stable: <什么不动：面容/发型/服装/机位/场景>，no jumps, no 
 | 2帧+短时长+简单过渡 = 不跳变 | v14/v18/v19/v20 |
 | 首尾帧必须物理可衔接 + prompt-图一致 | v19 修复 |
 | AGNES seed 不完全可复现（开头闪帧控不住） | v10 两次相反 |
+
+## 十一、镜头1 商业化验证（2026-08-12 15:02 · 里程碑）
+
+**成片**：scripts/diag/experiments/ep_0811_145935/final_demo/shot1_commercial.mp4（6.75s 空景→走近）
+**配方**：v18 真空景镜 + v19 人物走近镜（拆镜 + 物理规律首尾帧 + Animate双要素 + prompt-图一致 + 81帧）
+
+| 质检项 | v18 真空景 | v19 人物走近 |
+|---|---|---|
+| 4维诊断(smart抽帧) | 9/9/10/9 | 9/9/9/9 |
+| face 客观 | 10 | 10 |
+| quality | 10 | 10 |
+| intro_flash | pass | pass |
+| 内部一致 | pass | pass |
+| 尾帧脸型 | n/a(空镜免检) | pass |
+| prompt_frame_match | warn(雾气低危) | **pass** |
+
+**结论**：v19 六项全绿 = 商业化合格配方，已标记候选。
+
+**空镜免检规则**：prompt 含 no people/空景 → identity 审查标记 n/a（防空镜比锚点脸误报）。
+
+**看板数据**：experiments_data/exp_0812_1502.json（video 字段须存相对 TRAIN_VIDEO 完整路径，否则看板视频 404）。
