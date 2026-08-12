@@ -195,7 +195,7 @@ function variantCard(v, project) {
   const pRows = [];
   if (p.prompt_cn || p.prompt) {
     pRows.push(['中文提示词', p.prompt_cn ? '<div class="promptbox">' + p.prompt_cn + '</div>' : '（生成中）']);
-    pRows.push(['英文提示词', '<div class="promptbox">' + (p.prompt || '') + '</div>']);
+    pRows.push(['最终合成提示词（提交原文）', '<div class="promptbox">' + (p.prompt || '') + '</div>']);
   }
   if (p.keyframes && p.keyframes.length) {
     const hasAnchor = p.keyframes.some(k => k.role === '角色锚点');
