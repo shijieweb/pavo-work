@@ -14,12 +14,17 @@ param(
     [switch]$Check,
     [string]$DeployHost = $env:DEPLOY_HOST,
     [string]$RemotePath = $(if ($env:DEPLOY_PATH) { $env:DEPLOY_PATH } else { "/opt/workbuddy" }),
-    [string]$IdentityFile = $env:DEPLOY_KEY
+    [string]$IdentityFile = $env:DEPLOY_KEY,
+    [string]$RemotePyBin = "python3"
 )
 
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 function Write-Step($m){ Write-Host ("==> " + $m) -ForegroundColor Cyan }
+
+# 兼容 GNU 风格 --check：PowerShell 不认双横线，--check 会被当位置参数塞进 DeployHost
+if ($DeployHost -eq '--check') { $Check = $true; $DeployHost = '' }
+
 $PY_BIN = "C:/Users/67972/.workbuddy/binaries/python/versions/3.13.12/python.exe"
 $REPO_ROOT = (Resolve-Path (Split-Path (Split-Path $PSScriptRoot))).Path
 
@@ -28,8 +33,8 @@ $EXCLUDES = @("--exclude=.git", "--exclude=output", "--exclude=__pycache__",
               "--exclude=*.pyc", "--exclude=.env", "--exclude=node_modules",
               "--exclude=short_drama_workflow/html_prototype/logs")
 
-# 0) host not configured -> safe skip
-if ([string]::IsNullOrWhiteSpace($DeployHost)) {
+# 0) host not configured -> safe skip (--check with no host still enters check mode)
+if ([string]::IsNullOrWhiteSpace($DeployHost) -and -not $Check) {
     Write-Host ("DEPLOY_HOST not configured, skip deploy.") -ForegroundColor Yellow
     Write-Host ("  Set via: `$env:DEPLOY_HOST = 'user@vps.example.com'  or  .\deploy.ps1 -DeployHost user@vps") -ForegroundColor DarkGray
     exit 0
@@ -54,7 +59,7 @@ nohup __PYBIN__ short_drama_workflow/html_prototype/server.py > output/launches/
 nohup __PYBIN__ shared_board/server.py > output/launches/board.log 2>&1 &
 nohup __PYBIN__ agnes_proxy.py > output/launches/proxy.log 2>&1 &
 '@
-$remoteLaunch = $remoteLaunch.Replace("__REMOTE_PATH__", $RemotePath).Replace("__PYBIN__", $PY_BIN)
+$remoteLaunch = $remoteLaunch.Replace("__REMOTE_PATH__", $RemotePath).Replace("__PYBIN__", $RemotePyBin)
 
 $remoteHealth = 'curl -s -o /dev/null -w "8777:%{http_code} " http://127.0.0.1:8777/api/projects; curl -s -o /dev/null -w "8787:%{http_code} " http://127.0.0.1:8787/api/projects; curl -s -o /dev/null -w "8788:%{http_code}\n" http://127.0.0.1:8788/api/projects'
 

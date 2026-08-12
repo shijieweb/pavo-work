@@ -64,10 +64,11 @@
 ```powershell
 $env:DEPLOY_HOST = "user@vps.example.com"   # 或 -DeployHost
 .\deploy.ps1 --check                         # 只打印将执行的命令，不真连 VPS、不动本地
+.\deploy.ps1 -Check                           # 同上（PowerShell 原生只认 -Check，脚本已兼容 --check）
 .\deploy.ps1                                 # 真实 rsync + 远程起服务 + healthcheck
 ```
 - `DEPLOY_HOST` 未配置 → 打印"DEPLOY_HOST 未配置，跳过"并 `exit 0`（安全）。
-- `--check` 模式：打印 rsync/ssh 计划命令，不执行。
+- `--check` 模式：打印 rsync/ssh 计划命令，不执行。`.\deploy.ps1 --check` 与 `.\deploy.ps1 -Check` 均可进入检查模式（PowerShell 原生只认 `-Check`，脚本已兼容 `--check`）。
 - O5 未 provisioned 时：仅 `--check` 验证脚本不报错即视为通过。
 - 配置项：`DEPLOY_HOST`（必填）/ `DEPLOY_PATH`（默认 `/opt/workbuddy`）/ `DEPLOY_KEY`（私钥路径）。
 
