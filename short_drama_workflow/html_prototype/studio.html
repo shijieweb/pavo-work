@@ -709,6 +709,21 @@
           <div class="flex flex-wrap gap-x-3 gap-y-0.5">
             <span v-for="(v,k) in sh.diagnosis.scores" :key="k" class="text-[10px]"><span class="text-slate-500">{{ diagLabel(k) }}:</span> <b :class="diagColor(v)">{{ v }}</b></span>
           </div>
+          <!-- 【0812 老板方法论】提示词-帧匹配：开场场景 vs 首帧 + 结束状态 vs 尾帧 -->
+          <div v-if="sh.diagnosis.prompt_frame_match" class="mt-1.5 border-t border-slate-700/50 pt-1.5">
+            <div class="flex items-center gap-1.5 text-[10px]">
+              <span class="text-slate-400">📋 提示词-帧匹配</span>
+              <span :class="sh.diagnosis.prompt_frame_match.overall==='pass' ? 'text-emerald-400' : (sh.diagnosis.prompt_frame_match.overall==='fail' ? 'text-rose-400' : 'text-amber-300')" class="font-semibold">{{ sh.diagnosis.prompt_frame_match.overall==='pass' ? '✅ 匹配' : (sh.diagnosis.prompt_frame_match.overall==='fail' ? '❌ 不匹配' : '⚠ 部分') }}</span>
+              <span class="text-slate-500">开场:{{ (sh.diagnosis.prompt_frame_match.opening||{}).verdict||'-' }}</span>
+              <span class="text-slate-500">结束:{{ (sh.diagnosis.prompt_frame_match.ending||{}).verdict||'-' }}</span>
+            </div>
+            <ul v-if="((sh.diagnosis.prompt_frame_match.opening||{}).issues||[]).concat((sh.diagnosis.prompt_frame_match.ending||{}).issues||[]).length" class="space-y-0.5 mt-0.5">
+              <li v-for="(it,i) in ((sh.diagnosis.prompt_frame_match.opening||{}).issues||[]).concat((sh.diagnosis.prompt_frame_match.ending||{}).issues||[])" :key="i" class="text-[10px] flex gap-1">
+                <span :class="it.severity==='high' ? 'text-rose-400' : 'text-amber-300'" class="shrink-0">{{ it.severity==='high' ? '🔴' : '🟡' }}</span>
+                <span class="text-slate-300">{{ it.type || '' }}<template v-if="it.desc"> — {{ it.desc }}</template></span>
+              </li>
+            </ul>
+          </div>
           <p v-if="sh.diagnosis.summary" class="text-[10px] text-slate-400 mt-1 leading-snug">{{ sh.diagnosis.summary }}</p>
         </div>
         <!-- 视觉审查结果（AGNES 2.5-flash 多模态，写回 shot.vision_review） -->
@@ -2640,7 +2655,8 @@ createApp({
       await this.refreshSpec();
     },
     diagLabel(k) {
-      return ({ continuity: '连贯性', physical: '物理合理', character: '角色一致', first_last: '首尾衔接' })[k] || k;
+      return ({ continuity: '连贯性', physical: '物理合理', character: '角色一致', first_last: '首尾衔接',
+                face: '人脸一致', quality: '画质' })[k] || k;
     },
     diagColor(v) { return v >= 8 ? 'text-emerald-400' : v >= 6 ? 'text-amber-400' : 'text-rose-400'; },
     shotTitle(sh) {
