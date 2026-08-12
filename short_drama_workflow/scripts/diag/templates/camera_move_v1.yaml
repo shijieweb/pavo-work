@@ -1,0 +1,68 @@
+# templates/camera_move_v1.yaml
+# 来源：prompt_training.py build_variants 的 camera_move_v1 分支（第一轮模板·硬身份词，已证伪保留对照）
+# 变量从 shot/ref 注入；常量写死原 IDENTITY_BOOST。
+name: camera_move_v1
+description: "硬身份词方向（第一轮·已证伪保留对照）"
+type: camera_move
+
+variables:
+  first: "asset_frame_start"        # 从 shot 取起点空景图
+  last: "asset_frame_end"           # 从 shot 取尾帧图
+  anchor: "ref.remote_url"          # 从 ref 取角色锚点图（锁脸）
+  base_prompt: "shot.video_prompt"  # 从 shot 取原始视频 prompt
+
+constants:
+  IDENTITY_BOOST: >
+    The man is IDENTICAL to the reference image: same 28-year-old Asian male face,
+    same messy short black hair, same white button-up shirt with rolled sleeves,
+    same black trousers, same worn black backpack. Keep face, hairstyle, and clothing
+    exactly the same as the reference throughout the whole clip. No identity change.
+
+variants:
+  v0:
+    hypothesis: "基准：现状 2 帧 + 原 prompt"
+    goal: "量化基线：验证现状写法的真实水平（对照组）"
+    reference: "基线=生产默认写法"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}}"
+
+  v1:
+    hypothesis: "中间锚点：3 帧插值经过锚点脸 → 早锚定"
+    goal: "验证锚点帧锁脸是否可重复（第一轮曾 pass）"
+    reference: "第一轮 exp_0811_1755 v1"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色锚点"
+        src: "{{anchor}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}}"
+
+  v2:
+    hypothesis: "身份强化：prompt 写死外貌细节"
+    goal: "对照：硬身份词是否反而破坏脸型（第一轮已证伪）"
+    reference: "第一轮 exp_0811_1755 对照"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}} {{IDENTITY_BOOST}}"
+
+  v3:
+    hypothesis: "双管齐下：锚点帧 + 身份强化词"
+    goal: "对照：图锚+硬身份词组合"
+    reference: "第一轮 exp_0811_1755 对照"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色锚点"
+        src: "{{anchor}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}} {{IDENTITY_BOOST}}"

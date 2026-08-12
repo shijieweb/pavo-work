@@ -45,7 +45,7 @@
 
 | 任务 | 状态 | 开发 | 测试 | AC 进度 |
 |---|---|---|---|---|
-| T-20260812-01 P0-1 模板YAML化 | 进行中(开发接手) | 开发Agent | 测试Agent | AC-1.1~1.5 待实现 |
+| T-20260812-01 P0-1 模板YAML化 | 待验证(开发自检完) | 开发Agent | 测试Agent | AC-1.1~1.5 已实现·自测全绿 |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -76,7 +76,22 @@
 
 ## 交接区（跨会话接力）
 
-- 当前任务：T-20260812-01 P0-1（开发接手）
-- 开发进度：（开发Agent填写）
+- 当前任务：T-20260812-01 P0-1（开发自检完·待测试Agent验收）
+- 开发进度（开发Agent 回填·2026-08-12）：
+  - 已实现：把 `build_variants` 重构为 YAML 加载器（核心加载+渲染 ≤40 行），并提取 7 套 camera_move 模板为独立 YAML（v1~v7，v2 即原默认 fallthrough 分支）。新增辅助 `_resolve_variables` / `_render_template` / `_resolve_images`（另含 `_get_by_path` / `_render_variant`）。默认 `template=camera_move_v2` 不变。
+  - 文件清单（新增/改动）：
+    - 新增 `templates/camera_move_v1.yaml` … `camera_move_v7.yaml`（7 套）
+    - 新增 `templates/dialogue_v1.yaml`（验证"不改 Python 即可 `--template dialogue_v1` 加载"）
+    - 改动 `prompt_training.py`：`build_variants` 重写为加载器，`import yaml` + `TEMPLATES_DIR`
+    - 新增 `dev-work/regress_build_variants.py`（dry-run 回归脚本，零 AGNES 额度）
+    - 新增 `scripts/diag/_legacy_build_variants.py`（before 提交 d50d0fa 原函数快照，仅回归用，不进生产）
+  - 坑处理：
+    1. 双格式兼容：加载器同时支持 camera_move 的 `prompt/keyframes+{{var}}` 与已存在 `empty_scene_v1.yaml` 的 `text:/i2i:` 前缀 + `video_prompt/mode/negative/identity_check`（回归已验证两者均可加载）。
+    2. v2 默认分支：存为 `camera_move_v2.yaml`，加载器默认 `template=camera_move_v2`。
+    3. 文件读取：v3~v7 读 `experiments/*.txt`（anchor_far/sceneA_2/sceneB_2/sceneA_empty1/2/sceneB_close2/sceneB_distantsmall/frame3_halfbody），YAML 用 `file:` 标记 + `default:`（缺失优雅 fallback，anchor_far→anchor、其余→""），与旧代码一致；回归分别在"文件存在/缺失"两路径验证新旧一致。
+    4. main() 消费字段：`v["prompt"]/v["images"]/v.get("num_frames")/v.get("frame_rate")` 与看板 `v["keyframes"]` 的 {role,src} 列表均保留（未改训练逻辑）。
+    5. 回归方式：旧版快照 `_legacy_build_variants.py` 对照，fixture shot/ref 调新旧两函数逐字段 assert，未调用 `gen_video`/`main()`。
+  - 自测结果：dry-run 回归 116 项全绿（7 模板 × 逐变体 core 字段 images/keyframes/prompt/hyp/num_frames/frame_rate 新旧一致；empty_scene_v1 + dialogue_v1 可加载；默认=camera_move_v2）。详见 `dev-work/regress_output.txt`。
+  - 证据位置：`dev-work/regress_output.txt`（回归输出）、`git diff --stat`（文件清单）、本文件 AC 锚点。
 - 测试结论：（测试Agent填写）
-- 下一步：开发实现 → 测试验收 → 阿编把关
+- 下一步：测试Agent 实跑验收（AC-1.1~1.5）→ 阿编把关标完成

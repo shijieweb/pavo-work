@@ -1,0 +1,43 @@
+# templates/dialogue_v1.yaml
+# 新模板示例（对白镜）·验证"不改 Python 即可被 --template dialogue_v1 加载"（AC-1.4）。
+# 与 camera_move 系列共用同一加载器 schema：variables / constants / variants(keyframes+prompt)。
+name: dialogue_v1
+description: "对白镜模板：双人中景正反打（示例占位）"
+type: dialogue
+
+variables:
+  first: "asset_frame_start"
+  last: "asset_frame_end"
+  anchor: "ref.remote_url"
+  base_prompt: "shot.video_prompt"
+
+constants:
+  DIALOGUE_BOOST: >
+    Two characters facing each other in a mid shot, natural conversational body language,
+    subtle eye contact and head turns, stable clothing and identity across frames,
+    consistent camera angle, no jumps, no morphing.
+
+variants:
+  v0:
+    hypothesis: "基准：对白镜 2 帧 + 原 prompt"
+    goal: "对白镜基线写法"
+    reference: "dialogue_v1 示例"
+    keyframes:
+      - role: "对白起点"
+        src: "{{first}}"
+      - role: "对白尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}}"
+
+  v1:
+    hypothesis: "对白镜 + 对话约束 prompt"
+    goal: "验证对话动态约束是否稳定"
+    reference: "dialogue_v1 示例"
+    keyframes:
+      - role: "对白起点"
+        src: "{{first}}"
+      - role: "角色锚点"
+        src: "{{anchor}}"
+      - role: "对白尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}} {{DIALOGUE_BOOST}}"

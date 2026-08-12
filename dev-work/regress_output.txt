@@ -1,0 +1,36 @@
+=== 新旧 build_variants 逐模板对比（camera_move_v1~v7）===
+    · 注: v0 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v1 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v2 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v3 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+  ✓ camera_move_v1: 4 个变体 核心字段(images/keyframes/prompt/hyp/num_frames/frame_rate) 新旧一致
+  ✓ camera_move_v2: 4 个变体 核心字段(images/keyframes/prompt/hyp/num_frames/frame_rate) 新旧一致
+    · 注: v6 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v7 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v8 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+  ✓ camera_move_v3: 3 个变体 核心字段(images/keyframes/prompt/hyp/num_frames/frame_rate) 新旧一致
+    · 注: v9 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v10 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v11 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v12 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+  ✓ camera_move_v4: 4 个变体 核心字段(images/keyframes/prompt/hyp/num_frames/frame_rate) 新旧一致
+    · 注: v13 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v14 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v15 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+  ✓ camera_move_v5: 3 个变体 核心字段(images/keyframes/prompt/hyp/num_frames/frame_rate) 新旧一致
+    · 注: v16 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v17 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+  ✓ camera_move_v6: 2 个变体 核心字段(images/keyframes/prompt/hyp/num_frames/frame_rate) 新旧一致
+    · 注: v18 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v19 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+    · 注: v20 新增元数据字段 ['goal', 'reference']（旧版无，不影响训练逻辑）
+  ✓ camera_move_v7: 3 个变体 核心字段(images/keyframes/prompt/hyp/num_frames/frame_rate) 新旧一致
+
+=== 兼容性：已存在 empty_scene_v1.yaml + 新 dialogue_v1.yaml ===
+  ✓ empty_scene_v1.yaml 加载成功，变体: ['v0', 'v1', 'v2', 'v3']
+  ✓ dialogue_v1.yaml 加载成功（不加 Python 即可 --template dialogue_v1），变体: ['v0', 'v1']
+  ✓ 默认 template=camera_move_v2，变体: ['v0', 'v1', 'v4', 'v5']
+
+=== 结果 ===
+总检查项: 116 | 失败: 0
+✅ 全部通过：新旧 build_variants 输出逐字段一致（零额度消耗）
