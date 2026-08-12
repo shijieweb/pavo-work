@@ -56,6 +56,14 @@ python agnes_proxy.py
 ## 📚 文档
 
 维护手册 8 分册见 [`维护手册/`](维护手册/00_总览与地图.md)：能力地图 / API 清单（54 端点）/ 数据契约 / 生成管线 / 测试指南 / 排障指南 / 修改记录。
+镜头训练方法论与配方：`维护手册/09_商业化镜头训练SOP.md`（含训练营操作指南·第十二章）；避坑经验：`维护手册/08_经验避坑库.md`。
+
+## 🎬 镜头训练看板（外部训练员/AI 协作入口）
+
+- 看板：`http://127.0.0.1:8787/training`（实验数据/质检/参数/视频全可视）
+- 实验脚本：`short_drama_workflow/scripts/diag/prompt_training.py`（CLI：`--project --shot --type --template --variants`）
+- 经验自动固化：`auto_learn.py`（提取建议包）→ 人工审视 → `apply_fix.py`（应用）
+- 完整上手流程见 `维护手册/09` 第十二章；exp 数据结构见 `维护手册/03`。
 
 ## 🗺️ 路线图
 

@@ -126,3 +126,50 @@ Keep stable: <什么不动：面容/发型/服装/机位/场景>，no jumps, no 
 **空镜免检规则**：prompt 含 no people/空景 → identity 审查标记 n/a（防空镜比锚点脸误报）。
 
 **看板数据**：experiments_data/exp_0812_1502.json（video 字段须存相对 TRAIN_VIDEO 完整路径，否则看板视频 404）。
+
+## 十二、训练营操作指南（外部训练员/AI 接手用 · 2026-08-12）
+
+> 目标读者：另一位训练员（人或 AI）。按此指南可独立完成"跑实验 → 看结果 → 提建议 → 固化"闭环。
+
+### 0. 环境与入口
+- 看板：`http://127.0.0.1:8787/training`（需先启动：`short_drama_workflow/html_prototype/server.py` 起 8777，`agnes_proxy.py` 起 8787）。
+- 实验脚本：`short_drama_workflow/scripts/diag/prompt_training.py`
+- 经验提取器：`short_drama_workflow/scripts/diag/auto_learn.py`（只读）
+- 应用器：`short_drama_workflow/scripts/diag/apply_fix.py`（人工确认后执行）
+- 数据：`experiments_data/exp_*.json`（schema 见 03_数据契约）
+- 密钥：测试用免费 key（AGNES_TEST_API_KEY，无限额度）不占 VIP；生产才用 VIP。
+
+### 1. 跑一个实验（命令行）
+```bash
+cd short_drama_workflow/scripts/diag
+AGNES_TEST_API_KEY=<免费key> python prompt_training.py \
+  --project ep_0811_145935 --shot 1 \
+  --type "运镜镜头-我的假设验证" \
+  --template camera_move_v7 \
+  --variants v19
+```
+- `--template` 决定变体配方（camera_move_v5=2帧短时长 / v6=拆镜 / v7=物理规律首尾帧，见第三章配方表）。
+- `--variants` 指定要跑的变体（逗号分隔）；不传跑全部。
+- 每个 pass 变体自动产出 `learn` 块（rules_draft/evidence/pass_reason）+ 全套质检（smart抽帧 4 维 + face + intro_flash + 内部一致 + 尾帧脸型 + prompt_frame_match）。
+
+### 2. 看结果
+- 看板刷新：每个变体卡片含 verdict/4维分/质检项/参数区（时长/种子/负面词/最终合成提示词）/视频。
+- 判断合格：`verdict=pass` 且 intro_flash pass + 内部一致 pass + face≥7 + prompt_frame_match pass/warn（warn 低严重度可接受）。
+
+### 3. 提建议（自动固化流水线）
+```bash
+python auto_learn.py        # 只读扫描全部 exp → 产出 learn_output/固化建议_*.json
+python apply_fix.py --dry-run   # 预览将应用什么（不改文件）
+# 老板/训练员审视建议包 → 逐条标 approved/rejected → 
+python apply_fix.py         # 应用 approved（git 快照→去重→单测→回滚保险）
+```
+- 固化纪律：单次 pass = medium 置信度，仅建议；runs≥2 才算高置信自动进生产；冲突（已覆盖）自动标出。
+
+### 4. 实验纪律（第五章方法论浓缩）
+1. 单变量：一次只动一个因素；2. 假设驱动：每变体有理论依据；3. runs≥2 防 AGNES 随机性；4. 复验防过拟合；5. 看板透明，老板审查采纳。
+
+### 5. 常见坑速查（详见 08 经验库）
+- 首尾帧图必须物理可衔接（图1→图2 状态连续）；prompt 描述必须与图实际差异一致。
+- 空镜用文生图明文 no people；人物走近 i2i 要强约束景别（"占画面60-70%"）。
+- Animate 双要素必填（什么动+什么不动），缺一视频跳变/定格。
+- 单镜诊断必须传单镜 storyboard（完整 10 镜会让 face 误报）。

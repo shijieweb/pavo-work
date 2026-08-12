@@ -1294,6 +1294,37 @@ def _speech_clause(shot):
             "subtitles, captions, or any visible written characters in the video.")
 
 
+# 【0812 老板闭环验证修复】reference 分支只有 Keep stable 没有 Animate（"什么在动"），
+# AGNES 拿到单图 + "保持稳定" → 生成近乎定格的视频（镜1 重渲质检 fail："四帧几乎完全相同"）。
+# 这里按镜头动作/运镜描述生成 Animate 句，与 keyframes 分支的官方双要素模板对齐。
+_ANIMATE_ACTION_ZH = ["走", "跑", "坐", "站", "抬头", "低头", "转身", "推门", "拿", "吃",
+                      "夹", "端", "放", "看", "笑", "呼吸", "招手", "挥手", "点头", "摇头",
+                      "靠近", "离开", "走近", "走入", "走出", "停下", "转身", "抬手"]
+_ANIMATE_ACTION_EN = ["walk", "walking", "walks", "run", "sit", "standing", "raise", "turn",
+                      "enter", "push", "open", "hold", "grab", "eat", "look", "smile", "breathe",
+                      "approach", "step", "move", "walking out", "walking in", "stop", "nod"]
+
+
+def _animate_clause(shot):
+    """reference/图生视频分支的 Animate 句：描述"什么在动"（官方双要素之一）。
+    从 cn_story/video_prompt 提取动作 → 拼自然运动句；无动作 → 环境微动兜底。"""
+    text = " ".join([str(shot.get("cn_story") or ""), str(shot.get("video_prompt") or "")]).lower()
+    zh_hit = [w for w in _ANIMATE_ACTION_ZH if w in text]
+    en_hit = [w for w in _ANIMATE_ACTION_EN if w in text]
+    has_action = bool(zh_hit or en_hit)
+    if has_action:
+        # 有动作：人物自然运动 + 环境微动（呼吸/衣摆/灯光）
+        return ("Animate the scene with natural motion: the character moves with smooth natural "
+                "body language, subtle breathing, clothing and hair shifting gently with movement, "
+                "background lights flickering softly, environmental details breathing naturally. "
+                "Keep the motion smooth and continuous throughout the clip — no frozen frame, no static tableau.")
+    # 无动作（空镜/场景镜）：环境微动兜底
+    return ("Animate the environment with subtle natural motion: distant lights flickering softly, "
+            "mist or steam drifting gently, leaves or fabric swaying slightly in the air, "
+            "reflections on wet surfaces shimmering. "
+            "Keep the motion smooth and continuous throughout the clip — no frozen frame, no static tableau.")
+
+
 # ===== 关键帧管线（首尾针 / 参考图，统一决策）=====
 # gen_strategy 每镜可覆盖，缺省走全局默认：
 #   "keyframes" : 默认。首帧=锁脸锚点(免费复用) + 尾帧(img2img首帧→结束态)，
@@ -2113,6 +2144,88 @@ def _ensure_duration(shot):
     return max(int(d), min(need, 12))
 
 
+# 【0812 老板拍板·代码层强制拆镜】分镜模型常无视 8.6/8.7 提示词规则（实测 10s 长镜未拆），
+# 这里用代码兜底：运镜镜（camera 含推拉摇移跟等）且 duration>6s → 自动拆成多个 3-4s 短镜，
+# 每镜同场景/同机位、单动作，首尾帧提示词按物理规律派生（首镜=起点，末镜=终点，中镜=过渡）。
+_CAMERA_MOVE_WORDS = ["推", "拉", "摇", "移", "跟", "升降", "环绕", "pan", "tilt",
+                      "push", "pull", "zoom", "track", "dolly", "crane", "orbit",
+                      "enter", "approach", "走近", "推近", "拉远", "摇移", "跟拍"]
+
+
+def _should_split(shot):
+    """是否需要拆镜：运镜镜 + 时长 > 6s（8.7 短镜优先）。台词镜（subtitle）不拆（拆了台词无法归属）。"""
+    if shot.get("ui_shot"):
+        return False
+    if (shot.get("subtitle") or "").strip():
+        return False
+    cam = str(shot.get("camera") or "")
+    d = int(shot.get("duration") or 0)
+    has_move = any(w in cam for w in _CAMERA_MOVE_WORDS) or bool(shot.get("camera_move"))
+    return has_move and d > 6
+
+
+def _split_long_shots(shots):
+    """把超长运镜镜拆成 3-4s 短镜链（纯代码规则，不依赖模型纪律）。
+    返回新 shots 列表（id 重排，split_of 标注来源镜）。"""
+    out = []
+    nid = 1
+    for s in shots:
+        if not _should_split(s):
+            s["id"] = nid
+            nid += 1
+            out.append(s)
+            continue
+        d = int(s.get("duration") or 0)
+        n = max(2, min(3, -(-d // 4)))   # ceil(d/4)：10s→3镜(3.3s)、7s→2镜(3.5s)、≤6s不拆
+        per = round(d / n, 1)             # 每镜实际时长（总长不变）
+        base = dict(s)
+        src_id = s.get("id")
+        # 景别渐变词（物理规律：人物镜从远到近；空镜保持）
+        ffp = s.get("first_frame_prompt") or ""
+        lfp = s.get("last_frame_prompt") or ""
+        cn = s.get("cn_story") or ""
+        cam = s.get("camera") or ""
+        for i in range(n):
+            ns = dict(base)
+            ns["id"] = nid
+            nid += 1
+            ns["duration"] = per
+            ns["num_frames"] = _snap_nf(per * SPEC.get("frame_rate", 24))
+            ns["split_of"] = src_id
+            ns["split_phase"] = "%d/%d" % (i + 1, n)
+            # 每镜内部只做简单过渡：首镜=起点状态，末镜=终点状态，中镜=中间状态
+            if i == 0:
+                ns["first_frame_prompt"] = ffp
+                ns["last_frame_prompt"] = _mid_frame_prompt(ffp, lfp, 1, n)
+                ns["camera"] = "轻微推近" if cam else ""
+                ns["cn_story"] = cn + "（镜1/%d：起点状态）" % n
+            elif i == n - 1:
+                ns["first_frame_prompt"] = _mid_frame_prompt(ffp, lfp, n - 1, n)
+                ns["last_frame_prompt"] = lfp
+                ns["camera"] = "固定" if cam else ""
+                ns["cn_story"] = cn + "（镜%d/%d：终点状态）" % (n, n)
+            else:
+                ns["first_frame_prompt"] = _mid_frame_prompt(ffp, lfp, i, n)
+                ns["last_frame_prompt"] = _mid_frame_prompt(ffp, lfp, i + 1, n)
+                ns["camera"] = "固定" if cam else ""
+                ns["cn_story"] = cn + "（镜%d/%d：中间状态）" % (i + 1, n)
+            out.append(ns)
+        _log.info("[split] 镜%d（%ds 运镜）→ %d 个短镜（%s）", src_id, d, n,
+                  ",".join(str(x["id"]) for x in out[-n:]))
+    return out
+
+
+def _mid_frame_prompt(ffp, lfp, k, n):
+    """中间帧提示词：基于起点/终点描述派生"过渡状态"（同场景同机位，姿态/景别渐变）。"""
+    if not ffp and not lfp:
+        return ""
+    short_ffp = (ffp or "").strip()[:80]
+    short_lfp = (lfp or "").strip()[:80]
+    return ("Intermediate stage %d/%d: same scene, same camera angle, "
+            "transitioning from [%s] toward [%s], natural motion, consistent character."
+            % (k, n, short_ffp, short_lfp))
+
+
 def generate_video_real(shot_id, force=False):
     _log.info("[video] shot#%s 开始生成视频%s", shot_id, "（强制重渲）" if force else "")
     """REAL=1：按 gen_strategy 生成单镜真实动画，并写回 asset_video。
@@ -2269,6 +2382,10 @@ def generate_video_real(shot_id, force=False):
         _cgs = _clean_global_style()
         if _cgs and _cgs not in prompt:
             prompt = f"{prompt}, {_cgs}"
+        # 【0812 老板闭环修复】reference 分支补 Animate 句（之前只有 Keep stable → 视频定格）
+        _anim = _animate_clause(shot)
+        if _anim:
+            prompt = f"{prompt}, {_anim}"
         if ref_key and "locked character identity" not in prompt:
             prompt = f"{prompt}, {_identity_lock(ref_key)}"
             # 【T1 官方图生视频结构·老板 0811】稳定句：描述"什么该动+哪些保持稳定"
@@ -2302,6 +2419,10 @@ def generate_video_real(shot_id, force=False):
         cam = _camera_clause(shot)
         if cam and cam not in prompt and not _cam_mentioned(prompt):
             prompt = f"{prompt}, {cam}"
+        # 【0812 同 reference 修复】text2video 也补 Animate 句（防定格）
+        _anim = _animate_clause(shot)
+        if _anim:
+            prompt = f"{prompt}, {_anim}"
         task = create_video(
             prompt=prompt,
             image=None,  # 纯文生
@@ -2866,6 +2987,8 @@ def generate_storyboard_from_novel(novel, title="", episode="", script_json=None
     pdir = os.path.join(PROJECTS_ROOT, pid)
     for sub in ("references", "audio", "video"):
         os.makedirs(os.path.join(pdir, "assets", sub), exist_ok=True)
+    # 【0812 代码层强制拆镜】模型常无视 8.6/8.7 → 落盘前用代码兜底拆镜
+    sb["shots"] = _split_long_shots(sb.get("shots") or [])
     with open(os.path.join(pdir, "storyboard.json"), "w", encoding="utf-8") as f:
         json.dump(sb, f, ensure_ascii=False, indent=2)
     reg = load_registry()
