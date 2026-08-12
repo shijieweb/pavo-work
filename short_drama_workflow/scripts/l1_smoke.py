@@ -211,6 +211,7 @@ def main():
         return _orig_asset_abs(rel)
 
     server.asset_abs = _fake_asset_abs
+    sys.modules["server"] = server   # 关键：注册桩版，prompt_training 标准 import server 复用同一份
     # 桩自检（在 gen_video 之前、不调 AGNES，零 VIP）：确认桩把引用映射到真实 PNG
     for _r in (rel_first, rel_last):
         _c = server.asset_abs(_r)
