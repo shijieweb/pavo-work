@@ -187,6 +187,8 @@ STORYBOARD_SYS = (
     "   Shots with a ref key must be 'keyframes'; only genuinely character-free shots may be 'reference'.\n"
     "8. LAST_FRAME_PROMPT (keyframes only): describes the ENDING composition and MUST differ from the opening state so the clip actually moves. Same character, same clothing, different posture/expression/position.\n"
     "8.5 FIRST_FRAME_PROMPT (camera-move keyframes, MANDATORY): if the shot's 'camera' contains a camera MOVE (推/拉/摇/移/环绕/穿过/跟拍/push-in/tracking/dolly/pan/tilt/crane/orbit/through/enter), the opening frame is NOT the character close-up \u2014 it is where the camera starts (e.g. scene entrance, aisle, wide establishing). You MUST output first_frame_prompt describing that STARTING frame (a scene/environment view, possibly with the character small in the distance). Fixed static shots (固定/无运镜) may leave it empty.\n"
+    "8.6 DIRECTOR-THINK SPLIT (MANDATORY, 0812 老板导演思维): a single shot may ONLY contain ONE simple transition (same scene / same lighting / same camera position, only posture/expression/shot-size changing). If the beat requires a BIG change (scene change, lighting change, camera position change, character appearing from an empty scene), SPLIT it into multiple consecutive short shots, each with its own simple transition. Examples: \u201c\u7a7a\u666f\u2192\u4eba\u7269\u8fdc\u666f\u2192\u4eba\u7269\u4e2d\u666f\u201d must become 3 separate shots (each 3-4s, 81 frames), NOT one 10s shot. Never force AGNES to bridge a jump it cannot understand.\n"
+    "8.7 SHORT SHOTS PREFERRED (MANDATORY, 0812): default single-shot duration 3-4s (81 frames). Longer beats MUST be split into multiple short shots as in 8.6. Only dialogue with a long line may reach 5-8s, and never exceed 12s.\n"
     "9. SCENES & PROPS: include 2-4 'scenes' and 1-3 'props' with English image prompts, reused across shots for visual coherence. Every shot must carry a scene_key pointing to one of the scenes.\n"
     "10. CONTINUITY: continuity_note must describe how this shot continues the previous one (same position/props/lighting) so keyframes can chain; first shot writes \u5f00\u7bc7\u65e0\u524d\u7f6e.\n"
     "11. ASSET CN_PROMPT (MANDATORY): EVERY references entry and EVERY scene/prop MUST include the 'cn_prompt' object with the listed Chinese fields (style/content/basic_req plus per-type fields), describing the asset in Chinese for the asset-design panel. The Chinese content MUST semantically match the English img_prompt (same costume/age/environment). Output these fields directly with the storyboard \u2014 do NOT omit them.\n"
@@ -1403,6 +1405,11 @@ def _gen_camera_start(shot):
         gs = _clean_global_style()
         if gs and gs not in prompt:
             prompt = prompt + ", " + gs
+        # 【0812 物理规律】运镜起点若是空镜（首帧描述/分镜无人物）→ 强化 NEG 抑制人物幻觉；
+        # 与 _gen_first_frame_fallback 一致，防 AGNES 把人物塞进本该无人场景
+        _ffp = (shot.get("first_frame_prompt") or "") + (shot.get("cn_story") or "")
+        if re.search(r"无行人|无人|空镜|空无一人|没有人|无车|空旷|empty|no people|no person|without", _ffp, re.I):
+            prompt = prompt + ". NO people, NO characters, NO pedestrians, empty scene"
         cine = _cinema_clause(shot)
         if cine:
             prompt = prompt + ", " + cine
@@ -1537,11 +1544,20 @@ def _last_frame_prompt(shot):
 
 
 def _transition_prompt(shot):
-    """首尾针模式下的视频过渡 prompt（官方最佳实践：描述首→末平滑过渡，而非详细场景）。
-    注：尺寸/竖屏词不在此写（_cinema_clause 统一注入一次），避免与 video_prompt 残留尺寸词重复。"""
+    """首尾针模式下的视频过渡 prompt（官方最佳实践：Animate 双要素——描述什么动+什么不动）。
+    0812 老板方法论固化：来自官方示例
+    "Animate the character with subtle breathing motion, hair moving gently in the wind,
+     background lights flickering softly, while keeping the face and outfit consistent"
+    "Create a smooth transition from the first keyframe to the second keyframe,
+     maintaining character identity, consistent camera angle, and natural motion between scenes"
+    注意：尺寸/竖屏词不在此写（_cinema_clause 统一注入一次），避免与 video_prompt 残留尺寸词重复。"""
     style = _clean_global_style()
-    return (f"Smooth cinematic transition from the first keyframe to the second keyframe, "
-            f"maintaining character identity and consistent camera angle, natural motion"
+    return ("Create a smooth transition from the first keyframe to the second keyframe. "
+            "Animate: the character moves with natural body motion, subtle breathing, "
+            "hair moving gently, background lights flickering softly, environmental details "
+            "shifting naturally. "
+            "Keep stable: character's face, hairstyle and outfit fully consistent, "
+            "consistent camera angle, natural motion between scenes, no jumps, no morphing."
             + (f", {style}" if style else ""))
 
 
