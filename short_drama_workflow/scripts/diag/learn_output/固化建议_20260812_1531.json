@@ -51,7 +51,9 @@
         "09_商业化镜头训练SOP.md:n/a"
       ],
       "action": "人工裁决: 与既有表述疑似重复(空镜免检)，并入或跳过",
-      "status": "pending"
+      "status": "approved",
+      "review_note": "A: 确认已覆盖(09SOP+训练脚本空镜免检+生产NEG强化) 闭环; B: 真空景生成配方保留进08经验库",
+      "reviewer": "老板 15:44 A+B 都要"
     },
     {
       "id": "f72c66c071ff",
@@ -94,7 +96,9 @@
         "08_经验避坑库.md:同机位"
       ],
       "action": "人工裁决: 与既有表述疑似重复(物理规律首尾帧)，并入或跳过",
-      "status": "pending"
+      "status": "approved",
+      "reviewer": "老板 15:37 认可",
+      "review_note": "物理规律首尾帧经验有效：i2i 强约束景别(prompt-图一致)已固化生产"
     }
   ],
   "exp_level_rules": [],
