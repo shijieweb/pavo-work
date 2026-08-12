@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "created": "2026-08-12 18:42",
+    "exps_scanned": 1,
+    "variants": 2,
+    "pass": 2,
+    "learn_blocks": 2,
+    "dup_skipped": 0,
+    "conflict_marked": 2,
+    "note": "【人工闸门】以下建议均需老板/阿编审视后由 apply_fix.py 应用；本文件由只读提取器生成，未修改任何源文件。"
+  },
+  "rule_items": [
+    {
+      "id": "fb815ade835f",
+      "topic": "空镜免检",
+      "rule": "【v18 已验证配方】镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）（证据: 4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a）",
+      "source_exp": "exp_0812_1502",
+      "source_variant": "v18",
+      "hyp": "镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）",
+      "evidence": {
+        "variant": "v18",
+        "verdict": "pass",
+        "scores": {
+          "continuity": 9,
+          "physical": 9,
+          "character": 10,
+          "first_last": 9,
+          "face": 10,
+          "quality": 10
+        },
+        "intro_flash": "pass",
+        "internal_consistency": "pass",
+        "prompt_frame_match": "warn",
+        "identity": "n/a",
+        "num_frames": 81,
+        "frame_rate": 24,
+        "duration_s": 3.4,
+        "size": "448x832",
+        "seed": 1215,
+        "negative": true
+      },
+      "pass_reason": "4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a",
+      "runs": 1,
+      "confidence": "medium",
+      "conflict": true,
+      "conflict_hits": [
+        "03_数据契约.md:n/a",
+        "08_经验避坑库.md:no people",
+        "08_经验避坑库.md:NO people",
+        "08_经验避坑库.md:n/a",
+        "09_商业化镜头训练SOP.md:空镜免检"
+      ],
+      "action": "人工裁决: 与既有表述疑似重复(空镜免检)，并入或跳过",
+      "status": "pending"
+    },
+    {
+      "id": "f72c66c071ff",
+      "topic": "物理规律首尾帧",
+      "rule": "【v19 已验证配方】镜B物理走近：远景→中近景（同机位同场景，prompt-图一致）（证据: 4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a）",
+      "source_exp": "exp_0812_1502",
+      "source_variant": "v19",
+      "hyp": "镜B走近修复：远景→中近景（prompt与图一致，真走近）",
+      "evidence": {
+        "variant": "v19",
+        "verdict": "pass",
+        "scores": {
+          "continuity": 9,
+          "physical": 9,
+          "character": 9,
+          "first_last": 9,
+          "face": 10,
+          "quality": 10
+        },
+        "intro_flash": "pass",
+        "internal_consistency": "pass",
+        "prompt_frame_match": "pass",
+        "identity": "pass",
+        "num_frames": 81,
+        "frame_rate": 24,
+        "duration_s": 3.4,
+        "size": "448x832",
+        "seed": 1215,
+        "negative": true
+      },
+      "pass_reason": "4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a",
+      "runs": 1,
+      "confidence": "medium",
+      "conflict": true,
+      "conflict_hits": [
+        "prompt_library:首尾帧",
+        "03_数据契约.md:物理规律",
+        "03_数据契约.md:首尾帧",
+        "04_生成管线.md:首尾帧",
+        "08_经验避坑库.md:首尾帧"
+      ],
+      "action": "人工裁决: 与既有表述疑似重复(物理规律首尾帧)，并入或跳过",
+      "status": "pending"
+    }
+  ],
+  "exp_level_rules": [],
+  "param_snapshot": [
+    {
+      "num_frames": 81,
+      "frame_rate": 24,
+      "count": 2,
+      "negative": true,
+      "negative_prompt": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+      "seed_fixed": true,
+      "seed_value": 1224,
+      "mode": "keyframes",
+      "exps": [
+        "exp_0812_1502",
+        "exp_0812_1502"
+      ]
+    }
+  ]
+}
