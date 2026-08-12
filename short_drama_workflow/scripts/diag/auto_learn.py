@@ -200,7 +200,11 @@ def _suggest_action(topic, conflict, confidence):
 
 
 def _param_snapshot(exps):
-    """已验证参数快照：pass 变体的 num_frames/frame_rate/negative/seed 聚合。"""
+    """已验证参数快照：pass 变体的 num_frames/frame_rate/negative/seed 聚合。
+
+    P0-3 修复（2026-08-12）：原代码用 `is not None` 判断 negative/seed，
+    对字符串和布尔值判断有误。改为 bool() + 类型检测，并记录实际值。
+    """
     seen = {}
     for fp, d in exps:
         for v in (d.get("variants") or []):
@@ -209,11 +213,33 @@ def _param_snapshot(exps):
             p = v.get("params") or {}
             key = (p.get("num_frames"), p.get("frame_rate"))
             if key not in seen:
-                seen[key] = {"count": 0, "negative": p.get("negative") is not None,
-                             "seed_fixed": p.get("seed") is not None, "mode": p.get("mode"),
-                             "exps": []}
+                seen[key] = {
+                    "count": 0,
+                    "negative": False,         # 修复：默认 False
+                    "negative_prompt": "",     # 新增：记录实际负面词
+                    "seed_fixed": False,       # 修复：默认 False
+                    "seed_value": None,        # 新增：记录 seed 值
+                    "mode": p.get("mode"),
+                    "exps": []
+                }
             seen[key]["count"] += 1
             seen[key]["exps"].append(d.get("id"))
+            # 修复：用类型感知的判断替代 is not None
+            neg_val = p.get("negative")
+            if neg_val is not None:
+                if isinstance(neg_val, str):
+                    seen[key]["negative"] = bool(neg_val.strip())
+                    if seen[key]["negative"]:
+                        seen[key]["negative_prompt"] = neg_val[:200]
+                elif isinstance(neg_val, bool):
+                    seen[key]["negative"] = neg_val
+                else:
+                    seen[key]["negative"] = bool(neg_val)
+            # 修复：seed 检测
+            seed_val = p.get("seed")
+            if seed_val is not None and isinstance(seed_val, (int, float)):
+                seen[key]["seed_fixed"] = True
+                seen[key]["seed_value"] = seed_val
     return [{"num_frames": k[0], "frame_rate": k[1], **v} for k, v in seen.items()]
 
 

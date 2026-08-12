@@ -1,0 +1,110 @@
+# templates/empty_scene_v1.yaml
+# 真空景（空镜）生成模板
+# 来源：08 经验避坑库 C 段第 7 条"真空景生成配方"（0812 已验证 v18）
+# 验证记录：exp_0812_1502 v18 — 4维 9/9/10/9 + face 10 + quality 10 + intro_flash pass
+#
+# 适用场景：镜头需要纯环境空镜（无人物），如 establishing shot / 氛围过渡 / 时间推移
+# 关键经验：
+#   1. 空景必须文生图（text_to_image）生成首帧，不能用 i2i 从含人物原图衍生
+#   2. 尾帧从首帧 i2i 微变（雾气飘动/灯光微亮），物理=同场景时间推移
+#   3. 全程无人，质检 identity 审查免检标 n/a
+#   4. prompt 必须明文 "no people" / "empty street"
+
+name: empty_scene_v1
+description: "真空景双帧：文生图无人物 + i2i 微变（已验证 v18）"
+type: empty_scene
+
+# 变量占位符（运行时从 shot/ref 注入）
+variables:
+  base_prompt: "shot.video_prompt"    # 镜头原始 prompt
+  scene_desc: "shot.cn_story"         # 场景描述（中文，用于生成空景）
+
+# 常量（写死在模板里，来自 v18 验证配方）
+constants:
+  # 首帧 prompt：文生图，强调无人
+  FIRST_FRAME_PROMPT: >
+    Empty street at night, cold blue tones, wet asphalt reflecting streetlight glow,
+    thin mist drifting across the ground, distant building windows with faint lights,
+    atmospheric fog, cinematic lighting, moody noir atmosphere.
+    NO people, no figures, no silhouettes, completely empty street.
+    this is the first keyframe, environment and props in initial state, before any action
+
+  # 尾帧 prompt：从首帧 i2i 微变，物理=同场景时间推移
+  LAST_FRAME_PROMPT: >
+    Same empty street at night, same cold blue tones, same wet asphalt,
+    mist position slightly shifted, streetlight glow gently pulsing,
+    distant window lights flickering softly, same building, same lamp position,
+    same camera angle. NO people, no figures, completely empty.
+    this is the last keyframe, same scene with subtle time progression
+
+  # 视频 prompt：Animate 双要素（v18 验证配方）
+  VIDEO_PROMPT_EN: >
+    Smooth transition between the two keyframes of the same empty street.
+    Animate: thin mist drifting slowly across the wet asphalt, streetlight glow
+    gently pulsing, distant window lights flickering softly.
+    Keep stable: no people, same building, same lamp position, same camera angle,
+    same cold blue night, no jumps.
+
+  # 中文版 prompt（实测连贯/物理/首尾高 1-2 分，v15 验证）
+  VIDEO_PROMPT_CN: >
+    在同一条空旷街道的两个关键帧之间实现平滑过渡。
+    动画元素：薄雾缓缓飘过潮湿的沥青路面，路灯光芒轻柔脉动，远处窗户灯光微微闪烁。
+    保持稳定：无人物出现，建筑相同，路灯位置不变，摄像机角度一致，
+    保持相同的冷蓝色夜景，无画面跳变。
+
+  # 空景专用负面词（比通用负面词更强力的人物抑制）
+  NEG_PROMPT: >
+    text, watermark, logo, subtitles, morphing, deformed hands, extra fingers,
+    blurry face, frame jump, identity change, clothing change,
+    people, person, figure, human, silhouette, character, man, woman, child,
+    face, portrait, crowd, pedestrian
+
+# 变体定义
+variants:
+  v0:
+    hypothesis: "基准：英文 prompt + 2 帧 + 81 帧"
+    goal: "量化基线：验证 v18 配方可重复"
+    reference: "exp_0812_1502 v18（已验证 pass）"
+    keyframes: ["text:{{FIRST_FRAME_PROMPT}}", "i2i:{{LAST_FRAME_PROMPT}}"]
+    video_prompt: "{{VIDEO_PROMPT_EN}}"
+    num_frames: 81
+    frame_rate: 24
+    mode: keyframes
+    negative: "{{NEG_PROMPT}}"
+    identity_check: "skip"    # 空镜免检
+
+  v1:
+    hypothesis: "中文 prompt：运动描述更细腻"
+    goal: "验证中文 prompt 在空景中是否也优于英文（v15 经验扩展）"
+    reference: "exp_0812_004150 v15（中文连贯 9 vs 英文 7）"
+    keyframes: ["text:{{FIRST_FRAME_PROMPT}}", "i2i:{{LAST_FRAME_PROMPT}}"]
+    video_prompt: "{{VIDEO_PROMPT_CN}}"
+    num_frames: 81
+    frame_rate: 24
+    mode: keyframes
+    negative: "{{NEG_PROMPT}}"
+    identity_check: "skip"
+
+  v2:
+    hypothesis: "短时长 81 帧是否可进一步压缩"
+    goal: "空景变化少，测试是否更短时长更稳定"
+    reference: "09 SOP 第六节：变化点少=短时长"
+    keyframes: ["text:{{FIRST_FRAME_PROMPT}}", "i2i:{{LAST_FRAME_PROMPT}}"]
+    video_prompt: "{{VIDEO_PROMPT_EN}}"
+    num_frames: 81
+    frame_rate: 24
+    mode: keyframes
+    negative: "{{NEG_PROMPT}}"
+    identity_check: "skip"
+
+  v3:
+    hypothesis: "增强人物抑制：负面词叠加 + prompt 重复 no people"
+    goal: "测试是否进一步降低 AGNES 塞人概率"
+    reference: "08 经验库：写了 no people 也无效因为 i2i 母图有人"
+    keyframes: ["text:{{FIRST_FRAME_PROMPT}}", "i2i:{{LAST_FRAME_PROMPT}}"]
+    video_prompt: "{{VIDEO_PROMPT_EN}} absolutely no people no figures no humans"
+    num_frames: 81
+    frame_rate: 24
+    mode: keyframes
+    negative: "{{NEG_PROMPT}}, any person, any human, any figure, any face, any silhouette, any character"
+    identity_check: "skip"
