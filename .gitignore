@@ -31,3 +31,4 @@ _scan_*.py
 short_drama_workflow/html_prototype/*.bak.json
 # 提示词实验输出（大文件视频，不入库）
 short_drama_workflow/scripts/diag/experiments/
+_archive_*/
