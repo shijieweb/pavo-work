@@ -358,6 +358,48 @@ def _cn_translate(prompt_en, timeout=60):
         return ""
 
 
+def _learn_block(name, verdict, hyp, diag, ifl, ic, pfm, vr, v, nf, w, h, seed):
+    """【自动固化流水线·结构化经验产出】pass 变体自动生成 rules_draft/evidence/pass_reason，
+    供 auto_learn.py 只读提取。模板化组装，不依赖 LLM，保证确定性。"""
+    sc = diag or {}
+    ok4 = all((sc.get(k) or 0) >= 7 for k in ("continuity", "physical", "character", "first_last"))
+    ifl_v = (ifl or {}).get("verdict")
+    ic_v = (ic or {}).get("verdict")
+    pfm_v = (pfm or {}).get("overall") or ((pfm or {}).get("ending") or {}).get("verdict")
+    vr_v = (vr or {}).get("verdict") if isinstance(vr, dict) else vr
+    # 证据：质检数据快照（供 auto_learn 过滤与展示）
+    evidence = {
+        "variant": name,
+        "verdict": verdict,
+        "scores": {k: sc.get(k) for k in
+                   ("continuity", "physical", "character", "first_last", "face", "quality")},
+        "intro_flash": ifl_v, "internal_consistency": ic_v,
+        "prompt_frame_match": pfm_v, "identity": vr_v,
+        "num_frames": nf, "frame_rate": v.get("frame_rate", 24),
+        "duration_s": round(nf / float(v.get("frame_rate", 24)), 1),
+        "size": "%dx%d" % (w, h), "seed": seed,
+        "negative": bool(NEG_PROMPT),
+    }
+    # 通过原因（模板化判定）
+    reasons = []
+    if ok4:
+        reasons.append("4维全>=7")
+    if ifl_v == "pass":
+        reasons.append("intro_flash pass(开头不闪)")
+    if ic_v in ("pass", "warn", None):
+        reasons.append("内部一致 pass/warn")
+    if pfm_v in ("pass", "warn", None):
+        reasons.append("prompt-帧匹配 pass/warn")
+    if isinstance(vr_v, str) and vr_v in ("pass", "n/a", None):
+        reasons.append("尾帧脸型 pass/n/a")
+    pass_reason = "+".join(reasons) if reasons else "verdict=pass"
+    # 规则草案：从假说 hyp 提炼（模板化，不编造）
+    rules_draft = []
+    if verdict == "pass" and ok4:
+        rules_draft.append("【%s 已验证配方】%s（证据: %s）" % (name, hyp, pass_reason))
+    return {"rules_draft": rules_draft, "evidence": evidence, "pass_reason": pass_reason}
+
+
 def gen_video(prompt, images, out_dir, sid, shot, seed=None, frame_rate=24, num_frames=None):
     """提交 keyframes 视频 → 轮询 → 下载到 out_dir/shot<sid>.mp4。返回本地路径。
     seed: 固定随机种子（官方推荐可复现；训练实验传 seed 可对照排除随机性）。
@@ -548,6 +590,8 @@ def main():
                                "intro_flash": ifl,
                                "prompt_frame_match": pfm,
                                "video": vf,
+                               "learn": _learn_block(name, (d or {}).get("verdict"), v["hyp"], scores,
+                                                     ifl, ic, pfm, vr, v, nf, w, h, seed),
                                "params": {"prompt": v["prompt"][:400], "prompt_cn": _cn_translate(v["prompt"]),
                                           "keyframes": v.get("keyframes", []), "images": len(v["images"]),
                                           "num_frames": nf, "size": "%dx%d" % (w, h),

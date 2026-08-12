@@ -47,7 +47,35 @@
         "duration_s": 3.4
       },
       "identity_note": "空镜免检：v18 真空景镜头无人物，尾帧脸型比对属误报（已修训练脚本空镜免检）",
-      "pfm_note": "ending warn 为低严重度（雾气浓度随同场景时间推移微变，可接受）"
+      "pfm_note": "ending warn 为低严重度（雾气浓度随同场景时间推移微变，可接受）",
+      "learn": {
+        "rules_draft": [
+          "【v18 已验证配方】镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）（证据: 4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a）"
+        ],
+        "evidence": {
+          "variant": "v18",
+          "verdict": "pass",
+          "scores": {
+            "continuity": 9,
+            "physical": 9,
+            "character": 10,
+            "first_last": 9,
+            "face": 10,
+            "quality": 10
+          },
+          "intro_flash": "pass",
+          "internal_consistency": "pass",
+          "prompt_frame_match": "warn",
+          "identity": "n/a",
+          "num_frames": 81,
+          "frame_rate": 24,
+          "duration_s": 3.4,
+          "size": "448x832",
+          "seed": 1215,
+          "negative": true
+        },
+        "pass_reason": "4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a"
+      }
     },
     {
       "name": "v19",
@@ -81,6 +109,34 @@
         "num_frames": 81,
         "frame_rate": 24,
         "duration_s": 3.4
+      },
+      "learn": {
+        "rules_draft": [
+          "【v19 已验证配方】镜B物理走近：远景→中近景（同机位同场景，prompt-图一致）（证据: 4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a）"
+        ],
+        "evidence": {
+          "variant": "v19",
+          "verdict": "pass",
+          "scores": {
+            "continuity": 9,
+            "physical": 9,
+            "character": 9,
+            "first_last": 9,
+            "face": 10,
+            "quality": 10
+          },
+          "intro_flash": "pass",
+          "internal_consistency": "pass",
+          "prompt_frame_match": "pass",
+          "identity": "pass",
+          "num_frames": 81,
+          "frame_rate": 24,
+          "duration_s": 3.4,
+          "size": "448x832",
+          "seed": 1215,
+          "negative": true
+        },
+        "pass_reason": "4维全>=7+intro_flash pass(开头不闪)+内部一致 pass/warn+prompt-帧匹配 pass/warn+尾帧脸型 pass/n/a"
       }
     }
   ],
