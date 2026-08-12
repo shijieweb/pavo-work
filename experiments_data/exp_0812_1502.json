@@ -1,0 +1,88 @@
+{
+  "id": "exp_0812_1502",
+  "type": "镜头1-商业化验证（拆镜重做）",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "created": "2026-08-12 15:05:06",
+  "status": "candidate",
+  "key_finding": "v18+v19 拆镜配方全套新质检：v19 六项全绿(4维9/9/9/9+face10+quality10+intro_flash pass+内部一致 pass+尾帧脸型 pass+prompt_frame_match pass)；v18 真空景 4维9/9/10/9+intro_flash pass+内部一致 pass（identity 空镜免检 n/a，pfm ending 低严重度雾气微变 warn 可接受）。",
+  "variants": [
+    {
+      "name": "v18",
+      "verdict": "pass",
+      "hyp": "镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）",
+      "diagnosis": {
+        "continuity": 9,
+        "physical": 9,
+        "character": 10,
+        "first_last": 9,
+        "face": 10,
+        "quality": 10
+      },
+      "intro_flash": "pass",
+      "internal_consistency": "pass",
+      "identity_review": "n/a",
+      "prompt_frame_match": {
+        "ok": true,
+        "opening": {
+          "verdict": "pass",
+          "issues": []
+        },
+        "ending": {
+          "verdict": "warn",
+          "issues": [
+            {
+              "type": "场景冲突",
+              "severity": "low",
+              "desc": "尾帧中雾气的浓度和位置与首帧相比有明显变化，左侧路灯的光束效果更加明显，与提示词中'same camera angle'和'same building'的稳定要求存在轻微冲突"
+            }
+          ]
+        },
+        "overall": "warn"
+      },
+      "video": "shot1.mp4",
+      "params": {
+        "num_frames": 81,
+        "frame_rate": 24,
+        "duration_s": 3.4
+      },
+      "identity_note": "空镜免检：v18 真空景镜头无人物，尾帧脸型比对属误报（已修训练脚本空镜免检）",
+      "pfm_note": "ending warn 为低严重度（雾气浓度随同场景时间推移微变，可接受）"
+    },
+    {
+      "name": "v19",
+      "verdict": "pass",
+      "hyp": "镜B走近修复：远景→中近景（prompt与图一致，真走近）",
+      "diagnosis": {
+        "continuity": 9,
+        "physical": 9,
+        "character": 9,
+        "first_last": 9,
+        "face": 10,
+        "quality": 10
+      },
+      "intro_flash": "pass",
+      "internal_consistency": "pass",
+      "identity_review": "pass",
+      "prompt_frame_match": {
+        "ok": true,
+        "opening": {
+          "verdict": "pass",
+          "issues": []
+        },
+        "ending": {
+          "verdict": "pass",
+          "issues": []
+        },
+        "overall": "pass"
+      },
+      "video": "shot1.mp4",
+      "params": {
+        "num_frames": 81,
+        "frame_rate": 24,
+        "duration_s": 3.4
+      }
+    }
+  ],
+  "candidate": "v19"
+}

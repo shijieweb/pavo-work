@@ -496,9 +496,19 @@ def main():
             if r.returncode == 0 and os.path.isfile(frame):
                 sys.path.insert(0, os.path.join(HERE, "..", "diag"))
                 from vision_review import review
-                vr = review([anchor, frame], kind="identity")
-                print("  identity 审查(尾帧):", vr.get("verdict"), "| issues:", len(vr.get("issues") or []),
-                      "|", (vr.get("issues") or [{}])[0].get("desc", "")[:50] if vr.get("issues") else "")
+                # 【0812 老板方法论】空镜免检：prompt 描述 no people/空景时，尾帧无人物，
+                # 拿空镜帧比锚点脸必 fail 属误报——直接标记 N/A（免检）
+                _p_low = (v.get("prompt") or "").lower()
+                _is_empty = ("no people" in _p_low or "no person" in _p_low
+                             or "empty " in _p_low or "without any people" in _p_low)
+                if _is_empty:
+                    vr = {"verdict": "n/a", "issues": [],
+                          "note": "空镜镜头（prompt 无人物），免检尾帧脸型"}
+                    print("  identity 审查(尾帧): n/a（空镜免检）")
+                else:
+                    vr = review([anchor, frame], kind="identity")
+                    print("  identity 审查(尾帧):", vr.get("verdict"), "| issues:", len(vr.get("issues") or []),
+                          "|", (vr.get("issues") or [{}])[0].get("desc", "")[:50] if vr.get("issues") else "")
                 # 【内部一致性·0811 老板实测盲区】视频首帧 vs 尾帧：查视频自身服装/外观变化
                 ic = {"verdict": None, "issues": []}
                 try:
