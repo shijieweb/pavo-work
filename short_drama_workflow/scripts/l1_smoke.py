@@ -204,13 +204,17 @@ def main():
     _orig_asset_abs = server.asset_abs
 
     def _fake_asset_abs(rel):
-        if rel == rel_first:
-            return first_path
-        if rel == rel_last:
-            return last_path
+        base = os.path.basename(str(rel))
+        cand = os.path.join(ASSETS_DIR, base)
+        if os.path.isfile(cand):
+            return cand
         return _orig_asset_abs(rel)
 
     server.asset_abs = _fake_asset_abs
+    # 桩自检（在 gen_video 之前、不调 AGNES，零 VIP）：确认桩把引用映射到真实 PNG
+    for _r in (rel_first, rel_last):
+        _c = server.asset_abs(_r)
+        assert os.path.isfile(_c), "❌ 桩失效: %r -> %r" % (_r, _c)
 
     # ---- 仅 import prompt_training 需要使用 diagnosis 模块（本 smoke 不跑质检，打桩为空）----
     sys.modules.setdefault("diagnosis", types.ModuleType("diagnosis"))
