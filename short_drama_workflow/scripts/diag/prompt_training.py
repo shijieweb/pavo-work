@@ -378,7 +378,8 @@ def _learn_block(name, verdict, hyp, diag, ifl, ic, pfm, vr, v, nf, w, h, seed):
         "num_frames": nf, "frame_rate": v.get("frame_rate", 24),
         "duration_s": round(nf / float(v.get("frame_rate", 24)), 1),
         "size": "%dx%d" % (w, h), "seed": seed,
-        "negative": bool(NEG_PROMPT),
+        "negative": bool(NEG_PROMPT),         # evidence 保留布尔值（标记是否使用负面词）
+        "negative_prompt": NEG_PROMPT[:200],  # P0-3 修复：同时记录实际负面词文本
     }
     # 通过原因（模板化判定）
     reasons = []
