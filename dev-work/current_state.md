@@ -45,7 +45,7 @@
 
 | 任务 | 状态 | 开发 | 测试 | AC 进度 |
 |---|---|---|---|---|
-| T-20260812-01 P0-1 模板YAML化 | 待验证(开发自检完)·2阻塞BUG已修复待测试复核 | 开发Agent | 测试Agent | AC-1.1✓ 1.2✓ 1.3✓(修) 1.4✓ 1.5✓(修) |
+| T-20260812-01 P0-1 模板YAML化 | ✅ 完成(阿编把关·2026-08-12) | 开发Agent | 测试Agent | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -189,3 +189,77 @@
 ### 遗留
 - 无功能遗留。说明一处语义取舍：BUG-2 修复按「旧版仅对 `asset_frame_start`（首帧）做 datauri」复刻，故回归 shot 的 `asset_frame_end` 用非 `assets/` 路径以与旧版逐字段相等；若生产真实 `asset_frame_end` 也带 `assets/` 前缀，新 loader 会一并转 data URI（比旧版更完整，但与该边缘情形下的旧版输出会有差异——属旧版自身不一致，不在本次 AC 范围内）。
 - 观察项（非阻塞，沿用测试建议）：YAML 缺 `variants` 块或变体缺字段时加载器返回 `{}`/空列表不崩溃但静默，建议后续加 warning 便于排错。
+
+## 测试结论·独立复验（测试Agent·2026-08-12 二轮，接「开发修复后重测」）
+
+> 角色：测试（独立验收者），**只验收、绝不改代码**。方法：仅 `import` + `build_variants` + 回归脚本 + 结构检查，**未调用 `gen_video`/`main()`**，零 AGNES 额度。临时验证脚本均置于 `/tmp`（不入仓），复验后工作树干净（`git status` 无未提交改动）。
+
+- **整体结论：建议 阿编 放行（状态推到「已验证(测试验收过)」即停，无 done 权）。** 2 个阻塞 BUG（BUG-1 / BUG-2）经独立复验**确认已真修好**；回归分支经"修复前必失败"证明**有效**；AC-1.1~1.5 全部 PASS。唯一遗留为非阻塞 S4（静默返回，见下）。
+- **环境**：python 3.13.12 / pyyaml 6.0.3；before 快照 `3946e95`，fix 提交 `9d0fb01`。
+
+### 1) 重跑回归（不盲信开发输出）
+- `python dev-work/regress_build_variants.py` → **总检查项 200 | 失败 0** ✅。
+- `REGRESS_NO_TMP=1 python dev-work/regress_build_variants.py`（文件缺失 fallback 路径）→ **总检查项 200 | 失败 0** ✅。
+- 说明：本次 regression 第 5 节已用真实 `asset_frame_start="assets/first.png"` 触发 data_uri 分支（不再像首轮那样被 `/fixture` 路径掩盖），故"200 全绿"对生产真实 assets/ 路径有效。
+
+### 2) BUG-1 复验（empty_scene text:/i2i: 语义）—— PASS（修复前 FAIL / 修复后 PASS）
+- 独立构造 `es = pt.build_variants(SHOT, REF, "empty_scene_v1")["v0"]`：
+  - ✅ `images[0]` 为 dict 且 `mode=="text_to_image"`（首帧文生图）、`images[1]` 为 dict 且 `mode=="image_to_image"`（尾帧图生图），每帧含 `content`；
+  - ✅ `keyframes[0].role=="文生图(无源图)"`、`keyframes[1].role=="图生图(基于上一帧)"`；
+  - ✅ `keyframes[0/1].src` 为干净中文 prompt（`Empty street...` / `Same empty street...`），无 `text:`/`i2i:`/`{{` 残留；
+  - ✅ 不再是"裸 prompt 字符串透传"（`images` 元素为带 mode 的结构化 dict，非裸 str）。
+- **分支真实性（修复前必失败）**：临时 `git checkout 3946e95 -- prompt_training.py` 后重跑回归，脚本在 empty_scene 语义校验处直接 `AttributeError: 'str' object has no attribute 'get'`（修复前 `images[0]` 是裸字符串）→ 证明第 3 节断言**真能抓到 bug**；恢复 `9d0fb01` 后复跑仍 200/0。
+
+### 3) BUG-2 复验（camera_move assets/ data_uri）—— PASS（修复前 FAIL / 修复后 PASS）
+- 独立构造真实 `ASSET_SHOT={"asset_frame_start":"assets/first.png","asset_frame_end":"/fixture/last.png"}`，对 `camera_move_v1~v7` 调 `build_variants`，与 `_legacy_build_variants` 旧版逐字段比对：
+  - ✅ 全部变体 `images`/`keyframes`/`prompt` 新旧**完全相等**；
+  - ✅ `images` 中 `assets/` 开头的帧图均被转为 `data:image/...;base64,...`，**无裸 `assets/` 路径残留**；
+  - ✅ 首帧 `assets/first.png` 已转 data URI（复刻旧版 `_datauri(server.asset_abs(...))`）。
+- **分支真实性（修复前必失败）**：在 `3946e95` 版本上单独跑 assets/ 比对，新 loader 产出裸 `'assets/first.png'`、旧版产出 `'data:image/png;base64,STUB_assets/first.png'`，`nv != lv` 且"裸路径"断言同时触发（camera_move_v1~v7 全中）→ 证明第 5 节断言**真能抓到 bug**。
+- 边缘观察（非 bug，沿用开发说明）：若生产 `asset_frame_end` 也带 `assets/` 前缀，新 loader 会一并转 data URI（比旧版"仅首帧转"更完整），与该边缘下的旧版输出会**不等**——属旧版自身不一致，不在 AC-1.3 逐字段相等范围内。
+
+### 4) 新增回归分支真实性核查——通过
+- 第 3 节（empty_scene 语义）确有断言：`images[0].get("mode")=="text_to_image"`（L140）、`images[1].get("mode")=="image_to_image"`（L142）、`keyframes` 无 `text:/i2i:/{{` 残留、`role` 标明文生图/图生图。
+- 第 5 节（assets/ 分支）确有断言：逐变体 `nv==lv` 比对 + 循环断言"无裸 `assets/` 路径"（L199）。
+- 两者均在 `3946e95`（修复前）实际失败、在 `9d0fb01`（修复后）通过 → **分支有效，非空跑**。
+
+### 5) AC 复扫（独立脚本逐条确认）
+- **AC-1.1 PASS**：`camera_move_v1~v7.yaml` 全部存在且可加载（变体集 v0/v1/v2/v3、v0~v5、v6~v8、v9~v12、v13~v15、v16/v17、v18~v20 就位）。
+- **AC-1.2 PASS**：`build_variants` 函数体约 12 行（≤40 达标）；`--template` 切换 `camera_move_v1/v3/v5/v7` + `dialogue_v1` + `empty_scene_v1` 均成功。
+- **AC-1.3 PASS**：真实 `assets/` 路径下新 loader 与旧版逐字段一致（200 项回归 + 独立逐变体比对双重确认）。
+- **AC-1.4 PASS**：`dialogue_v1.yaml` 由加载器直接加载、未改任何 Python（变体 v0/v1 含 images/keyframes/prompt）。
+- **AC-1.5 PASS**：`{{var}}` 渲染无 `{{` 残留；`text:/i2i:` 区分文生图/图生图语义；`file:` 标记正确读取 `experiments/*.txt` 且缺失优雅 fallback（独立抽查 `_resolve_images("file:experiments/xxx.txt")` 通过）。
+
+### 6) 回归残留观察（S4 结论）
+- 独立确认：`build_variants` 对缺 `variants` 块返回 `{}`、变体缺 `keyframes/prompt` 时 `_render_variant` 返回空结构（`images:[]/keyframes:[]/prompt:""`），**不崩溃但静默**。
+- **判断**：功能不受影响（非阻塞），但该静默行为在 YAML 拼错字段名时会让 `main()` 静默产出 0 视频、难以排错。沿用此前建议，正式提 **S4 BUG**（见下方缺陷清单）。
+
+### 7) 缺陷清单（测试专属，仅报告不改）
+- ~~`[BUG][S2|P1] empty_scene_v1 text:/i2i: 未区分文生图/i2i 语义`~~ **已修复（二轮复验 PASS）**——关闭。
+- ~~`[BUG][S2|P1] camera_move 关键帧丢失 data_uri 转换`~~ **已修复（二轮复验 PASS）**——关闭。
+- ~~`[BUG][S4|P3] 证据路径描述不符`~~ **已修复**——开发进度已更正为实际落盘位置 `dev-work/_legacy_build_variants.py`，复验确认文件确实在该路径且回归可正常导入——关闭。
+- `[BUG][S4|P3] YAML 缺 variants/字段时加载器静默返回 {} / 空列表，无 warning（回归残留观察项）`
+  - 严重度 S4（不崩溃、不影响现有功能）；优先级 P3（非阻塞，建议后续加 warning 便于排错）。
+  - 复现：`build_variants` 在 `tpl.get("variants")` 为空或变体缺 `keyframes/prompt` 时返回 `{}`/空结构，`main()` 将静默跑出 0 视频。
+  - 期望：至少打印 warning（如 `print("⚠ 模板 %s 无 variants/字段缺失，产出空变体集" % template)`）便于配置错误时快速定位。
+  - 实际：当前静默返回，无提示。
+  - 环境：python 3.13.12 / 仓库 9d0fb01。
+
+### 8) 下一步
+- 阿编把关：对照本验收表逐条勾证据，确认无误后由阿编将状态机从「已验证(测试验收过)」推进到「完成」。
+- 可选：将上述 S4 warning 项交开发在后续迭代补上（非本次放行阻塞项）。
+
+---
+
+## 阿编把关结论（主理人·2026-08-12，切换 Hunyuan Hy3 后首测）
+
+- **放行决定：✅ 放行（完成）**。AC-1.1~1.5 全部 PASS，2 个阻塞 BUG 经测试复验确认真修好。
+- **主理人亲自复验证据**：用 `C:/Users/67972/.workbuddy/binaries/python/versions/3.13.12/python.exe` 重跑 `dev-work/regress_build_variants.py`，正常路径与 `REGRESS_NO_TMP=1` 缺失 fallback 路径均 **200 项 / 失败 0**，含 `assets/` data_uri 分支与 empty_scene 语义分支（修复前在 `3946e95` 上会失败，证明分支有效）。零 AGNES 额度。
+- **闭环是否跑通（本次核心测试目标）**：✅ 跑通。完整走完 开发实现 → 测试独立抓 BUG → 开发修复 → 测试复验 PASS → 主理人把关 五步，且测试确实独立抓出了开发自己 116 项回归没暴露的 2 个生产级 BUG（回归 fixture 掩盖），正是双角色闭环存在的价值。
+- **Hy3 模型表现（老板关切）**：开发/测试两个角色在 Hunyuan Hy3 下工作正常——能读懂任务卡、写代码、跑 dry-run 测试、按 `[BUG][S|P]` 格式报缺陷、遵守状态机权限（开发不标完成、测试不修码）。未观察到模型相关异常或上下文丢失。
+- **本次发现的问题（已闭环）**：
+  1. `[已修] empty_scene_v1` 的 `text:/i2i:` 仅透传字符串、未区分文生图/i2i 语义 → 空镜生成失效。
+  2. `[已修] camera_move` 真实 `assets/` 路径下丢失 data_uri 转换 → 生产数据下 AGNES 收不到图。
+  3. `[已修] 开发证据路径描述不符`（S4）。
+  4. `[遗留·S4·非阻塞] YAML 缺 variants/字段时加载器静默返回，建议加 warning`——建议后续迭代补，不阻塞本次。
+- **下一步建议**：S4 warning 项可开新任务卡交开发补；P0-1 完成后可推进 P0-2（图视冲突预检）/ P0-4（跨 seed 一致性），二者依赖 P0-1 的 YAML 模板机制。
