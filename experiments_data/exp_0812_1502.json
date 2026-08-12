@@ -42,8 +42,26 @@
       },
       "video": "ep_0811_145935/shot1/v18/shot1.mp4",
       "params": {
+        "prompt": "Smooth transition between the two keyframes of the same empty street. Animate: thin mist drifting slowly across the wet asphalt, streetlight glow gently pulsing, distant window lights flickering softly. Keep stable: no people, same building, same lamp position, same camera angle, same cold blue night, no jumps.",
+        "prompt_cn": "在同一条空旷街道的两个关键帧之间实现平滑过渡。动画元素：薄雾缓缓飘过潮湿的沥青路面，路灯光芒轻柔脉动，远处窗户灯光微微闪烁。保持稳定：无人物出现，建筑相同，路灯位置不变，摄像机角度一致，保持相同的冷蓝色夜景，无画面跳变。",
+        "keyframes": [
+          {
+            "role": "镜A首帧·真空景",
+            "src": "https://platform-outputs.agnes-ai.space/images/t2i/7d9ed776efee40d58b27ab36329f2c75.png"
+          },
+          {
+            "role": "镜A尾帧·空景微变",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_7FTvuTVsR68CO8KvXVlylGD7dycLjV5c/output.png"
+          }
+        ],
+        "images": 2,
         "num_frames": 81,
+        "size": "480x854",
         "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "seed": 1223,
         "duration_s": 3.4
       },
       "identity_note": "空镜免检：v18 真空景镜头无人物，尾帧脸型比对属误报（已修训练脚本空镜免检）",
@@ -106,8 +124,26 @@
       },
       "video": "ep_0811_145935/shot1/v19/shot1.mp4",
       "params": {
+        "prompt": "Smooth transition of the same man in the same street. Animate: he takes a few steps forward (camera moves closer), subtle breathing, hair moving gently in night wind, backpack straps shifting slightly. Keep stable: same face, white shirt, black trousers, black backpack, same building and lamp behind, same camera angle, no jumps, no morphing.",
+        "prompt_cn": "同一个男人在同一条街道上平滑过渡。动画效果：他向前迈几步（镜头随之推进），呼吸轻微起伏，头发在夜风中轻柔飘动，背包肩带微微晃动。保持稳定：面部特征不变，白衬衫、黑色长裤、黑色背包，身后的建筑与路灯保持一致，镜头角度不变，无跳跃，无变形。",
+        "keyframes": [
+          {
+            "role": "镜B首帧·人物远景",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_2jJhncwKsoCGfxFaTQcR5QwpKPFpj9w1/output.png"
+          },
+          {
+            "role": "镜B尾帧·人物中近景（明显变大）",
+            "src": "https://platform-outputs.agnes-ai.space/images/i2i/task_lHKsM8OvF4dpUpQFJVvZaTYdPATMArS9/output.png"
+          }
+        ],
+        "images": 2,
         "num_frames": 81,
+        "size": "480x854",
         "frame_rate": 24,
+        "mode": "keyframes",
+        "model": "agnes-video-v2.0",
+        "negative": "text, watermark, logo, subtitles, morphing, deformed hands, extra fingers, blurry face, frame jump, identity change, clothing change",
+        "seed": 1224,
         "duration_s": 3.4
       },
       "learn": {
