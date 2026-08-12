@@ -72,6 +72,16 @@ $env:DEPLOY_HOST = "user@vps.example.com"   # 或 -DeployHost
 - O5 未 provisioned 时：仅 `--check` 验证脚本不报错即视为通过。
 - 配置项：`DEPLOY_HOST`（必填）/ `DEPLOY_PATH`（默认 `/opt/workbuddy`）/ `DEPLOY_KEY`（私钥路径）。
 
+### 5) check_wip.ps1（T-20260812-05 · WIP 机械检查）
+```powershell
+.\check_wip.ps1                  # 统计 board 项目(默认19) doing 任务数，≤3 放行
+.\check_wip.ps1 -Limit 0         # 红卡：doing>0 即 FAIL exit 1（GATE0 派活前可做硬拦截）
+.\check_wip.ps1 -Owner 阿编      # 只统计该 author 的 doing 任务（近似 v4 按角色 WIP）
+```
+- 调 board API `GET /api/tasks?project_id=<id>`（带 `X-Agent` + `X-Board-Token`，令牌读 `shared_board/.env`）。
+- doing ≤ Limit → `[OK] WIP PASS (n/limit)` exit 0；超限 → `[FAIL] WIP 超限` + 列标题 exit 1。
+- board 服务未起 → 明确报错 exit 1（不静默）。零 AGNES 额度，幂等可重复。
+
 ## 已知坑（已在脚本内规避）
 
 1. `Get-NetTCPConnection` 常把 8777 归 PID 0（假象）→ 一律改用 `Get-CimInstance Win32_Process` 按 CommandLine 精确查。
