@@ -1,0 +1,57 @@
+# templates/camera_move_v6.yaml
+# 来源：prompt_training.py build_variants 的 camera_move_v6 分支（第六轮·老板导演思维：首尾帧必须同场景/同光效/同机位）
+# 拆镜：镜A 空景→空景微变；镜B 人物中景→人物微变。sceneA_2/sceneB_2 缺失时 fallback 为 ""。
+name: camera_move_v6
+description: "首尾帧同场景拆解（镜A空景/镜B人物）（第六轮）"
+type: camera_move
+
+variables:
+  first: "asset_frame_start"
+  last: "asset_frame_end"
+  anchor: "ref.remote_url"
+  base_prompt: "shot.video_prompt"
+  sceneA_2:
+    file: "experiments/sceneA_2.txt"
+    default: ""
+  sceneB_2:
+    file: "experiments/sceneB_2.txt"
+    default: ""
+
+constants:
+  V16_PROMPT: >
+    Smooth transition from keyframe 1 to keyframe 2 of the same empty street scene.
+    Animate: thin mist drifting slowly across the wet asphalt, streetlight glow gently
+    brightening, distant building windows flickering softly.
+    Keep stable: same glass office building, same street lamp position, same cold blue
+    night tone, same camera angle, no people appearing, no jumps.
+  V17_PROMPT: >
+    Smooth transition from keyframe 1 to keyframe 2 of the same man in the same scene.
+    Animate: he raises his head slightly, shoulders relax, subtle breathing, hair moving
+    gently in the night wind, a faint exhale visible.
+    Keep stable: same face, same white shirt, same black trousers and backpack, same
+    midnight street background, same camera angle, no jumps, no morphing.
+
+variants:
+  v16:
+    hypothesis: "镜A拆解：空景→空景微变（同场景双帧，雾气/灯光微动）"
+    goal: "同场景双帧时间推移"
+    reference: "第六轮·镜A空景"
+    num_frames: 81
+    keyframes:
+      - role: "镜A首帧·空景"
+        src: "{{first}}"
+      - role: "镜A尾帧·空景微变"
+        src: "{{sceneA_2}}"
+    prompt: "{{V16_PROMPT}}"
+
+  v17:
+    hypothesis: "镜B拆解：人物中景→人物微变（同人同机位，姿态微动）"
+    goal: "同人同机位姿态微变"
+    reference: "第六轮·镜B人物"
+    num_frames: 81
+    keyframes:
+      - role: "镜B首帧·人物中景"
+        src: "{{last}}"
+      - role: "镜B尾帧·人物微变"
+        src: "{{sceneB_2}}"
+    prompt: "{{V17_PROMPT}}"

@@ -1,0 +1,88 @@
+# templates/camera_move_v3.yaml
+# 来源：prompt_training.py build_variants 的 camera_move_v3 分支（第三轮·老板方向：多帧控制点 + 官方过渡 prompt）
+# frame3_halfbody 读 experiments/frame3_halfbody.txt，缺失时优雅 fallback 为 ""。
+name: camera_move_v3
+description: "多帧控制点 + 官方过渡关系 prompt（第三轮）"
+type: camera_move
+
+variables:
+  first: "asset_frame_start"
+  last: "asset_frame_end"
+  anchor: "ref.remote_url"
+  base_prompt: "shot.video_prompt"
+  frame3_halfbody:
+    file: "experiments/frame3_halfbody.txt"
+    default: ""
+
+constants:
+  TRANS4: >
+    Smooth continuous camera push-in across 4 keyframes of the same character and scene,
+    with NO jumps and NO clothing or identity changes between frames:
+    Frame 1: empty urban street at midnight, glass office building, cold street lamp.
+    Frame 2: the Chinese male programmer appears, front view, same face and clothing as the reference
+    (white button-up shirt with rolled sleeves, black trousers, worn black backpack).
+    Frame 3: same man in full body standing under the street lamp, same face, hairstyle and clothing, tired posture.
+    Frame 4: same man in medium shot, same face and clothing, tired expression, cold blue night.
+    Keep the character's face, hairstyle, and clothing IDENTICAL across all frames.
+    Keep camera and scene consistent. Photorealistic, cinematic, 24fps.
+    Generate a smooth transition between the keyframes: keep the character's appearance
+    unchanged (no face morphing), keep the camera angle consistent (no shaking),
+    achieve natural motion between scenes (no jumps).
+  TRANS3: >
+    Smooth continuous camera push-in across 3 keyframes of the same character and scene,
+    with NO jumps and NO clothing or identity changes:
+    Frame 1: empty urban street at midnight, glass office building, cold street lamp.
+    Frame 2: the Chinese male programmer, same face and clothing as the reference
+    (white button-up shirt with rolled sleeves, black trousers, worn black backpack).
+    Frame 3: same man in medium shot, same face and clothing, tired expression.
+    Keep the character's face, hairstyle, and clothing IDENTICAL across all frames.
+    Keep camera and scene consistent. Photorealistic, cinematic, 24fps.
+    Generate a smooth transition between the keyframes: keep the character's appearance
+    unchanged (no face morphing), keep the camera angle consistent (no shaking),
+    achieve natural motion between scenes (no jumps).
+  V3_V7_SUFFIX: >
+    Keep the same character face and clothing across all four frames, smooth transition, no jumps.
+
+variants:
+  v6:
+    hypothesis: "4帧+过渡prompt：官方推荐写法"
+    goal: "官方推荐多帧控制点 + 过渡关系 prompt"
+    reference: "第三轮·官方过渡写法"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色脸锚"
+        src: "{{anchor}}"
+      - role: "角色半身"
+        src: "{{frame3_halfbody}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{TRANS4}}"
+
+  v7:
+    hypothesis: "4帧+场景prompt：对照——同图数但 prompt 仍场景描述"
+    goal: "对照：同图数但 prompt 仍场景描述"
+    reference: "第三轮·对照"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色脸锚"
+        src: "{{anchor}}"
+      - role: "角色半身"
+        src: "{{frame3_halfbody}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}} {{V3_V7_SUFFIX}}"
+
+  v8:
+    hypothesis: "3帧+过渡prompt：对照——同写法少一个控制点"
+    goal: "对照：同写法少一个控制点"
+    reference: "第三轮·对照"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色锚点"
+        src: "{{anchor}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{TRANS3}}"

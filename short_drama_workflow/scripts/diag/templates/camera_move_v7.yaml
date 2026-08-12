@@ -1,0 +1,84 @@
+# templates/camera_move_v7.yaml
+# 来源：prompt_training.py build_variants 的 camera_move_v7 分支（第七轮·老板修正：首尾帧图本身须符合物理/空间规律）
+# 镜A 真空景双帧；镜B 人物由远走近。各文件缺失时按原代码 fallback（anchor_far→anchor，其余→""）。
+name: camera_move_v7
+description: "首尾帧物理连贯：真空景 + 人物由远走近（第七轮）"
+type: camera_move
+
+variables:
+  first: "asset_frame_start"
+  last: "asset_frame_end"
+  anchor: "ref.remote_url"
+  base_prompt: "shot.video_prompt"
+  anchor_far:
+    file: "experiments/anchor_far.txt"
+    default: "{{anchor}}"
+  empty1:
+    file: "experiments/sceneA_empty1.txt"
+    default: ""
+  empty2:
+    file: "experiments/sceneA_empty2.txt"
+    default: ""
+  close1:
+    file: "experiments/sceneB_close2.txt"
+    default: ""
+  distant_small:
+    file: "experiments/sceneB_distantsmall.txt"
+    default: "{{anchor_far}}"
+
+constants:
+  V18_PROMPT: >
+    Smooth transition between the two keyframes of the same empty street.
+    Animate: thin mist drifting slowly across the wet asphalt, streetlight glow gently
+    pulsing, distant window lights flickering softly.
+    Keep stable: no people, same building, same lamp position, same camera angle,
+    same cold blue night, no jumps.
+  V19_PROMPT: >
+    Smooth transition of the same man in the same street.
+    Animate: he takes a few steps forward (camera moves closer), subtle breathing,
+    hair moving gently in night wind, backpack straps shifting slightly.
+    Keep stable: same face, white shirt, black trousers, black backpack, same building and
+    lamp behind, same camera angle, no jumps, no morphing.
+  V20_PROMPT: >
+    Smooth transition of the same man in the same street.
+    Animate: he walks toward the camera filling more and more of the frame,
+    subtle breathing, hair moving gently, backpack straps shifting.
+    Keep stable: same face, white shirt, black trousers, black backpack, same building and
+    lamp behind, same camera angle, no jumps, no morphing.
+
+variants:
+  v18:
+    hypothesis: "镜A真空景双帧：文生图无人物+i2i微变（物理：同场景时间推移）"
+    goal: "真空景过渡验证"
+    reference: "第七轮·镜A真空景"
+    num_frames: 81
+    keyframes:
+      - role: "镜A首帧·真空景"
+        src: "{{empty1}}"
+      - role: "镜A尾帧·空景微变"
+        src: "{{empty2}}"
+    prompt: "{{V18_PROMPT}}"
+
+  v19:
+    hypothesis: "镜B走近修复：远景→中近景（prompt与图一致，真走近）"
+    goal: "人物由远走近，物理连贯"
+    reference: "第七轮·镜B走近"
+    num_frames: 81
+    keyframes:
+      - role: "镜B首帧·人物远景"
+        src: "{{anchor_far}}"
+      - role: "镜B尾帧·人物中近景（明显变大）"
+        src: "{{close1}}"
+    prompt: "{{V19_PROMPT}}"
+
+  v20:
+    hypothesis: "镜B极值：远景小(1/3)→中近景特写（物理规律显著）"
+    goal: "远景小→中近景特写，物理规律显著"
+    reference: "第七轮·镜B极值"
+    num_frames: 81
+    keyframes:
+      - role: "镜B极值首帧·人物远景小(1/3)"
+        src: "{{distant_small}}"
+      - role: "镜B极值尾帧·人物中近景特写"
+        src: "{{close1}}"
+    prompt: "{{V20_PROMPT}}"

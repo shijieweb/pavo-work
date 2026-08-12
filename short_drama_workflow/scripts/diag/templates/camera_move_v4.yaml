@@ -1,0 +1,90 @@
+# templates/camera_move_v4.yaml
+# 来源：prompt_training.py build_variants 的 camera_move_v4 分支（第四轮·老板方向：验证开头闪帧根因）
+# anchor_far 读 experiments/anchor_far.txt，缺失时 fallback 为 anchor（角色锚点）。
+name: camera_move_v4
+description: "验证开头闪帧根因（第四轮）"
+type: camera_move
+
+variables:
+  first: "asset_frame_start"
+  last: "asset_frame_end"
+  anchor: "ref.remote_url"
+  base_prompt: "shot.video_prompt"
+  anchor_far:
+    file: "experiments/anchor_far.txt"
+    default: "{{anchor}}"
+
+constants:
+  V9_PROMPT: >
+    Generate a smooth cinematic transition between the two keyframes, maintaining visual
+    consistency and natural camera movement. Frame 1: empty urban street at midnight,
+    cold blue night, street lamp. Frame 2: the Chinese male programmer in medium shot,
+    tired expression. Keep camera slowly pushing in across the transition. Keep the
+    character's face, hairstyle, and clothing IDENTICAL.
+  V10_PROMPT: >
+    Generate a smooth cinematic transition between the three keyframes, maintaining visual
+    consistency and natural camera movement. Frame 1: empty urban street at midnight,
+    cold blue night, street lamp. Frame 2: the same man in a small far figure, walking
+    towards the camera. Frame 2: the Chinese male programmer in medium shot, tired
+    expression. Keep camera slowly pushing in across the transition. Keep the character's
+    face, hairstyle, and clothing IDENTICAL.
+  V11_PROMPT: >
+    Smooth continuous camera push-in across 3 keyframes of the same scene.
+    Frame 1 MUST BE empty urban street with NO person visible at all.
+    The character appears starting from Frame 2.
+    Frame 2: the Chinese male programmer appears, same face and clothing as reference.
+    Frame 3: same man in medium shot, same face and clothing.
+    Keep the character's face, hairstyle, and clothing IDENTICAL across frames.
+    Keep camera consistent. NO jumps, NO clothing changes.
+
+variants:
+  v9:
+    hypothesis: "2帧+过渡prompt：回归官方推荐[空景→尾帧]，无中间锚点帧"
+    goal: "回归官方 2 帧 [空景→尾帧]，避免模型误解时间顺序"
+    reference: "第四轮·官方推荐"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{V9_PROMPT}}"
+
+  v10:
+    hypothesis: "3帧+过渡prompt：锚点帧用远景小人物（非特写脸）"
+    goal: "锚点帧用远景小人物，避免被误当起点"
+    reference: "第四轮·远景小人物"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色远景小(非特写)"
+        src: "{{anchor_far}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{V10_PROMPT}}"
+
+  v11:
+    hypothesis: "3帧+空景约束prompt：明示Frame 1无人物，人物从Frame 2出现"
+    goal: "强化空景约束 prompt"
+    reference: "第四轮·空景约束"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色锚点"
+        src: "{{anchor}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{V11_PROMPT}}"
+
+  v12:
+    hypothesis: "v10写法+30fps：官方更流畅运动（对比24fps）"
+    goal: "对比 30fps vs 24fps 流畅度"
+    reference: "第四轮·帧率对比"
+    frame_rate: 30
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色远景小(非特写)"
+        src: "{{anchor_far}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{V10_PROMPT}}"

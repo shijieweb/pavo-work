@@ -1,0 +1,73 @@
+# templates/camera_move_v2.yaml
+# 来源：prompt_training.py build_variants 的默认 fallthrough 分支（第二轮·软身份词方向）
+# 注意：原代码无 if template=="camera_move_v2"，而是结尾默认 return；此文件即该默认分支。
+# 加载器默认 template=camera_move_v2。
+name: camera_move_v2
+description: "软身份词方向（第二轮·默认）"
+type: camera_move
+
+variables:
+  first: "asset_frame_start"
+  last: "asset_frame_end"
+  anchor: "ref.remote_url"
+  base_prompt: "shot.video_prompt"
+
+constants:
+  SOFT_IDENTITY_BOOST: >
+    Keep the man's clothing and accessories consistent with the reference image:
+    white button-up shirt with rolled sleeves, black trousers, worn black backpack.
+    Same overall mood and body language. For the face, follow the reference image exactly.
+  BASE_REF: "AGNES keyframes 官方语义（多图=插值控制点）；第一轮 exp_0811_1755 机制发现：prompt 角色描述优先级>参考图，锁脸靠锚点帧图主导"
+
+variants:
+  v0:
+    hypothesis: "基准：现状 2 帧 + 原 prompt（对照）"
+    goal: "量化基线：验证现状写法的真实水平（对照组）"
+    reference: "基线=生产默认写法"
+    implement: "关键帧 2 帧[起点空景,尾帧中景]+原 prompt，无任何增强"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}}"
+
+  v1:
+    hypothesis: "锚点帧：3 帧插值经过锚点脸（第一轮视觉唯一 pass）"
+    goal: "验证锚点帧锁脸是否可重复（第一轮曾 pass）"
+    reference: "第一轮 exp_0811_1755 v1"
+    implement: "关键帧 3 帧[起点空景,角色锚点图,尾帧中景]，prompt 不变"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色锚点"
+        src: "{{anchor}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}}"
+
+  v4:
+    hypothesis: "锚点+软词：图锚锁脸 + 服装软锁"
+    goal: "锚点帧+软身份词组合，期望硬门槛全过"
+    reference: "{{BASE_REF}}"
+    implement: "3 帧 + SOFT_IDENTITY_BOOST（服装/配饰/气质软锁，不写死脸型）"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "角色锚点"
+        src: "{{anchor}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}} {{SOFT_IDENTITY_BOOST}}"
+
+  v5:
+    hypothesis: "软词：仅服装/配饰软锁"
+    goal: "单独验证软身份词是否足够锁角色"
+    reference: "{{BASE_REF}}"
+    implement: "2 帧 + SOFT_IDENTITY_BOOST（无锚点帧）"
+    keyframes:
+      - role: "起点空景"
+        src: "{{first}}"
+      - role: "尾帧"
+        src: "{{last}}"
+    prompt: "{{base_prompt}} {{SOFT_IDENTITY_BOOST}}"
