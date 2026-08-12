@@ -111,30 +111,58 @@ def _render_template(text, ctx):
 
 
 def _resolve_images(token, ctx):
-    """解析单个 keyframe src 标记：text:/i2i:/file: 走各自语义，否则按变量/字面量直出。"""
+    """解析单个 keyframe src 标记，返回结构化结果 {"mode", "raw"}（raw 为未转 data_uri 的干净值）。
+
+    语义（AC-1.5）：
+      - text:xxx  → 文生图 text_to_image（首帧，无源图，用 prompt 生成图）
+      - i2i:xxx   → 图生图 image_to_image（尾帧，基于上一帧）
+      - file:xxx  → 读实验文件（mode=file）
+      - 其它（camera_move 的 {{first}}/{{last}}/{{anchor}} 真实图路径/URL）→ mode=image
+        （assets/ 前缀帧图在 _render_variant 收集 images 时转 data URI，复刻旧版 first 帧逻辑）
+    """
     s = _render_template(token, ctx)
     if s.startswith("text:"):
-        return s[len("text:"):]
+        return {"mode": "text_to_image", "raw": s[len("text:"):].strip()}
     if s.startswith("i2i:"):
-        return s[len("i2i:"):]
+        return {"mode": "image_to_image", "raw": s[len("i2i:"):].strip()}
     if s.startswith("file:"):
         p = s[len("file:"):]
         fp = os.path.join(HERE, p) if not os.path.isabs(p) else p
-        return open(fp, encoding="utf-8").read().strip() if os.path.isfile(fp) else ""
-    return s
+        content = open(fp, encoding="utf-8").read().strip() if os.path.isfile(fp) else ""
+        return {"mode": "file", "raw": content}
+    return {"mode": "image", "raw": s}
 
 
 def _render_variant(vdef, ctx):
-    """把单个变体定义渲染为 main() 消费的字典：images + keyframes(role/src) + prompt + hyp。"""
+    """把单个变体定义渲染为 main() 消费的字典：images + keyframes(role/src) + prompt + hyp。
+
+    关键帧语义（AC-1.5）：
+      - text_to_image（首帧文生图，无源图）/ image_to_image（尾帧图生图，基于上一帧）：
+        images 每帧为 {"mode":..., "content":...} dict，供下游 gen_video 区分首帧文生图/尾帧 i2i；
+        keyframes 的 role/src 渲染为干净值（去掉 text:/i2i: 前缀）。
+      - image（camera_move 真实图路径/URL）：images 保持字符串格式（兼容 gen_video）；
+        assets/ 前缀帧图转 data URI（复刻旧版 first 帧 _datauri(server.asset_abs(...)) 逻辑）。
+    """
     keyframes, images = [], []
     for kf in vdef.get("keyframes", []):
         if isinstance(kf, dict):
             role, raw = kf.get("role", ""), kf.get("src", "")
         else:
             role, raw = "", kf
-        val = _resolve_images(raw, ctx)
-        keyframes.append({"role": role or raw, "src": val})
-        images.append(val)
+        res = _resolve_images(raw, ctx)
+        mode, content = res["mode"], res["raw"]
+        # keyframes：role/src 渲染为干净值（去掉 text:/i2i: 前缀）；src 保持原始值（与旧版看板展示一致）
+        if not role:
+            role = {"text_to_image": "文生图(无源图)",
+                    "image_to_image": "图生图(基于上一帧)"}.get(mode, raw)
+        keyframes.append({"role": role, "src": content})
+        # images：文生图/图生图 → 带 mode 标记的 dict；真实图 → 字符串（assets/ 转 data URI）
+        if mode in ("text_to_image", "image_to_image"):
+            images.append({"mode": mode, "content": content})
+        else:
+            img = _datauri(server.asset_abs(content)) if (
+                isinstance(content, str) and content.startswith("assets/")) else content
+            images.append(img)
     prompt = _render_template(vdef.get("prompt") or vdef.get("video_prompt") or "", ctx)
     out = {"images": images, "keyframes": keyframes, "prompt": prompt,
            "hyp": vdef.get("hypothesis", "")}
@@ -238,7 +266,19 @@ def gen_video(prompt, images, out_dir, sid, shot, seed=None, frame_rate=24, num_
     """提交 keyframes 视频 → 轮询 → 下载到 out_dir/shot<sid>.mp4。返回本地路径。
     seed: 固定随机种子（官方推荐可复现；训练实验传 seed 可对照排除随机性）。
     frame_rate: 帧率（官方：更流畅运动用 24 或 30）。
-    num_frames: 覆盖帧数（官方：8n+1；短时长实验如 81=3.4s）；None 走 _shot_nf。"""
+    num_frames: 覆盖帧数（官方：8n+1；短时长实验如 81=3.4s）；None 走 _shot_nf。
+
+    兼容结构化关键帧（AC-1.5）：images 元素可为 {"mode":..., "content":...} dict，
+    其中 text_to_image=文生图首帧（无源图）/ image_to_image=图生图尾帧；此处还原为提交用的 content，
+    保持与旧版字符串格式一致的行为。"""
+    # 还原结构化关键帧为提交用内容（字符串格式不变），同时保留 mode 信息供下游扩展
+    norm_images = []
+    for _im in (images or []):
+        if isinstance(_im, dict):
+            norm_images.append(_im.get("content"))
+        else:
+            norm_images.append(_im)
+    images = norm_images
     os.makedirs(out_dir, exist_ok=True)
     w, h = server._video_size()
     from agnes_client import wait_for_video
