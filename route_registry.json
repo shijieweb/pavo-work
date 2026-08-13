@@ -243,6 +243,15 @@
       "demo": true,
       "flags": {},
       "note": "AC-1.5 演示条目：新服务加一行即通。8779 通常未启动，命中返回 502/503 属预期（注册表已生效的柔性证据）"
+    },
+    {
+      "prefix": "/ext",
+      "target": "http://127.0.0.1:8788/api/ext",
+      "kind": "generic",
+      "flags": {
+        "board_token_inject": true
+      },
+      "note": "外部指导 API（T-20260813-05）：/ext/* 改写为 8788 /api/ext/*；无鉴权直达（老板决策），代理自动注入 X-Board-Token 过 board 写闸"
     }
   ],
   "examples": [
