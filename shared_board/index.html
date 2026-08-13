@@ -161,6 +161,34 @@
   .toast.show{opacity:1}
   .flash{animation:flash 2s ease-out}
   @keyframes flash{0%{background:rgba(59,130,246,.2)}100%{background:transparent}}
+  /* ── 筛选栏（T-08b 9） ── */
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 14px;background:var(--card-bg);border-bottom:1px solid var(--border)}
+  .fgroup{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
+  .fgroup .flabel{font-size:12px;color:var(--text2);margin-right:2px}
+  .fbtn{font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--btn-bg);color:var(--text);cursor:pointer;font-weight:500;transition:.15s;min-height:auto}
+  .fbtn:hover{background:var(--btn-hover)}
+  .fbtn.active{background:var(--btn-active);border-color:#818cf8;font-weight:600;color:var(--text)}
+  .freset{font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:5px 8px;min-height:auto}
+  /* ── 状态快捷切换菜单（T-08b 10） ── */
+  .status-menu{position:fixed;z-index:50;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;display:none;min-width:140px}
+  .status-menu.show{display:block}
+  .status-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;padding:7px 10px;border-radius:6px;font-size:13px;color:var(--text);cursor:pointer;font-weight:500}
+  .status-menu button:hover{background:var(--btn-hover)}
+  .status-menu .sm-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .card .badge{cursor:pointer}
+  .card .badge:hover{filter:brightness(.95);text-decoration:underline}
+  /* ── 完成时间戳 / 进度条位 / 关联标签（T-08b A 类） ── */
+  .done-stamp{font-size:10px;color:var(--st-done);font-weight:600;margin-top:4px;display:inline-block}
+  .progress-wrap{margin-top:8px}
+  .progress-bar{height:4px;background:var(--prog-bg);border-radius:2px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--prog-fill);border-radius:2px}
+  .progress-label{font-size:10px;color:var(--text2);margin-top:2px}
+  .parent-ref{cursor:pointer}
+  .parent-ref:hover{text-decoration:underline}
+  .dep-tag{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 5px;border-radius:3px;font-weight:600;cursor:pointer}
+  .dep-tag:hover{text-decoration:underline}
+  /* ── 指导留言栏（T-08b 11，复用审计块样式） ── */
+  .notes-toggle{cursor:pointer}
   /* ── 响应式：横向滚动优先（6 列不降列堆叠） ── */
   @media(max-width:600px){
     .col{flex:0 0 80vw}
@@ -185,17 +213,28 @@
       <button data-view="tree">树</button>
     </div>
     <button id="btnRefresh" title="强制刷新">🔄 刷新</button>
+    <button id="btnAuto" class="ghost active" title="自动刷新（开启时异步刷新数据，不打断抽屉编辑）">🔄 自动</button>
     <button id="btnDark" title="暗色模式">🌙</button>
   </div>
   <div id="prog" class="progbar"></div>
 </header>
 <div id="presence" class="presbar"><span class="muted">无 agent 在线</span></div>
+<div class="filterbar" id="filterbar">
+  <div class="fgroup"><span class="flabel">状态</span><span id="fStatus"></span></div>
+  <div class="fgroup"><span class="flabel">优先级</span><span id="fPriority"></span></div>
+  <div class="fgroup"><span class="flabel">作者</span><span id="fAuthor"></span></div>
+  <button class="freset" onclick="resetFilters()">✕ 清除筛选</button>
+</div>
 <div class="board" id="board"></div>
 <div class="wrap" id="treeWrap" hidden>
   <div id="tree"></div>
   <div id="empty" class="empty">先建一个项目，再开始加任务</div>
 </div>
 <div class="auditwrap"><div id="audit" class="auditbox"></div></div>
+<div class="auditwrap"><div id="notesBox" class="auditbox">
+  <div class="ahead notes-toggle" onclick="toggleNotes()">📌 指导留言 <span id="notesCount" class="muted"></span> <span class="muted" id="notesToggle">[收起]</span></div>
+  <div id="notesBody"></div>
+</div></div>
 
 <div class="mask" id="mask" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
@@ -220,6 +259,7 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="status-menu" id="statusMenu"></div>
 
 <script>
 if(location.protocol==="file:"){document.body.innerHTML='<div style="padding:24px;color:#dc2626;line-height:1.7">请通过 <b>http://电脑局域网IP:8788</b> 打开此页面（手机与电脑连同一 WiFi，用电脑的 IP 访问），<br>不要直接双击 html 文件，否则前端连不上服务。</div>';}
@@ -237,6 +277,7 @@ function showToast(msg){
 function ERR(msg){ showToast("操作失败："+msg); }
 async function api(url,opt){opt=opt||{};if(BOARD_TOKEN){opt.headers=Object.assign({},opt.headers||{},{'X-Board-Token':BOARD_TOKEN});}try{const r=await fetch(API+url,opt);if(!r.ok)throw new Error("HTTP "+r.status);if(r.status===204)return{};return await r.json();}catch(e){ERR(e.message);throw e;}}
 let projects=[], tasks=[], cur=null, expanded=new Set(), curTask=null, viewMode='kanban';
+let filterStatus=null, filterPriority=null, filterAuthor=null, curStatusId=null, notesCache=[], notesOpen=true, autoOn=true, autoTimer=null;
 
 // 泳道 6 列（5 态 + 阻塞旁路，status→列 1:1 直映射，无 fallback）
 const COLUMNS=[
@@ -247,6 +288,9 @@ const COLUMNS=[
   {key:'完成',label:'🏁 完成',cls:'st-done'},
   {key:'阻塞',label:'⚠️ 阻塞',cls:'st-blocked'}
 ];
+// 筛选维度取值（状态含阻塞以保留全能力；优先级 4 档）
+const FILTER_STATUSES=['待办','进行中','待验证','已验证','完成','阻塞'];
+const FILTER_PRIORITIES=['紧急','高','中','低'];
 const STATUS_CLS={'待办':'todo','进行中':'doing','待验证':'verify','已验证':'verified','完成':'done','阻塞':'blocked'};
 const AVATAR_INIT={'老板':'老','PM':'PM','产品经理':'产','前端研发':'前','后端研发':'后','测试工程师':'测'};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
@@ -270,9 +314,10 @@ async function load(){
     if(cur) sel.value=cur;
     if(cur) tasks=await api("/api/tasks?project_id="+cur);
     render();
+    loadNotes();
   }catch(e){}
 }
-function setProj(id){cur=id; if(id) load(); else {tasks=[];render();}}
+function setProj(id){cur=id; filterStatus=filterPriority=filterAuthor=null; if(id) load(); else {tasks=[];render();}}
 document.getElementById("projSel").onchange=e=>{ setProj(e.target.value); const p=projects.find(x=>x.id==e.target.value); document.getElementById("projOwner").value=p?(p.owner||"老板"):"老板"; };
 
 async function addProject(){
@@ -351,25 +396,35 @@ function renderCard(t){
   const priCls="p"+(pi>=0?pi:2);
   const kids=tasks.filter(x=>x.parent_id==t.id);
   const subHtml=kids.length?'<span class="subcount">👥 '+kids.length+' 子任务</span>':'';
-  const parentHtml=isChild?'<span class="parent-ref">↳ 父 #'+t.parent_id+'</span>':'';
+  const parentHtml=isChild?'<span class="parent-ref" onclick="event.stopPropagation();scrollToCard('+t.parent_id+')" title="点击定位父任务 #'+t.parent_id+'">↳ 父 #'+t.parent_id+'</span>':'';
   const cls='card st-'+statusCls(t.status)+(isChild?' child-card':'')+(t.status==='阻塞'?' blocked':'');
   const author=t.author||'老板';
+  // ① 完成时间戳徽章（done/完成 用 updated 近似）
+  const doneHtml=(t.status==='完成'||t.status==='done')?'<span class="done-stamp">✅ '+esc(t.updated||'')+'</span>':'';
+  // ③ 进度条位（暂无 progress 则不显示，留好结构，T-09 接入）
+  const prog=(typeof t.progress==='number')?'<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:'+t.progress+'%"></div></div><div class="progress-label">'+t.progress+'%</div></div>':'';
+  // ⑩ 卡片状态徽章（可点快捷切换，不开 drawer）
+  const stBadge='<span class="badge" data-status="'+esc(t.status)+'" onclick="event.stopPropagation();openStatusMenu('+t.id+',event)" title="点击快捷切换状态">'+esc(t.status)+'</span>';
   return '<div class="'+cls+'" id="card-'+t.id+'" onclick="openDrawer('+t.id+')">'
-    +'<div class="card-header"><span class="card-id">#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span></span>'
+    +'<div class="card-header"><span class="card-id">#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span> '+stBadge+'</span>'
     +'<button class="dbtn" onclick="event.stopPropagation();openDrawer('+t.id+')">详情</button></div>'
     +'<div class="card-title">'+esc(t.title)+'</div>'
+    +prog
     +'<div class="card-meta">'
     +'<span class="assignee"><span class="avatar '+avatarClass(author)+'">'+avatarInit(author)+'</span> '+esc(author)+'</span>'
     +'<span>🕐 '+esc(t.updated||'')+'</span>'
-    +(subHtml||parentHtml?'<span>'+subHtml+parentHtml+'</span>':'')
+    +(subHtml||parentHtml||doneHtml?'<span>'+subHtml+parentHtml+doneHtml+'</span>':'')
     +'</div></div>';
 }
 function renderBoard(){
   const board=document.getElementById("board");
   const groups={}; COLUMNS.forEach(c=>groups[c.key]=[]);
-  tasks.forEach(t=>{ const k=statusToColumn(t.status); if(groups[k]) groups[k].push(t); });
-  board.innerHTML=COLUMNS.map(col=>{
-    const cards=groups[col.key];
+  // 过滤卡片（优先级/作者/状态），与泳道列协同
+  tasks.forEach(t=>{ if(!matchFilter(t)) return; const k=statusToColumn(t.status); if(groups[k]) groups[k].push(t); });
+  // 状态筛选与优先级/作者一致：保留全部列，由 matchFilter 在卡片级隐藏不匹配卡片（PRD 〇.9「隐藏不匹配卡片」）
+  const cols = COLUMNS;
+  board.innerHTML=cols.map(col=>{
+    const cards=groups[col.key]||[];
     const html=cards.length?cards.map(renderCard).join(''):'<div class="empty">暂无任务</div>';
     return '<div class="col"><div class="col-header"><span class="col-dot '+col.cls+'"></span>'+col.label+' <span class="count">'+cards.length+'</span></div><div class="col-body">'+html+'</div></div>';
   }).join('');
@@ -377,7 +432,7 @@ function renderBoard(){
 
 // ── 树视图（保留 T-07：单击展开/双击/长按/详情按钮/子任务） ──
 function build(id){
-  const kids=tasks.filter(t=>t.parent_id==id);
+  const kids=tasks.filter(t=>t.parent_id==id && matchFilter(t));
   const box=document.createElement("div");
   kids.forEach(t=>{
     const node=document.createElement("div"); node.className="node";
@@ -413,9 +468,11 @@ function build(id){
 function renderProg(){
   const box=document.getElementById("prog");
   if(!cur){box.innerHTML="";return;}
-  const c={}; tasks.forEach(t=>{c[t.status]=(c[t.status]||0)+1;});
+  // 统计口径与当前筛选/泳道一致
+  const ft=tasks.filter(matchFilter);
+  const c={}; ft.forEach(t=>{c[t.status]=(c[t.status]||0)+1;});
   const n=k=>c[k]||0;
-  box.innerHTML='<span class="stat">总计 <b>'+tasks.length+'</b></span>'
+  box.innerHTML='<span class="stat">总计 <b>'+ft.length+'</b></span>'
     +'<span class="stat st-doing">进行中 <b>'+n("进行中")+'</b></span>'
     +'<span class="stat st-verify">待验证 <b>'+n("待验证")+'</b></span>'
     +'<span class="stat st-blocked">阻塞 <b>'+n("阻塞")+'</b></span>'
@@ -424,6 +481,7 @@ function renderProg(){
 }
 function render(){
   renderProg();
+  renderFilterButtons();
   const board=document.getElementById("board");
   const treeWrap=document.getElementById("treeWrap");
   if(!cur){
@@ -435,7 +493,7 @@ function render(){
     board.style.display='none'; treeWrap.hidden=false;
     const tree=document.getElementById("tree"); tree.innerHTML="";
     document.getElementById("empty").style.display="none";
-    const roots=tasks.filter(t=>t.parent_id==null);
+    const roots=tasks.filter(t=>t.parent_id==null && matchFilter(t));
     if(!roots.length){ tree.innerHTML='<div class="empty">这个项目还没有任务，点上方「+ 主任务」</div>'; return; }
     tree.append(build(null));
   } else {
@@ -468,6 +526,92 @@ function renderAudit(list){
   box.innerHTML=head+list.slice(0,20).map(r=>'<div class="arow">['+esc(r.ts)+'] '+esc(r.agent)+' '+esc(r.action)+' '+esc(r.target)+'</div>').join("");
 }
 
+// ── T-08b：筛选按钮组 / 状态快切 / flash 定位 / 指导留言 / 自动刷新 ──
+function matchFilter(t){
+  if(filterStatus && t.status!==filterStatus) return false;
+  if(filterPriority && (t.priority||'中')!==filterPriority) return false;
+  if(filterAuthor && (t.author||'老板')!==filterAuthor) return false;
+  return true;
+}
+function renderFilterButtons(){
+  const sb=document.getElementById('fStatus');
+  sb.innerHTML=FILTER_STATUSES.map(s=>`<button class="fbtn${filterStatus===s?' active':''}" data-dim="status" data-val="${s}">${s}</button>`).join('');
+  const pb=document.getElementById('fPriority');
+  pb.innerHTML=FILTER_PRIORITIES.map(p=>`<button class="fbtn${filterPriority===p?' active':''}" data-dim="priority" data-val="${p}">${p}</button>`).join('');
+  const authors=[...new Set(tasks.map(t=>(t.author||'老板')))];
+  const ab=document.getElementById('fAuthor');
+  ab.innerHTML=authors.map(a=>`<button class="fbtn${filterAuthor===a?' active':''}" data-dim="author" data-val="${esc(a)}">${esc(a)}</button>`).join('');
+}
+document.getElementById('filterbar').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-dim]'); if(!b) return;
+  const dim=b.dataset.dim, val=b.dataset.val;
+  if(dim==='status') filterStatus = (filterStatus===val)?null:val;
+  else if(dim==='priority') filterPriority = (filterPriority===val)?null:val;
+  else if(dim==='author') filterAuthor = (filterAuthor===val)?null:val;
+  renderFilterButtons(); render();
+});
+function resetFilters(){ filterStatus=filterPriority=filterAuthor=null; renderFilterButtons(); render(); }
+
+// ⑩ 卡片状态快捷切换（不开 drawer，调 PUT 状态接口；含 阻塞 以保留全能力）
+function openStatusMenu(id,ev){
+  ev.stopPropagation();
+  const menu=document.getElementById('statusMenu');
+  curStatusId=id;
+  menu.innerHTML=FILTER_STATUSES.map(s=>`<button data-st="${s}"><span class="sm-dot" style="background:var(--st-${STATUS_CLS[s]})"></span>${s}</button>`).join('');
+  menu.style.left=Math.min(ev.clientX, window.innerWidth-160)+'px';
+  menu.style.top=(ev.clientY+6)+'px';
+  menu.classList.add('show');
+}
+async function quickSetStatus(id,st){
+  try{
+    await api("/api/tasks/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:st})});
+    await load(); showToast("已切换 #"+id+" → "+st);
+  }catch(e){}
+}
+document.getElementById('statusMenu').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-st]'); if(!b) return;
+  document.getElementById('statusMenu').classList.remove('show');
+  quickSetStatus(curStatusId,b.dataset.st);
+});
+document.addEventListener('click',()=>{ const m=document.getElementById('statusMenu'); if(m) m.classList.remove('show'); });
+
+// ② flash 高亮定位（依赖/关联标签点击滚动定位 + 闪烁）
+function scrollToCard(id){
+  const el=document.getElementById('card-'+id);
+  if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),2000); }
+  else showToast('未找到关联卡片 #'+id);
+}
+
+// ⑪ 指导留言栏（GET /api/ext/notes?project_id=N，最新置顶，可折叠，复用审计块样式）
+async function loadNotes(){
+  if(!cur){ notesCache=[]; renderNotes(); return; }
+  try{ const list=await api("/api/ext/notes?project_id="+cur); notesCache=Array.isArray(list)?list:[]; }
+  catch(e){ /* 出错保留上一次缓存，不打断看板 */ }
+  renderNotes();
+}
+function renderNotes(){
+  const box=document.getElementById('notesBody');
+  const cnt=document.getElementById('notesCount');
+  if(!cur){ box.innerHTML='<div class="muted">选择项目后查看指导留言</div>'; cnt.textContent=''; return; }
+  cnt.textContent=notesCache.length?('('+notesCache.length+')'):'';
+  if(!notesCache.length){ box.innerHTML='<div class="muted">暂无指导留言</div>'; return; }
+  box.innerHTML=notesCache.map(n=>'<div class="arow">['+esc(n.ts)+'] <b>'+esc(n.agent||'远程指导')+'</b>：'+esc(n.text)+'</div>').join('');
+}
+function toggleNotes(){
+  notesOpen=!notesOpen;
+  document.getElementById('notesBody').hidden=!notesOpen;
+  document.getElementById('notesToggle').textContent=notesOpen?'[收起]':'[展开]';
+}
+
+// ⑬ 自动刷新开关（默认开；异步刷数据，不打断抽屉编辑；关=停轮询）
+async function tick(){
+  if(!autoOn) return;
+  if(cur){ try{ tasks=await api("/api/tasks?project_id="+cur); render(); }catch(e){} }
+  loadPresence(); loadAudit(); loadNotes();
+}
+function startAuto(){ if(autoTimer) clearInterval(autoTimer); autoTimer=setInterval(tick,5000); }
+function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
+
 // ── 视图切换（泳道 ⇄ 树，默认泳道） ──
 document.getElementById("viewToggle").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return;
@@ -487,11 +631,17 @@ document.getElementById('btnDark').addEventListener('click',()=>{
 });
 
 // ── 手动刷新 ──
-document.getElementById('btnRefresh').addEventListener('click',()=>{ load(); showToast('已刷新'); });
+document.getElementById('btnRefresh').addEventListener('click',()=>{ load(); loadNotes(); showToast('已刷新'); });
 
-// ── 自动刷新（保留 5s；T-08b 13 加开关） ──
-setInterval(()=>{if(cur) load(); loadPresence(); loadAudit();},5000);
-load(); loadPresence(); loadAudit();
+// ── 自动刷新开关（默认开；T-08b 13） ──
+document.getElementById('btnAuto').addEventListener('click',()=>{
+  autoOn=!autoOn;
+  const b=document.getElementById('btnAuto');
+  b.classList.toggle('active',autoOn);
+  if(autoOn){ startAuto(); showToast('已开启自动刷新'); } else { stopAuto(); showToast('已关闭自动刷新'); }
+});
+if(autoOn) startAuto();
+load(); loadPresence(); loadAudit(); loadNotes();
 </script>
 </body>
 </html>
