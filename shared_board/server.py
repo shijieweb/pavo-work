@@ -95,6 +95,13 @@ def db():
         c.execute("ALTER TABLE audit ADD COLUMN project_id INTEGER")
     except Exception:
         pass  # 旧库已存在该列时忽略
+    # 外部指导留言（T-20260813-05）：远程指导角色经 8787 /ext/notes 写入，前端「指导留言」栏/审计流展示
+    c.execute("""CREATE TABLE IF NOT EXISTS notes(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER,
+        text TEXT,
+        agent TEXT,
+        ts TEXT)""")
     c.commit(); return c
 
 def send(h, code, obj):
@@ -163,6 +170,59 @@ class H(BaseHTTPRequestHandler):
                 else:
                     rows = c.execute("SELECT ts,agent,action,target FROM audit ORDER BY id DESC LIMIT 20").fetchall()
                 send(self, 200, [{"ts": r[0], "agent": r[1], "action": r[2], "target": r[3]} for r in rows]); c.close(); return
+            # ---- 外部指导 API（T-20260813-05）：只读 + 留言，经 8787 /ext/* 访问，无鉴权直达 ----
+            if self.path.startswith("/api/ext/status"):
+                projs = c.execute("SELECT id,name,owner,created FROM projects ORDER BY id").fetchall()
+                inflight = c.execute("""SELECT id,parent_id,title,detail,status,author,updated,priority
+                    FROM tasks WHERE status<>'done'
+                    ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id""").fetchall()
+                recent = c.execute("SELECT ts,agent,action,target FROM audit ORDER BY id DESC LIMIT 8").fetchall()
+                send(self, 200, {
+                    "projects": [{"id": r[0], "name": r[1], "owner": r[2], "created": r[3]} for r in projs],
+                    "in_flight_tasks": [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中"} for r in inflight],
+                    "recent_audit": [{"ts": r[0], "agent": r[1], "action": r[2], "target": r[3]} for r in recent],
+                    "generated_at": now(),
+                }); c.close(); return
+            if self.path.startswith("/api/ext/projects"):
+                owner = None
+                if "?" in self.path:
+                    qs = urllib.parse.parse_qs(self.path.split("?", 1)[1])
+                    owner = qs.get("owner", [None])[0]
+                if owner:
+                    rows = c.execute("SELECT id,name,owner,created FROM projects WHERE owner=? ORDER BY id", (owner,)).fetchall()
+                else:
+                    rows = c.execute("SELECT id,name,owner,created FROM projects ORDER BY id").fetchall()
+                send(self, 200, [{"id": r[0], "name": r[1], "owner": r[2], "created": r[3]} for r in rows]); c.close(); return
+            if self.path.startswith("/api/ext/tasks"):
+                q = urllib.parse.parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+                pid = q.get("project_id", [None])[0]
+                if pid is None or not pid.isdigit():
+                    send(self, 400, {"error": "project_id 必填且为整数"}); c.close(); return
+                rows = c.execute("SELECT id,parent_id,title,detail,status,author,updated,priority FROM tasks WHERE project_id=? ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id", (int(pid),)).fetchall()
+                send(self, 200, [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中"} for r in rows]); c.close(); return
+            if self.path.startswith("/api/ext/audit"):
+                q = {}
+                if "?" in self.path:
+                    q = urllib.parse.parse_qs(self.path.split("?", 1)[1])
+                pid = q.get("project_id", [None])[0]
+                if pid:
+                    rows = c.execute("SELECT ts,agent,action,target FROM audit WHERE project_id=? ORDER BY id DESC LIMIT 20", (pid,)).fetchall()
+                else:
+                    rows = c.execute("SELECT ts,agent,action,target FROM audit ORDER BY id DESC LIMIT 20").fetchall()
+                send(self, 200, [{"ts": r[0], "agent": r[1], "action": r[2], "target": r[3]} for r in rows]); c.close(); return
+            if self.path.startswith("/api/ext/presence"):
+                rows = c.execute("SELECT agent,last_seen FROM presence ORDER BY last_seen DESC").fetchall()
+                send(self, 200, [{"agent": r[0], "last_seen": r[1]} for r in rows]); c.close(); return
+            if self.path.startswith("/api/ext/notes"):
+                q = {}
+                if "?" in self.path:
+                    q = urllib.parse.parse_qs(self.path.split("?", 1)[1])
+                pid = q.get("project_id", [None])[0]
+                if pid:
+                    rows = c.execute("SELECT id,project_id,text,agent,ts FROM notes WHERE project_id=? ORDER BY id DESC LIMIT 100", (pid,)).fetchall()
+                else:
+                    rows = c.execute("SELECT id,project_id,text,agent,ts FROM notes ORDER BY id DESC LIMIT 100").fetchall()
+                send(self, 200, [{"id": r[0], "project_id": r[1], "text": r[2], "agent": r[3], "ts": r[4]} for r in rows]); c.close(); return
             send(self, 404, {"error": "not found"})
         except Exception:
             traceback.print_exc(); send(self, 500, {"error": "server error"})
@@ -189,6 +249,22 @@ class H(BaseHTTPRequestHandler):
                 if raw: audit(c, agent, "创建任务", f"项目{pid}/{d.get('title','')}", pid)
                 if raw: touch(c, raw)
                 send(self, 200, {"id": cur.lastrowid}); c.close(); return
+            if self.path == "/api/ext/notes":
+                # 外部指导留言（T-20260813-05）：写 notes 表 + 审计 agent=远程指导 + 刷新在线；无鉴权（代理注入 token 过写闸）
+                pid = d.get("project_id")
+                if pid is None or not isinstance(pid, int):
+                    send(self, 400, {"error": "project_id 必填且为整数"}); c.close(); return
+                if proj_owner(c, pid) is None:
+                    send(self, 404, {"error": f"项目不存在: {pid}"}); c.close(); return
+                text = d.get("text")
+                if not isinstance(text, str) or not text.strip():
+                    send(self, 400, {"error": "text 不能为空"}); c.close(); return
+                note_agent = raw or "远程指导"
+                cur = c.execute("INSERT INTO notes(project_id,text,agent,ts) VALUES(?,?,?,?)", (pid, text.strip(), note_agent, now()))
+                c.commit()
+                audit(c, note_agent, "指导留言", f"项目{pid}/留言：{text.strip()[:30]}", pid)
+                touch(c, note_agent)
+                send(self, 200, {"ok": True, "id": cur.lastrowid}); c.close(); return
             send(self, 404, {"error": "not found"})
         except Exception:
             traceback.print_exc(); send(self, 500, {"error": "server error"})
