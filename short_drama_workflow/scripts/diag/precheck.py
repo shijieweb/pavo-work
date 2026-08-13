@@ -12,10 +12,11 @@
 - prompt_training 空镜免检口径：prompt 含 no people/no person/empty /without any people → n/a
 
 用法：
-  # 零额度 dry-run（不调 AGNES 视觉 API）
+  # 零额度 dry-run（不调 AGNES 视觉 API，默认安全路径）
   python precheck.py --project ep_0811_145935 --shot 1 --dry-run
-  # 真跑视觉（免费 key：AGNES_TEST_MODE=1 + AGNES_TEST_API_KEY，不占 VIP）
-  AGNES_TEST_MODE=1 python precheck.py --project ep_0811_145935 --shot 1
+  # 真跑视觉：必须 AGNES_TEST_API_KEY（免费 key）+ 过 test-mode 硬守卫，否则拒绝（防烧 VIP）
+  #   （.env 含 AGNES_TEST_API_KEY 时自动加载；无免费 key 时真视觉被拦截并报错退出，绝不走 prod/VIP）
+  python precheck.py --project ep_0811_145935 --shot 1
   # 直接传图/prompt（不依赖项目）
   python precheck.py --shot-id 1 --first a.png --last b.png --prompt "Wide shot, ..." --dry-run
 """
@@ -29,6 +30,31 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ_ROOT = os.path.join(HERE, "..", "..", "html_prototype")
 sys.path.insert(0, PROJ_ROOT)
 sys.path.insert(0, os.path.expanduser("~/.workbuddy/skills/agnes-ai/scripts"))
+
+
+def load_env(path):
+    """把 .env 里的键值注入 os.environ（仅当尚未设置），不打印任何密钥。
+
+    必须在 import agnes_client 之前执行（_KeyPool 在模块加载时读 os.environ），
+    与 l1_smoke.load_env 同构：让真视觉路径能自动拿到 AGNES_TEST_API_KEY（免费 key）。"""
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                key, val = key.strip(), val.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = val
+    except Exception:
+        pass
+
+
+load_env(os.path.expanduser("~/.workbuddy/.env"))
+load_env(r"C:/Users/67972/WorkBuddy/workbuddy/short_drama_workflow/.env")
 
 import server  # noqa: E402  (只读复用 asset_abs / 纯函数；import 不启动 HTTP 服务)
 
@@ -53,7 +79,10 @@ def _datauri(path):
 
 
 def _frame_src(v):
-    """把首/尾帧入参归一化为 AGNES 可读：http/data URI 原样；assets/ 相对路径转 data URI。"""
+    """把首/尾帧入参归一化为 AGNES 可读：http/data URI 原样；本地路径转 data URI。
+
+    本地路径（assets/ 相对或裸绝对/相对路径）不存在 → 返回 ""（判缺失，
+    与 assets/ 前缀缺失分支一致 → 素材自检判 warn；OBS-1 修复：裸路径不再被误判为已提供）。"""
     if not v:
         return ""
     s = str(v)
@@ -62,7 +91,7 @@ def _frame_src(v):
     if s.startswith("assets/"):
         abs_p = server.asset_abs(s)
         return _datauri(abs_p) if os.path.isfile(abs_p) else ""
-    return _datauri(s) if os.path.isfile(s) else s
+    return _datauri(s) if os.path.isfile(s) else ""
 
 
 def _resolve_frames(shot, first, last):
@@ -71,6 +100,39 @@ def _resolve_frames(shot, first, last):
     f0 = first if first is not None else (shot.get("asset_frame_start") or "")
     f1 = last if last is not None else (shot.get("asset_frame_end") or "")
     return _frame_src(f0), _frame_src(f1)
+
+
+class TestModeGuardError(RuntimeError):
+    """真视觉入口守卫失败：当前非 test 模式且无免费 key，拒绝真视觉（防烧 VIP）。"""
+
+
+def ensure_test_mode():
+    """【BUG-1 修复】真视觉入口硬守卫（对齐 l1_smoke.ensure_test_mode 范式，l1_smoke.py:75-94）。
+
+    保证 key-pool 处于 test 模式（免费 KEY）后才允许调用 AGNES 视觉 API，否则抛
+    TestModeGuardError（绝不进入 prod/VIP 分支）。逻辑：
+      1. 读 key_pool_status()；若是 prod/VIP，尝试 _pool.use_test() 切到免费 KEY。
+      2. 若没有免费 KEY（use_test()==False）→ 抛 TestModeGuardError（绝不烧 VIP）。
+      3. 再断言 mode=="test"：双重保险，任何情况下都不允许在 prod 下提交视觉。
+    返回 key_pool_status() dict（mode 必为 "test"）。
+    """
+    try:
+        sys.path.insert(0, os.path.expanduser("~/.workbuddy/skills/agnes-ai/scripts"))
+        import agnes_client as _ac
+    except Exception as _e:
+        raise TestModeGuardError("agnes_client 不可用，拒绝真视觉（防误烧 VIP）: %s" % str(_e)[:120])
+    st = _ac.key_pool_status()
+    if st["mode"] != "test":
+        switched = _ac._pool.use_test()  # 注意：模块级无 use_test()，是 _pool.use_test()
+        if not switched:
+            raise TestModeGuardError(
+                "当前 mode=%s（VIP/prod），且无 AGNES_TEST_API_KEY 可切免费 KEY；"
+                "为杜绝误烧 VIP，拒绝真视觉预检（请配置 AGNES_TEST_API_KEY 或使用 --dry-run）" % st["mode"])
+    # 切到 test 后再次硬断言：必须是 test，否则禁止视觉（防误烧 VIP）
+    st2 = _ac.key_pool_status()
+    if st2["mode"] != "test":
+        raise TestModeGuardError("入口守卫失败：mode 非 test，拒绝真视觉（防误烧 VIP）")
+    return st2
 
 
 def render_final_prompt(shot, strategy=None):
@@ -214,6 +276,18 @@ def precheck_shot(shot, first=None, last=None, prompt=None,
         return base
 
     # 5) 真跑视觉：复用 prompt_frame_match（AGNES 2.5-flash 免费 3000 次/天）
+    # 【BUG-1 修复】真视觉入口硬守卫：必须先确保 test 模式（免费 KEY），否则拒绝（防烧 VIP）。
+    try:
+        ensure_test_mode()
+    except TestModeGuardError as _ge:
+        base.update({
+            "precheck": "warn",
+            "reason": "真视觉被 test-mode 守卫拦截（防烧 VIP，AC-1.3 不阻塞）：%s" % str(_ge),
+            "prompt_frame_match": None,
+            "conflicts": [{"stage": "guard", "type": "test-mode 守卫", "severity": "high",
+                           "desc": str(_ge)[:200]}],
+        })
+        return base
     sys.path.insert(0, HERE)
     from vision_review import prompt_frame_match
     pfm = prompt_frame_match(prompt, f0, f1, model=model, timeout=timeout)
@@ -277,6 +351,15 @@ def main():
     prompt = args.prompt
     if prompt is None and shot:
         prompt = render_final_prompt(shot) or shot.get("video_prompt") or shot.get("prompt") or ""
+
+    # 【BUG-1 修复】CLI 真视觉（非 --dry-run）入口守卫：无免费 key 时明确报错并非零退出（防烧 VIP）
+    if not args.dry_run:
+        try:
+            ensure_test_mode()
+        except TestModeGuardError as _ge:
+            print(json.dumps({"ok": False, "precheck": "blocked", "error": str(_ge)},
+                             ensure_ascii=False, indent=2))
+            sys.exit(3)
 
     res = precheck_shot(shot, first=args.first, last=args.last, prompt=prompt,
                         model=args.model, dry_run=args.dry_run, timeout=args.timeout)
