@@ -352,6 +352,9 @@
 | 2026-08-13 | 开发(software-engineer) | T-20260813-05 看板外部API | 派活→待验证 | design.md 审过(agnes_proxy零改动结论核实)；before b265759 + 完成 cc00088(注册表+/ext·server.py 6端点+notes表·board.db状态对齐·21项自测PASS·temp DB/8799测试未碰线上) |
 | 2026-08-13 | 主理人(合伙人) | T-20260813-05 | 待验证→派验收 | 主理人核产(cc00088最小集+agnesis_proxy零改动+py_compile)；干净重启8787(19632)/8788(25660)；线上实测6端点无token全200+POST写库+不污染+AC-1.5查库(10done+2todo)+回归35全过；派QA独立验收 |
 | 2026-08-13 | QA(software-qa-engineer-2) | T-20260813-05 | 已验证→完成 | 独立验收AC-1.1~1.5全PASS+回归35/35 exit0+无BUG；L0静态(注册表/notes表/前端审计流/零改动)+L1真跑(含4错误路径+UTF-8无损+直连8788 401预期)；建议放行 |
+| 2026-08-13 | 开发(software-engineer-3) | T-20260813-07 看板5态+docs+校验+热加载 | 派活→待验证 | design审过(K1关键坑+K2~K4全覆盖·/ext/docs修正)；before ff33776 + 完成 bb8f7c2(6文件+274/-22：server.py枚举+校验+/docs路由+K1三态过滤·docs.html·index.html 5处中文化·migrate_status_zh.py·check_wip三态·agnes_proxy热加载mtime惰性) |
+| 2026-08-13 | 主理人(合伙人) | T-20260813-07 | 待验证→派验收 | 主理人核产(bb8f7c2最小集+py_compile)+**执行线上迁移**(K3顺序：停8788→备份board.db.bak-190840→迁移todo→待办×10/done→完成×10→0英文残留→起新代码)+干净重启8787(29144)/8788(13040)+线上实测(AC-1.1中文+K1在途0、AC-1.2校验400/200、AC-1.3/docs 200、AC-1.6热加载加删路由秒级+字节还原、AC-1.7回归9项200+route_diff 35全过) |
+| 2026-08-13 | QA(software-qa-engineer-4) | T-20260813-07 | 已验证→完成 | 独立验收AC-1.1~1.7全PASS+无BUG；K1~K4专项全过(在途三态未爆表/热加载字节还原/备份含英文/前端0英文残留)；隔离实例8799+线上只读；TEST-FIX-1 QA自修(test期望对齐三态口径) |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -359,6 +362,7 @@
 > 用法见 `short_drama_workflow/ops/judge_and_log.sh`（包装 judge_subagent.sh，零破坏）。
 
 <!-- JUDGE_LEDGER -->
+- 2026-08-13 19:16 | T-20260813-07 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收全PASS·5态中文+docs+校验+热加载·K1~K4全覆盖
 - 2026-08-13 18:42 | T-20260813-05 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收全PASS·6端点200+状态对齐+回归35全过·无BUG
 - 2026-08-13 18:32 | T-20260813-06 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收抓BUG-1烧VIP风险·a04c8f1修复·Round2全PASS
 - 2026-08-13 17:37 | T-20260813-02 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人复验·33路由PASS·AC-1.5真服务铁证200
