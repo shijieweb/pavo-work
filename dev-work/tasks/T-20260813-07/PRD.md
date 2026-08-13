@@ -1,0 +1,73 @@
+# 任务卡 T-20260813-07 · 看板状态 5 态中文 + /docs 说明页 + 校验 400 + 注册表热加载
+
+- **需求基线闸**：老板已签 ☑（2026-08-13 18:52 "按照你的建议来，整合输出一个完整的，让团队去做"）
+- **目标**：board 状态统一 **5 态中文**（含验收态）+ **/docs 网页 API 说明页** + **服务端校验 400** + **8787 注册表热加载**，一次干净重启生效，不破坏既有功能。
+- **设计依据**：`dev-work/看板改造方案_20260813.md`（v3，§2.3/2.5/2.6/2.7）
+- **产出路径**：
+  - `shared_board/server.py`（状态默认值/校验/`GET /docs` 路由）
+  - `shared_board/docs.html`（新增·API 说明页）
+  - `shared_board/index.html`（状态列直接展示中文，去英文映射）
+  - `shared_board/board.db`（存量状态迁移，**迁移前备份**）
+  - `short_drama_workflow/ops/check_wip.ps1`（在途三态统计）
+  - `~/.workbuddy/skills/board/SKILL.md`（状态约定改中文 5 态）
+  - `agnes_proxy.py`（注册表 mtime 热加载）
+
+---
+
+## 一、状态机：5 态中文（§2.3 + §2.6 合并，一次迁移到位）
+
+- **枚举（最终态）**：`待办 / 进行中 / 待验证 / 已验证 / 完成`；`阻塞` 保留为旁路态（可提交）。
+- `server.py`：status 默认 `'待办'`；`/api/tasks` 直接返回中文。
+- `index.html`：状态列直接展示中文，删除英文→中文映射层。
+- `check_wip.ps1`：在途统计 = 进行中 + 待验证 + 已验证（不再只数 doing）。
+- `SKILL.md`：状态约定改中文 5 态。
+- **存量迁移**：`UPDATE tasks SET status='待办' WHERE status='todo'`（doing→进行中 / blocked→阻塞 / done→完成），**执行前备份 board.db**。
+
+## 二、/docs 网页 API 说明页（§2.7 机制一）
+
+- 新增 `shared_board/docs.html` + `server.py` 路由 `GET /docs`（本地 `8788/docs`；外部经 8787：`/board/docs` 或 `/ext/docs` 可达）。
+- 页面内容（即"接入规范"载体，不另造 md）：
+  1. 状态枚举：待办/进行中/待验证/已验证/完成（+阻塞）；
+  2. 优先级：紧急/高/中/低；
+  3. 端点表 + 必带字段（title、priority 必填；status 可选默认待办）；
+  4. curl 示例：本地带 `X-Agent`（+ `X-Board-Token`）、外部 `/ext/*` 免鉴权；
+  5. 身份与规则：owner 写锁 403、审计自动记。
+
+## 三、服务端校验 400（§2.7 机制二）
+
+- POST `/api/tasks` 与 PUT `/api/tasks/<id>` 校验：`title` 非空、`priority ∈ {紧急,高,中,低}`、`status ∈ 5 态枚举(+阻塞)`；非法 → `400` + 明确 error 信息（如 `{"error":"status 非法，允许: 待办/进行中/待验证/已验证/完成/阻塞"}`）。
+- 目的：防脏数据（英文/乱值根本提交不进去），保护 check_wip/前端//ext 下游。
+
+## 四、注册表热加载（§2.5）
+
+- `agnes_proxy.py`：`_load_route_registry()` 从"模块顶层一次"改为 **mtime 惰性重载**——照抄现有 `_BOARD_TOKEN_CACHE`（`agnes_proxy.py:63-85`）模式：每次路由匹配 stat `route_registry.json` mtime，变化才重载（缓存秒级）。
+- 前缀冲突校验保留：新注册表冲突 → **拒绝加载、沿用旧路由**。
+- 边界：热加载只覆盖**声明式路由变更**；代码逻辑变更仍走干净重启。
+
+---
+
+## 验收标准（AC 锚点）
+
+- [ ] AC-1.1 `GET /api/tasks?project_id=19` 全部 status 为中文 5 态（无英文残留）
+- [ ] AC-1.2 POST 非法 status（如 `todo`）/ 缺 title → 400 且错误信息明确；合法提交 → 200
+- [ ] AC-1.3 `GET /docs` 本地 + 外部（`/board/docs`）均 200，页面含枚举/端点/示例/规则
+- [ ] AC-1.4 check_wip.ps1 对"进行中/待验证/已验证"计数正确（构造样例验证）
+- [ ] AC-1.5 存量迁移后 db 查询英文状态 0 残留；迁移前有备份
+- [ ] AC-1.6 注册表热加载：加一条测试路由 → **不重启** 8787 → 5 秒内生效；冲突注册表 → 拒绝且旧路由继续可用
+- [ ] AC-1.7 回归：现有 `/ext` 6 端点、`/studio`、`/board`、根路径全 200（不破坏既有功能）
+
+## 证据要求
+
+- 开发：git diff 文件清单 + `py_compile` 三文件 + dry-run 回归输出 + 迁移前后 db 备份文件 + 自测命令输出（无输出=未自测=不交付）。
+- 测试：独立 L0（校验用例/迁移检查/热加载 dry-run）+ 线上验证（/docs 可达、校验 400 实测、热加载实测、AC-1.7 回归）。
+- **干净重启** 8787/8788：杀残留 PID 确认无 LISTEN 再起、核实新 PID 绑定（`Get-CimInstance Win32_Process` 按 CommandLine 杀，防脏双进程 S1P0）。
+
+## 边界 / 禁止
+
+- 只动上述产出路径文件；**不碰**生成链 / studio 业务逻辑 / /ext 端点语义（status 返回中文即可）。
+- 迁移 board.db 前**必须备份**；改 `agnes_proxy.py` / `server.py` 前 `git commit before:`。
+- 不引入新依赖；校验错误信息用中文，清晰可读。
+
+## 流程（老板 18:09 新流程）
+
+开发先写 `design.md` → 测试先写 `test.md` → 主理人双审通过 → 开发实现 → 主理人核产+线上验证 → QA 独立验收 → 放行。走 GATE0 + 闸1。
