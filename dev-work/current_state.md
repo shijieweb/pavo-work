@@ -349,6 +349,9 @@
 | 2026-08-13 | 开发(software-engineer-2) | T-20260813-06 BUG修复 | 已验证→待验证 | a04c8f1：ensure_test_mode硬守卫(仿l1_smoke)+端点默认dry_run=true+文档纠正+OBS-1裸路径判缺失；守卫自测4项+无key拦截证据 |
 | 2026-08-13 | 主理人(合伙人) | T-20260813-06 | 待验证→Round2 | 主理人核产(a04c8f1真实+最小集)+线上验证(端点默认零额度+守卫拦截blocked实测)+回归34PASS；派QA Round2 |
 | 2026-08-13 | QA(software-qa-engineer-3) | T-20260813-06 Round2 | 已验证→完成 | Round2 全PASS：BUG-1守卫拦截exit3+有key真视觉match零VIP、OBS-1裸路径warn、AC-1.1~1.5无回归；放行收尾 |
+| 2026-08-13 | 开发(software-engineer) | T-20260813-05 看板外部API | 派活→待验证 | design.md 审过(agnes_proxy零改动结论核实)；before b265759 + 完成 cc00088(注册表+/ext·server.py 6端点+notes表·board.db状态对齐·21项自测PASS·temp DB/8799测试未碰线上) |
+| 2026-08-13 | 主理人(合伙人) | T-20260813-05 | 待验证→派验收 | 主理人核产(cc00088最小集+agnesis_proxy零改动+py_compile)；干净重启8787(19632)/8788(25660)；线上实测6端点无token全200+POST写库+不污染+AC-1.5查库(10done+2todo)+回归35全过；派QA独立验收 |
+| 2026-08-13 | QA(software-qa-engineer-2) | T-20260813-05 | 已验证→完成 | 独立验收AC-1.1~1.5全PASS+回归35/35 exit0+无BUG；L0静态(注册表/notes表/前端审计流/零改动)+L1真跑(含4错误路径+UTF-8无损+直连8788 401预期)；建议放行 |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -356,6 +359,7 @@
 > 用法见 `short_drama_workflow/ops/judge_and_log.sh`（包装 judge_subagent.sh，零破坏）。
 
 <!-- JUDGE_LEDGER -->
+- 2026-08-13 18:42 | T-20260813-05 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收全PASS·6端点200+状态对齐+回归35全过·无BUG
 - 2026-08-13 18:32 | T-20260813-06 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收抓BUG-1烧VIP风险·a04c8f1修复·Round2全PASS
 - 2026-08-13 17:37 | T-20260813-02 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人复验·33路由PASS·AC-1.5真服务铁证200
 - 2026-08-13 17:14 | T-20260813-04 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实测·鉴权取消+服务自启全过
