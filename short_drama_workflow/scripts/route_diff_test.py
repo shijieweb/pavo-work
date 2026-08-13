@@ -5,8 +5,8 @@ route_diff_test.py · 8787 路由清单 diff 回归（T-20260813-02 / AC-1.4 + A
 ================================================================================
 读取 route_registry.json（单一事实源），对每个 prefix 经 8787 统一门户做探测断言：
   - GET    <prefix>            → 期望 200/404（后端可达 = 转发目标正确）
-  - PUT    <prefix>/__route_diff_probe__  → 期望非 501（AC-1.3：PUT/DELETE 对注册表内所有前缀生效）
-  - DELETE <prefix>/__route_diff_probe__  → 期望非 501
+  - PUT    <prefix>/__route_diff_probe__  → 期望非「门户 501」（body 含 unsupported method 才算未转发；后端透传的 501 属转发生效）
+  - DELETE <prefix>/__route_diff_probe__  → 同上（AC-1.3：PUT/DELETE 对注册表内所有前缀生效）
 零 AGNES 额度：所有探测只打 127.0.0.1:8787（及其内网后端 127.0.0.1:*），不碰任何外部 API。
 柔性断言（AC-1.5 demo 条目，如 /demo → 127.0.0.1:8779）：假服务未必在跑，命中 502/503
 （连接拒绝/转发已生效）也算预期；唯一判 FAIL 的是「门户未加载该注册表行」（404 unknown path / 501）。
@@ -85,9 +85,11 @@ def _check_route(base, route, timeout):
         if err is not None:
             lines.append("%-6s %-28s -> 连接失败: %s" % (method, prefix, err))
             ok = False
-        elif st == 501:
+        elif st == 501 and b"unsupported method" in body:
             lines.append("%-6s %-28s -> 501 (FAIL: 未转发到目标, 仅注册表内路由才应 501)" % (method, prefix))
             ok = False
+        elif st == 501:
+            lines.append("%-6s %-28s -> %s (转发生效, 后端 %s 应答, 后端自身不支持该 method)" % (method, prefix, st, target))
         elif st == 404 and PORTAL_UNKNOWN in body.decode("utf-8", "ignore"):
             lines.append("%-6s %-28s -> 404 unknown path (FAIL: 门户未加载该注册表行)" % (method, prefix))
             ok = False
