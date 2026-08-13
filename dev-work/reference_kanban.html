@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>任务看板 · 短视频App</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f2f5;--card-bg:#fff;--text:#1a1a2e;--text2:#666;--border:#e2e8f0;
+  --col-hd-bg:#fff;--btn-bg:#fff;--btn-hover:#f0f2f5;--btn-active:#e0e7ff;
+  --shadow:0 1px 3px rgba(0,0,0,.06);--shadow-lg:0 2px 8px rgba(0,0,0,.1);
+  --p-high:#ef4444;--p-high-bg:#fef2f2;--p-med:#f59e0b;--p-med-bg:#fffbeb;--p-low:#22c55e;--p-low-bg:#f0fdf4;
+  --p-crit:#dc2626;--p-crit-bg:#fef2f2;
+  --done-bg:#f0fdf4;--blocked-bg:#fef2f2;--prog-bg:#e2e8f0;--prog-fill:#3b82f6;--prog-done:#22c55e;
+  --tag-bg:#f0f4ff;--tag-text:#4f46e5;--hot-bg:#fef2f2;--hot-text:#dc2626;
+  --milestone-done:#22c55e;--milestone-active:#3b82f6;--milestone-pending:#e2e8f0;
+}
+.dark{
+  --bg:#0f172a;--card-bg:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--border:#334155;
+  --col-hd-bg:#1e293b;--btn-bg:#1e293b;--btn-hover:#334155;--btn-active:#3730a3;
+  --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 2px 8px rgba(0,0,0,.5);
+  --p-high-bg:rgba(239,68,68,.1);--p-med-bg:rgba(245,158,11,.1);--p-low-bg:rgba(34,197,94,.1);
+  --p-crit-bg:rgba(220,38,38,.15);
+  --done-bg:rgba(34,197,94,.1);--blocked-bg:rgba(239,68,68,.1);
+  --prog-bg:#334155;--tag-bg:rgba(79,70,229,.15);
+  --hot-bg:rgba(220,38,38,.15);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.app{padding:16px;max-width:1560px;margin:0 auto}
+/* header */
+.header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.header h1{font-size:22px;font-weight:700}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.meta{font-size:12px;color:var(--text2)}
+.meta .dot{display:inline-block;width:7px;height:7px;background:#22c55e;border-radius:50%;margin-right:4px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--btn-bg);color:var(--text);cursor:pointer;font-size:13px;transition:.15s}
+.btn:hover{background:var(--btn-hover)}.btn.active{background:var(--btn-active);border-color:#818cf8;font-weight:600}
+.btn-refresh{font-size:13px;background:none;border:none;color:var(--text2);cursor:pointer}
+/* filters */
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+/* stats */
+.stats{display:flex;gap:16px;margin-bottom:14px;font-size:13px;color:var(--text2)}
+.stat b{color:var(--text)}
+/* board */
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.col{display:flex;flex-direction:column}
+.col-header{display:flex;align-items:center;gap:6px;padding:10px 14px;background:var(--col-hd-bg);border-radius:10px 10px 0 0;font-size:14px;font-weight:600;border:1px solid var(--border);border-bottom:none}
+.col-header .count{margin-left:auto;font-size:12px;color:var(--text2);background:var(--btn-bg);padding:2px 8px;border-radius:10px}
+.col-body{flex:1;padding:8px;border:1px solid var(--border);border-top:none;min-height:200px;border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px}
+/* card */
+.card{background:var(--card-bg);border-radius:8px;padding:12px;border:1px solid var(--border);box-shadow:var(--shadow);transition:.2s;cursor:default;position:relative}
+.card:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:6px}
+.card-id{font-size:11px;font-weight:600;color:var(--text2)}
+.card-title{font-size:14px;font-weight:600;line-height:1.4;margin-bottom:8px}
+.card-meta{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text2)}
+.card-meta span{display:flex;align-items:center;gap:4px}
+.priority-badge{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600}
+.p-high{color:#991b1b;background:var(--p-high-bg)}.p-med{color:#92400e;background:var(--p-med-bg)}.p-low{color:#166534;background:var(--p-low-bg)}.p-critical{color:#991b1b;background:var(--p-crit-bg)}
+/* progress */
+.progress-wrap{margin-top:8px}
+.progress-bar{height:4px;background:var(--prog-bg);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--prog-fill);border-radius:2px;transition:width .5s}
+.progress-label{font-size:10px;color:var(--text2);margin-top:2px;text-align:right}
+/* blocking */
+.card.blocked{border-color:#ef4444;border-width:2px;animation:block-pulse 2s infinite}
+@keyframes block-pulse{0%,100%{border-color:#ef4444}50%{border-color:#fca5a5}}
+.block-reason{font-size:11px;color:#dc2626;background:var(--blocked-bg);padding:4px 8px;border-radius:4px;margin-top:6px}
+/* hotfix */
+.hotfix .card-id{color:#dc2626}.hotfix .card-title{color:#dc2626}
+.hotfix{border-left:3px solid #dc2626}
+/* done */
+.col-done .card{opacity:.75}
+.done-stamp{font-size:10px;color:#16a34a;font-weight:600}
+/* overdue */
+.card.overdue .card-title{color:#ef4444}
+.overdue-tag{font-size:9px;background:#fef2f2;color:#dc2626;padding:1px 5px;border-radius:3px;font-weight:600}
+/* dependencies */
+.dep-list{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}
+.dep-tag{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 5px;border-radius:3px;cursor:pointer}
+.dep-tag:hover{text-decoration:underline}
+/* assignee */
+.assignee{font-size:12px;display:flex;align-items:center;gap:4px}
+.assignee .avatar{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.av-pm{background:#8b5cf6}.av-fe{background:#3b82f6}.av-be{background:#f59e0b}.av-qa{background:#22c55e}
+/* milestones */
+.milestones{margin-top:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:16px;box-shadow:var(--shadow)}
+.milestones h3{font-size:14px;margin-bottom:12px}
+.milestone-bar{display:flex;align-items:center;gap:0;position:relative;height:32px}
+.milestone-item{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+.milestone-dot{width:14px;height:14px;border-radius:50%;position:relative;z-index:1}
+.milestone-dot.done{background:var(--milestone-done)}
+.milestone-dot.active{background:var(--milestone-active);box-shadow:0 0 0 4px rgba(59,130,246,.2)}
+.milestone-dot.pending{background:var(--milestone-pending)}
+.milestone-label{font-size:11px;text-align:center;margin-top:4px;line-height:1.3;max-width:80px}
+.milestone-line{position:absolute;top:7px;left:50%;width:100%;height:2px;background:var(--prog-bg);z-index:0}
+.milestone-item:first-child .milestone-line{left:50%}.milestone-item:last-child .milestone-line{width:50%}
+.today-marker{position:absolute;top:-6px;height:26px;width:2px;background:#ef4444;z-index:2}
+.today-label{font-size:9px;color:#ef4444;white-space:nowrap;margin-top:-2px}
+/* empty state */
+.empty{text-align:center;padding:40px 16px;color:var(--text2);font-size:13px}
+/* responsive */
+@media(max-width:1000px){.board{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.board{grid-template-columns:1fr}}
+/* toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:8px 20px;border-radius:8px;font-size:13px;z-index:99;opacity:0;transition:opacity .3s}.toast.show{opacity:1}
+/* highlight */
+.flash{animation:flash 2s ease-out}
+@keyframes flash{0%{background:rgba(59,130,246,.2)}100%{background:transparent}}
+</style>
+</head>
+<body class="light">
+<div class="app">
+<!-- header -->
+<div class="header">
+  <div>
+    <h1>🔵 短视频App · 任务看板</h1>
+    <div class="meta" style="margin-top:2px"><span class="dot"></span> 数据更新: <span id="lastUpdate">--</span> · 自动刷新 60s</div>
+  </div>
+  <div class="header-right">
+    <button class="btn" id="btnRefresh" title="强制刷新">🔄 刷新</button>
+    <button class="btn" id="btnDark" title="暗色模式">🌙</button>
+  </div>
+</div>
+
+<!-- filters -->
+<div class="filters" id="filters">
+  <button class="btn active" data-filter="all">全部</button>
+  <button class="btn" data-filter="产品经理">👤 产品经理</button>
+  <button class="btn" data-filter="PM">👤 PM</button>
+  <button class="btn" data-filter="后端研发">👤 后端研发</button>
+  <button class="btn" data-filter="前端研发">👤 前端研发</button>
+  <button class="btn" data-filter="测试工程师">👤 测试工程师</button>
+</div>
+
+<!-- stats -->
+<div class="stats">
+  <span>总计 <b id="statTotal">0</b></span>
+  <span>进行中 <b id="statProgress">0</b></span>
+  <span>阻塞 <b id="statBlocked" style="color:#dc2626">0</b></span>
+  <span>完成 <b id="statDone" style="color:#16a34a">0</b></span>
+  <span>逾期 <b id="statOverdue" style="color:#ef4444">0</b></span>
+</div>
+
+<!-- board -->
+<div class="board" id="board"></div>
+
+<!-- milestones -->
+<div class="milestones" id="milestones"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA_URL = 'TASKS.json';
+const COLUMNS = [
+  { key: 'backlog', label: '📋 待办', class: '' },
+  { key: 'inProgress', label: '🔄 进行中', class: '' },
+  { key: 'blocked', label: '⚠️ 阻塞', class: '' },
+  { key: 'done', label: '✅ 完成', class: 'col-done' }
+];
+const ASSIGNEE_ICONS = { 'PM': 'av-pm', '产品经理': 'av-pm', '后端研发': 'av-be', '前端研发': 'av-fe', '测试工程师': 'av-qa' };
+const ASSIGNEE_INIT = { 'PM': 'PM', '产品经理': '产', '后端研发': '后', '前端研发': '前', '测试工程师': '测' };
+const PRIORITY_LABEL = { high: '🔴高', medium: '🟡中', low: '🟢低', critical: '💀致命' };
+const PRIORITY_CLASS = { high: 'p-high', medium: 'p-med', low: 'p-low', critical: 'p-critical' };
+const STATUS_LABEL = { backlog: '📋', inProgress: '🔄', blocked: '⚠️', done: '✅' };
+
+let currentFilter = 'all';
+let currentData = null;
+
+function isOverdue(card) { return card.deadline && new Date(card.deadline) < new Date(new Date().toDateString()); }
+
+function statusColumn(status) {
+  if (status === 'done') return 'done'; if (status === 'blocked') return 'blocked';
+  if (status === 'inProgress') return 'inProgress'; return 'backlog';
+}
+
+const DEMO_DATA = {"project":"短视频App","updated":"2026-08-11T09:45:00+08:00","cards":[{"id":"T-001","title":"用户注册/登录 PRD","assignee":"产品经理","priority":"high","dependsOn":[],"deadline":"2026-08-11","status":"done","progress":100,"blockedBy":null,"completedAt":"2026-08-10","tags":["auth"]},{"id":"T-002","title":"项目技术方案评审","assignee":"PM","priority":"high","dependsOn":["T-001"],"deadline":"2026-08-11","status":"done","progress":100,"blockedBy":null,"completedAt":"2026-08-11","tags":["planning"]},{"id":"T-003","title":"用户注册 API","assignee":"后端研发","priority":"high","dependsOn":["T-002"],"deadline":"2026-08-13","status":"inProgress","progress":70,"blockedBy":null,"tags":["auth","api"]},{"id":"T-004","title":"用户登录 API","assignee":"后端研发","priority":"high","dependsOn":["T-002"],"deadline":"2026-08-13","status":"inProgress","progress":30,"blockedBy":null,"tags":["auth","api"]},{"id":"T-005","title":"登录/注册页面","assignee":"前端研发","priority":"high","dependsOn":["T-003","T-004"],"deadline":"2026-08-15","status":"backlog","progress":0,"blockedBy":null,"tags":["auth","ui"]},{"id":"T-006","title":"视频播放器组件","assignee":"前端研发","priority":"high","dependsOn":[],"deadline":"2026-08-17","status":"inProgress","progress":45,"blockedBy":null,"tags":["player","ui"]},{"id":"T-007","title":"视频上传接口","assignee":"后端研发","priority":"medium","dependsOn":[],"deadline":"2026-08-16","status":"blocked","progress":20,"blockedBy":"等待阿里云OSS账号开通","tags":["video","api"]},{"id":"T-008","title":"测试用例: 登录注册","assignee":"测试工程师","priority":"medium","dependsOn":["T-001"],"deadline":"2026-08-14","status":"inProgress","progress":60,"blockedBy":null,"tags":["testing","auth"]},{"id":"T-009","title":"视频推荐算法 PRD","assignee":"产品经理","priority":"medium","dependsOn":[],"deadline":"2026-08-14","status":"backlog","progress":0,"blockedBy":null,"tags":["algorithm"]},{"id":"HOT-001","title":"🚨 登录页XSS漏洞修复","assignee":"前端研发","priority":"critical","dependsOn":[],"deadline":"2026-08-11","status":"inProgress","progress":85,"blockedBy":null,"isHotfix":true,"tags":["security","hotfix"]}],"milestones":[{"name":"MVP内测","date":"2026-08-15","status":"inProgress"},{"name":"正式上线","date":"2026-08-25","status":"pending"}]};
+
+async function loadData() {
+  try {
+    const r = await fetch(DATA_URL + '?t=' + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    currentData = d;
+    d.cards.sort((a, b) => {
+      const p = { critical: 0, high: 1, medium: 2, low: 3 };
+      return (p[a.priority] ?? 2) - (p[b.priority] ?? 2) || a.id.localeCompare(b.id);
+    });
+    render(d);
+    document.getElementById('lastUpdate').textContent = new Date(d.updated).toLocaleString('zh-CN');
+  } catch (e) {
+    if (DEMO_DATA) { currentData = DEMO_DATA; document.getElementById('lastUpdate').textContent = '演示数据 (离线模式)'; render(DEMO_DATA); return; }
+    document.getElementById('lastUpdate').textContent = '加载失败';
+    document.getElementById('board').innerHTML = '<div class="empty" style="grid-column:1/-1">⚠️ 无法加载数据，请检查 TASKS.json</div>';
+  }
+}
+
+function renderCard(card) {
+  const overdue = isOverdue(card) && card.status !== 'done';
+  const cls = ['card'];
+  if (card.isHotfix) cls.push('hotfix');
+  if (card.status === 'blocked') cls.push('blocked');
+  if (overdue) cls.push('overdue');
+
+  const depHtml = card.dependsOn?.length
+    ? '<div class="dep-list">' + card.dependsOn.map(d => `<span class="dep-tag" onclick="scrollToCard('${d}')">🔗 ${d}</span>`).join('') + '</div>'
+    : '';
+
+  const progressHtml = card.status === 'inProgress' || card.status === 'blocked'
+    ? `<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${card.progress}%"></div></div><div class="progress-label">${card.progress}%</div></div>`
+    : '';
+
+  const blockHtml = card.blockedBy
+    ? `<div class="block-reason">🚫 ${card.blockedBy}</div>` : '';
+
+  const doneHtml = card.status === 'done'
+    ? `<div class="done-stamp">✅ ${card.completedAt || ''}</div>` : '';
+
+  const overdueHtml = overdue
+    ? `<span class="overdue-tag">⚠️ 逾期</span>` : '';
+
+  const hotfixHtml = card.isHotfix
+    ? '<span style="font-size:14px;line-height:1">🚨</span>' : '';
+
+  const avClass = ASSIGNEE_ICONS[card.assignee] || 'av-pm';
+  const avInit = ASSIGNEE_INIT[card.assignee] || '?';
+
+  return `
+    <div class="${cls.join(' ')}" id="card-${card.id}">
+      <div class="card-header">
+        <span class="card-id">${hotfixHtml} ${card.id} <span class="${PRIORITY_CLASS[card.priority]} priority-badge">${PRIORITY_LABEL[card.priority]}</span> ${overdueHtml}</span>
+      </div>
+      <div class="card-title">${card.title}</div>
+      <div class="card-meta">
+        <span class="assignee"><span class="avatar ${avClass}">${avInit}</span> @${card.assignee}</span>
+        <span>⏰ ${card.deadline || '无截止'}</span>
+        ${depHtml}
+      </div>
+      ${progressHtml}
+      ${blockHtml}
+      ${doneHtml}
+    </div>`;
+}
+
+function render(data) {
+  const board = document.getElementById('board');
+  const ms = document.getElementById('milestones');
+
+  const filtered = currentFilter === 'all' ? data.cards : data.cards.filter(c => c.assignee === currentFilter);
+
+  const groups = { backlog: [], inProgress: [], blocked: [], done: [] };
+  filtered.forEach(c => { groups[statusColumn(c.status)].push(c); });
+
+  board.innerHTML = COLUMNS.map(col => {
+    const cards = groups[col.key];
+    const cardHtml = cards.length ? cards.map(renderCard).join('') : '<div class="empty">暂无任务</div>';
+    return `<div class="col ${col.class}">
+      <div class="col-header">${col.label} <span class="count">${cards.length}</span></div>
+      <div class="col-body">${cardHtml}</div>
+    </div>`;
+  }).join('');
+
+  // Stats
+  document.getElementById('statTotal').textContent = data.cards.length;
+  document.getElementById('statProgress').textContent = data.cards.filter(c => c.status === 'inProgress').length;
+  document.getElementById('statBlocked').textContent = data.cards.filter(c => c.status === 'blocked').length;
+  document.getElementById('statDone').textContent = data.cards.filter(c => c.status === 'done').length;
+  document.getElementById('statOverdue').textContent = data.cards.filter(c => isOverdue(c) && c.status !== 'done').length;
+
+  // Milestones
+  if (data.milestones?.length) {
+    const todayPct = data.milestones.length === 1 ? 100 : 50; // rough
+    ms.innerHTML = `
+      <h3>📅 里程碑</h3>
+      <div class="milestone-bar" style="position:relative">
+        ${data.milestones.map((m, i) => `<div class="milestone-item">
+          <div class="milestone-line"></div>
+          <div class="milestone-dot ${m.status}"></div>
+          <div class="milestone-label">${m.name}<br><small>${m.date}</small></div>
+        </div>`).join('')}
+      </div>`;
+  }
+}
+
+function scrollToCard(id) {
+  const el = document.getElementById('card-' + id);
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2000); }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// filters
+document.getElementById('filters').addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') {
+    document.querySelectorAll('#filters .btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    currentFilter = e.target.dataset.filter;
+    if (currentData) render(currentData);
+  }
+});
+
+// refresh button
+document.getElementById('btnRefresh').addEventListener('click', () => { loadData(); showToast('已刷新'); });
+
+// dark mode
+const isDark = localStorage.getItem('kanban-dark') === '1';
+if (isDark) { document.body.classList.add('dark'); document.getElementById('btnDark').textContent = '☀️'; }
+document.getElementById('btnDark').addEventListener('click', () => {
+  const dark = document.body.classList.toggle('dark');
+  localStorage.setItem('kanban-dark', dark ? '1' : '0');
+  document.getElementById('btnDark').textContent = dark ? '☀️' : '🌙';
+});
+
+// auto refresh
+setInterval(loadData, 60000);
+loadData();
+</script>
+</body>
+</html>
