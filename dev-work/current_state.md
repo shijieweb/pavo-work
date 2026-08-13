@@ -339,6 +339,7 @@
 | 2026-08-13 | 开发 | T-20260813-01 l1_smoke 固化 | 待办→待验证 | 闸1自签（纯验证类·不改需求基线·白名单核验通过）；5 提交 ceb0d00/d590b06/7183432/acfdc6f（仅新增 scripts/l1_smoke.py 303 行，零生产改动） |
 | 2026-08-13 | 主理人 | T-20260813-01 l1_smoke 固化 | 待验证→派测试(已验证进行中) | 主理人本机可控后台实跑 L1 免费KEY PASS（task V3gwmQ·成片URL HTTP200+video/mp4·零VIP）；证据落 design.md§3 + l1_smoke.run.log 覆盖旧失败版；派测试独立验收 AC-1.1~1.4 |
 | 2026-08-13 | 主理人 | T-20260813-01 l1_smoke 固化 | 派测试(进行中)→已验证→完成 | 测试 subagent 静默返回空(test.md未写·无挂死进程)；主理人依 SOP(current_state行324)接手主会话实证：AC-1.1 curl 200+video/mp4、AC-1.2 exit3不提交、AC-1.3 mode=test零VIP、AC-1.4 --help exit0任意目录；逐条真跑复核全 PASS，放行完成 |
+| 2026-08-13 | 主理人(合伙人) | T-20260813-03 对外入口令牌闸 | 待办→进行中→完成 | 老板授权"你干吧"；自探暴露面(0.0.0.0:8787 + 公网隧道 401 前 200 + PUT 可改文件)；加 PORTAL_TOKEN 闸覆盖 /studio+/api/*+/v1+/agnesapi+/console+/merge；自验抓 1 真 bug(PORTAL_TOKEN 在 _load_env 前读取→恒开)已修；localhost+公网双路径 401/200 全过；token 存 ~/.workbuddy/.env 不进代码；D4"本地网络"前提正式破产归档 |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -346,5 +347,6 @@
 > 用法见 `short_drama_workflow/ops/judge_and_log.sh`（包装 judge_subagent.sh，零破坏）。
 
 <!-- JUDGE_LEDGER -->
+- 2026-08-13 16:58 | T-20260813-03 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实跑·公网+localhost 双路径 401/200 全过
 - 2026-08-13 16:30 | T-20260813-01 | judge=❌ 打回（原因:） | 验证打回留痕
 - 2026-08-13 16:30 | T-20260813-01 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实证·AC-1.1成片URL
