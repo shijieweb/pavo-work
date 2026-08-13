@@ -1,0 +1,107 @@
+{
+  "task": "T-20260813-06",
+  "ac": "AC-1.5",
+  "desc": "P0-2 图视冲突预检 dry-run 证据（零 AGNES 调用·AGNES_TEST_API_KEY 未使用）",
+  "ts": "2026-08-13",
+  "project": "ep_0811_145935",
+  "shot": 1,
+  "mode": "dry-run",
+  "frames": {
+    "first": "experiments/ep_0811_145935/shot1_v2/s1_0.png",
+    "last": "experiments/ep_0811_145935/shot1_v2/s1_5_8.png"
+  },
+  "cases": [
+    {
+      "case": "C1 真实项目+真实帧 dry-run",
+      "shot_id": 1,
+      "strategy": "reference",
+      "result": {
+        "ok": true,
+        "empty_shot": false,
+        "dry_run": true,
+        "model": "agnes-2.5-flash",
+        "inputs": {
+          "shot_id": 1,
+          "strategy": "reference",
+          "prompt": "Wide establishing shot of a Chinese city street at night, wet asphalt reflecting neon and street lights, a lone man in his late twenties walks out of a tall glass office building into the frame from b",
+          "first": "experiments/ep_0811_145935/shot1_v2/s1_0.png",
+          "last": "experiments/ep_0811_145935/shot1_v2/s1_5_8.png"
+        },
+        "precheck": "dry-run",
+        "reason": "dry-run：素材齐备，未调用 AGNES 视觉 API（AC-1.3 零额度验证）",
+        "prompt_frame_match": null,
+        "conflicts": []
+      }
+    },
+    {
+      "case": "C2 空镜免检(AC-1.2)",
+      "shot_id": 9,
+      "result": {
+        "ok": true,
+        "empty_shot": true,
+        "dry_run": true,
+        "model": "agnes-2.5-flash",
+        "inputs": {
+          "shot_id": 9,
+          "strategy": "keyframes",
+          "prompt": "Empty street at night, no people, no characters, wet asphalt",
+          "first": "a.png",
+          "last": "b.png"
+        },
+        "precheck": "n/a",
+        "reason": "空镜镜头（prompt 含 no people/空景），免检",
+        "prompt_frame_match": null,
+        "conflicts": []
+      }
+    },
+    {
+      "case": "C3 素材缺失 warn",
+      "shot_id": 3,
+      "result": {
+        "ok": true,
+        "empty_shot": false,
+        "dry_run": true,
+        "model": "agnes-2.5-flash",
+        "inputs": {
+          "shot_id": 3,
+          "strategy": "keyframes",
+          "prompt": "Wide shot of a street",
+          "first": "a.png",
+          "last": ""
+        },
+        "precheck": "warn",
+        "reason": "素材缺失：尾帧图（缺首尾帧素材，请先生成关键帧）",
+        "prompt_frame_match": null,
+        "conflicts": [
+          {
+            "stage": "input",
+            "type": "素材缺失",
+            "severity": "low",
+            "desc": "缺少 尾帧图"
+          }
+        ]
+      }
+    },
+    {
+      "case": "C4 ui 策略免检",
+      "shot_id": 5,
+      "result": {
+        "ok": true,
+        "empty_shot": false,
+        "dry_run": true,
+        "model": "agnes-2.5-flash",
+        "inputs": {
+          "shot_id": 5,
+          "strategy": "ui",
+          "prompt": "UI screen",
+          "first": "a.png",
+          "last": "b.png"
+        },
+        "precheck": "n/a",
+        "reason": "ui 策略：无首尾帧图可比（UI 动效镜）",
+        "prompt_frame_match": null,
+        "conflicts": []
+      }
+    }
+  ]
+}
