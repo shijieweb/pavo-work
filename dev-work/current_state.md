@@ -339,3 +339,12 @@
 | 2026-08-13 | 开发 | T-20260813-01 l1_smoke 固化 | 待办→待验证 | 闸1自签（纯验证类·不改需求基线·白名单核验通过）；5 提交 ceb0d00/d590b06/7183432/acfdc6f（仅新增 scripts/l1_smoke.py 303 行，零生产改动） |
 | 2026-08-13 | 主理人 | T-20260813-01 l1_smoke 固化 | 待验证→派测试(已验证进行中) | 主理人本机可控后台实跑 L1 免费KEY PASS（task V3gwmQ·成片URL HTTP200+video/mp4·零VIP）；证据落 design.md§3 + l1_smoke.run.log 覆盖旧失败版；派测试独立验收 AC-1.1~1.4 |
 | 2026-08-13 | 主理人 | T-20260813-01 l1_smoke 固化 | 派测试(进行中)→已验证→完成 | 测试 subagent 静默返回空(test.md未写·无挂死进程)；主理人依 SOP(current_state行324)接手主会话实证：AC-1.1 curl 200+video/mp4、AC-1.2 exit3不提交、AC-1.3 mode=test零VIP、AC-1.4 --help exit0任意目录；逐条真跑复核全 PASS，放行完成 |
+
+#### 子角色判定台账（judge，自动追加）
+
+> 纪律：每次派活收尾，主理人跑 `bash ops/judge_and_log.sh --task <T-id> --artifact <路径> [--expect ...] [--forbid ...] [--commit-dir ...]`，脚本自动在此追加一行。**结论来自主会话读盘（judge_subagent.sh），非子角色文本**——与上方状态推进表互为印证：状态表记"完成"前，此处须有对应 judge=PASS/WARN 结论。
+> 用法见 `short_drama_workflow/ops/judge_and_log.sh`（包装 judge_subagent.sh，零破坏）。
+
+<!-- JUDGE_LEDGER -->
+- 2026-08-13 16:30 | T-20260813-01 | judge=❌ 打回（原因:） | 验证打回留痕
+- 2026-08-13 16:30 | T-20260813-01 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实证·AC-1.1成片URL
