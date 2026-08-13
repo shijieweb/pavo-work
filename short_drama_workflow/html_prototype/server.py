@@ -4826,6 +4826,34 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(500, {"ok": False, "error": str(e)})
 
+        elif p.path == "/api/precheck":
+            # 【P0-2 图视冲突预检·T-20260813-06】生成前预检：prompt vs 首尾帧图（复用 prompt_frame_match）。
+            # 方案 A（主理人拍板）：独立端点手动触发，生成链零改动；dry_run=true 零 AGNES 调用（AC-1.3）；
+            # 空镜→n/a 免检（AC-1.2）；失败=拦截提示不阻塞生成（AC-1.3）。结果写回 shot.precheck。
+            try:
+                sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "scripts", "diag")))
+                from precheck import precheck_shot, render_final_prompt
+                sid = data.get("id")
+                shot = find_shot(sid) if sid else None
+                if shot is None:
+                    self._send(404, {"ok": False, "error": f"shot {sid} not found"})
+                    return
+                _pv = data.get("prompt") or render_final_prompt(shot) or shot.get("video_prompt") or ""
+                _res = precheck_shot(shot, first=data.get("first"), last=data.get("last"),
+                                     prompt=_pv, model=data.get("model") or "agnes-2.5-flash",
+                                     dry_run=bool(data.get("dry_run", False)))
+                if _res.get("ok"):
+                    shot["precheck"] = {k: _res.get(k) for k in
+                                        ("precheck", "reason", "conflicts", "empty_shot",
+                                         "prompt_frame_match", "dry_run")}
+                    try:
+                        _save_spec()  # 【0811 修复同源】预检结果必须落盘，否则 refreshSpec 重载即丢
+                    except Exception as _se:
+                        _log.error("[precheck] 预检结果落盘失败: %s", _se)
+                self._send(200, _res)
+            except Exception as e:
+                self._send(500, {"ok": False, "error": str(e)})
+
         elif p.path == "/api/vision/review":
             # 【视觉审查·老板 0811】AGNES 2.5-flash 多模态审查（免费 3000 次/天）：
             # quality 单帧画质 / identity 角色一致性(锚点vs生成帧) / continuity 镜头连贯(上镜尾帧vs本镜首帧)

@@ -94,6 +94,13 @@
       "note": "工作台 API：诊断"
     },
     {
+      "prefix": "/api/precheck",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：P0-2 图视冲突预检（生成前，方案A 独立端点）"
+    },
+    {
       "prefix": "/api/queue/",
       "target": "http://127.0.0.1:8777",
       "kind": "studio",
