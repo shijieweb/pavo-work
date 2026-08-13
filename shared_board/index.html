@@ -107,6 +107,8 @@
   .assignee .avatar{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
   .pri{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;white-space:nowrap}
   .p0{color:#991b1b;background:var(--p-crit-bg)}.p1{color:#991b1b;background:var(--p-high-bg)}.p2{color:#92400e;background:var(--p-med-bg)}.p3{color:#166534;background:var(--p-low-bg)}
+  /* 暗色下优先级徽章文字改浅色（WARN-1：WCAG AA ≥4.5，背景保持 rgba 浅底） */
+  .dark .p0,.dark .p1{color:#fca5a5}.dark .p2{color:#fcd34d}.dark .p3{color:#86efac}
   /* ── 子任务（方案 A：全量平铺 + 父引用 chip + 计数徽章） ── */
   .child-card{margin-left:10px;border-left:3px solid var(--border)}
   .parent-ref{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 5px;border-radius:3px;font-weight:600}
@@ -426,7 +428,7 @@ function render(){
   const treeWrap=document.getElementById("treeWrap");
   if(!cur){
     if(viewMode==='tree'){ board.style.display='none'; treeWrap.hidden=false; document.getElementById("tree").innerHTML=""; document.getElementById("empty").style.display="block"; }
-    else { treeWrap.hidden=true; board.style.display='block'; board.innerHTML='<div class="empty">先建一个项目，再开始加任务</div>'; }
+    else { treeWrap.hidden=true; board.style.display='flex'; board.innerHTML='<div class="empty">先建一个项目，再开始加任务</div>'; }
     return;
   }
   if(viewMode==='tree'){
@@ -437,7 +439,7 @@ function render(){
     if(!roots.length){ tree.innerHTML='<div class="empty">这个项目还没有任务，点上方「+ 主任务」</div>'; return; }
     tree.append(build(null));
   } else {
-    treeWrap.hidden=true; board.style.display='block';
+    treeWrap.hidden=true; board.style.display='flex';
     renderBoard();
   }
 }
