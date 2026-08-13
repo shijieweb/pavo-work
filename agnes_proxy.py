@@ -133,6 +133,90 @@ def _is_studio(path):
 
 def _is_board(path):
     return path in ("/board", "/board/", "/board.html") or path.startswith("/board/")
+
+# ===== 路由注册表（route_registry.json）单一事实源（T-20260813-02）=====
+# 加服务 = 注册表加一行（prefix + target + kind + 可选 flags），对外永远只有 8787。
+# 无注册表 / 解析失败 / 空 routes → 回退上面的硬编码（STUDIO_PREFIXES + _is_board），保证兼容不崩。
+# 前缀唯一校验：任一 prefix 与另一条存在「相等或互为路径前缀」（如 /api 与 /api/spec）
+# 会抢同一路径 → 启动即报错（raise SystemExit）。
+ROUTE_REGISTRY_FILE = os.path.join(SCRIPT_DIR, "route_registry.json")
+
+class RouteRegistryError(Exception):
+    """路由注册表配置错误（如前缀冲突），启动时中止。"""
+
+def _find_prefix_conflict(prefixes):
+    """返回互相冲突的一对 (a, b)，无冲突返回 None。
+    路径段感知：/api 与 /api/spec 冲突（/api/spec 是 /api/ 下子路径，会抢同一路径）；
+    /api/log 与 /api/logs 不冲突（同为独立端点，且同挂 8777，不影响匹配）。"""
+    for i in range(len(prefixes)):
+        for j in range(i + 1, len(prefixes)):
+            a, b = prefixes[i], prefixes[j]
+            if a == b or a.startswith(b + "/") or b.startswith(a + "/"):
+                return (a, b)
+    return None
+
+def _load_route_registry(path=None):
+    """加载路由注册表。
+    缺失/解析失败/空 routes → 返回 None（回退硬编码白名单）；
+    前缀冲突 → 抛 RouteRegistryError（启动即报错，防两服务抢同一路径）。"""
+    p = path if path is not None else ROUTE_REGISTRY_FILE
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    raw = data.get("routes")
+    if not isinstance(raw, list) or not raw:
+        return None
+    routes = []
+    for item in raw:
+        if not isinstance(item, dict):
+            return None
+        prefix = item.get("prefix")
+        target = item.get("target")
+        if not isinstance(prefix, str) or not prefix.startswith("/"):
+            return None
+        if not isinstance(target, str) or not (target.startswith("http://") or target.startswith("https://")):
+            return None
+        flags = item.get("flags")
+        if flags is not None and not isinstance(flags, dict):
+            return None
+        routes.append({
+            "prefix": prefix,
+            "target": target.rstrip("/"),
+            "kind": item.get("kind") if isinstance(item.get("kind"), str) else "generic",
+            "flags": flags if isinstance(flags, dict) else {},
+            "demo": bool(item.get("demo", False)),
+            "note": item.get("note", ""),
+        })
+    conflict = _find_prefix_conflict([r["prefix"] for r in routes])
+    if conflict:
+        raise RouteRegistryError(
+            "route_registry.json 前缀冲突：%r 与 %r 相等或互为路径前缀，会抢同一路径，请修正注册表" % conflict)
+    return routes
+
+try:
+    _ROUTE_REGISTRY = _load_route_registry()
+except RouteRegistryError as e:
+    raise SystemExit("[route_registry] " + str(e))
+
+def _route_matches(path, route):
+    """单条路由匹配：board 需边界（/board、/board/、/board.html、/board/*），其余 == 或 startswith。"""
+    p = route["prefix"]
+    if route["kind"] == "board":
+        return path in (p, p + "/", p + ".html") or path.startswith(p + "/")
+    return path == p or path.startswith(p)
+
+def _route_for(path):
+    """注册表驱动：返回命中的第一条路由；无注册表时返回 None（走硬编码回退）。"""
+    if _ROUTE_REGISTRY is None:
+        return None
+    for route in _ROUTE_REGISTRY:
+        if _route_matches(path, route):
+            return route
+    return None
 # 服务端持久化文件：资产库 + 设置。使 localhost 与 127.0.0.1 访问同一份数据（同源共享）
 STATE_FILE = os.path.join(SCRIPT_DIR, "agnes_state.json")
 # 已知 ffmpeg 路径（WinGet 安装），找不到时回退到 PATH
@@ -244,11 +328,7 @@ class H(BaseHTTPRequestHandler):
         if path == "/api/hub/status":
             self._hub_status()
             return
-        if _is_board(path):
-            self._proxy_board("GET", None)
-            return
-        if _is_studio(path):
-            self._proxy_studio("GET", None)
+        if self._route_dispatch(path, "GET", None):
             return
         if path.startswith("/files/"):
             self._serve_file(path[len("/files/"):])
@@ -262,11 +342,7 @@ class H(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length) if length else None
         path = self.path.split("?")[0]
-        if _is_board(path):
-            self._proxy_board("POST", data)
-            return
-        if _is_studio(path):
-            self._proxy_studio("POST", data)
+        if self._route_dispatch(path, "POST", data):
             return
         if path == "/api/hub/start-studio":
             self._send(200, json.dumps(_launch_studio(), ensure_ascii=False))
@@ -286,11 +362,7 @@ class H(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length) if length else None
         path = self.path.split("?")[0]
-        if _is_board(path):
-            self._proxy_board("PUT", data)
-            return
-        if _is_studio(path):
-            self._proxy_studio("PUT", data)
+        if self._route_dispatch(path, "PUT", data):
             return
         self._send(501, json.dumps({"error": "unsupported method PUT for " + path}))
 
@@ -298,13 +370,86 @@ class H(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length) if length else None
         path = self.path.split("?")[0]
-        if _is_board(path):
-            self._proxy_board("DELETE", data)
-            return
-        if _is_studio(path):
-            self._proxy_studio("DELETE", data)
+        if self._route_dispatch(path, "DELETE", data):
             return
         self._send(501, json.dumps({"error": "unsupported method DELETE for " + path}))
+
+    def _route_dispatch(self, path, method, data):
+        """注册表驱动路由判定：命中返回 True 并转发；未命中/无注册表回退硬编码，均返回 False。"""
+        if _ROUTE_REGISTRY is not None:
+            route = _route_for(path)
+            if route is not None:
+                if route["kind"] == "studio":
+                    self._proxy_studio(method, data)
+                elif route["kind"] == "board":
+                    self._proxy_board(method, data)
+                else:
+                    self._proxy_route(method, data, route)
+                return True
+        else:
+            # 无注册表（缺失/解析失败/空 routes）→ 回退现有硬编码行为，保证兼容不崩
+            if _is_board(path):
+                self._proxy_board(method, data)
+                return True
+            if _is_studio(path):
+                self._proxy_studio(method, data)
+                return True
+        return False
+
+    def _proxy_route(self, method, data, route):
+        """通用注册表路由转发：去掉挂载前缀后的子路径拼到 target；可选 token 注入 / HTML 改写。
+        供 kind=generic 的新服务使用（board 仍走 _proxy_board、studio 仍走 _proxy_studio，逻辑不动）。"""
+        raw = self.path
+        p0 = raw.split("?")[0]
+        prefix = route["prefix"]
+        target = route["target"]
+        flags = route.get("flags") or {}
+        if p0 == prefix:
+            sub = "/"
+        else:
+            sub = p0[len(prefix):]
+            if not sub.startswith("/"):
+                sub = "/" + sub
+        query = ("?" + raw.split("?", 1)[1]) if "?" in raw else ""
+        req = urllib.request.Request(target + sub + query, data=data, method=method)
+        ct = self.headers.get("Content-Type")
+        if ct:
+            req.add_header("Content-Type", ct)
+        # 可选：仿看板的令牌自动注入（本地自用免门禁）
+        if flags.get("board_token_inject"):
+            tok = self.headers.get("X-Board-Token") or _board_token()
+            if tok:
+                req.add_header("X-Board-Token", tok)
+        ag = self.headers.get("X-Agent")
+        if ag:
+            req.add_header("X-Agent", ag)
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                body = resp.read()
+                ctype = resp.headers.get("Content-Type", "application/octet-stream")
+                # 可选：仿看板的 HTML /api/→<prefix>/api/ 改写，使子服务前端仍走 8787 单入口
+                if flags.get("rewrite_html_api") and method == "GET" \
+                        and p0 in (prefix, prefix + "/", prefix + ".html") \
+                        and "text/html" in ctype:
+                    body = body.replace(b"/api/", (prefix + "/api/").encode("utf-8"))
+                self.send_response(resp.status)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+        except urllib.error.HTTPError as e:
+            body = e.read()
+            self.send_response(e.code)
+            self.send_header("Content-Type", e.headers.get("Content-Type", "application/json"))
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as e:
+            self._send(503, json.dumps({
+                "error": "路由目标不可达（%s -> %s）：%s" % (prefix, target, e),
+                "hint": "检查 route_registry.json 对应服务是否已启动",
+            }, ensure_ascii=False))
 
     def _hub_status(self):
         """门户健康探测：报告工作台/共享看板后端是否在线（首页卡片据此显示在线/未启动）。"""
@@ -670,6 +815,10 @@ if __name__ == "__main__":
     print("   └─ 工作台     /studio      (反向代理 -> :%d)" % STUDIO_PORT)
     print("=" * 58)
     print("密钥留在服务端 | ffmpeg: %s" % (ff if ff else "未找到（视频拼接不可用）"))
+    if _ROUTE_REGISTRY is not None:
+        print("   路由注册表   route_registry.json  (%d 条路由·单一事实源)" % len(_ROUTE_REGISTRY))
+    else:
+        print("   路由注册表   缺失/解析失败 → 回退硬编码白名单（兼容模式）")
     # 默认拉起共享看板（8788）：手机经 8787 入口可一键直达，跨设备看进度预览
     try:
         lb = _launch_board()

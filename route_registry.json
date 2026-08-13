@@ -1,0 +1,254 @@
+{
+  "version": 1,
+  "_doc": "8787 统一门户·路由单一事实源（T-20260813-02）。加服务 = 在此 routes 数组加一行（prefix + target + kind + 可选 flags），重启 8787 即生效；对外永远只有 8787。无本文件/解析失败/空 routes 时 agnes_proxy.py 自动回退硬编码白名单，保证兼容不崩。",
+  "routes": [
+    {
+      "prefix": "/studio",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "短剧工作台入口：整段反代到 8777（含自愈拉起/缓存透传/900s 超时）"
+    },
+    {
+      "prefix": "/api/projects",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API（前端用绝对路径 /api/*，故与 /studio 同挂 8777）"
+    },
+    {
+      "prefix": "/api/spec",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：剧本/分镜规格"
+    },
+    {
+      "prefix": "/api/generate",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：生成链路"
+    },
+    {
+      "prefix": "/api/project/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：单项目（含子路径）"
+    },
+    {
+      "prefix": "/api/pipeline",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：流水线"
+    },
+    {
+      "prefix": "/api/agent",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：智能体"
+    },
+    {
+      "prefix": "/api/export",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：导出"
+    },
+    {
+      "prefix": "/api/shot/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：分镜（含子路径）"
+    },
+    {
+      "prefix": "/api/assemble",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：拼接"
+    },
+    {
+      "prefix": "/api/finalize",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：定稿"
+    },
+    {
+      "prefix": "/api/quality",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：质检"
+    },
+    {
+      "prefix": "/api/diagnose",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：诊断"
+    },
+    {
+      "prefix": "/api/queue/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：任务队列（含子路径）"
+    },
+    {
+      "prefix": "/api/key-pool",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：密钥池"
+    },
+    {
+      "prefix": "/api/meta",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：元信息"
+    },
+    {
+      "prefix": "/api/series/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：剧集（含子路径）"
+    },
+    {
+      "prefix": "/api/prompt/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：提示词（含子路径）"
+    },
+    {
+      "prefix": "/api/novel/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：小说（含子路径）"
+    },
+    {
+      "prefix": "/api/style/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：风格（含子路径）"
+    },
+    {
+      "prefix": "/api/outline/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：大纲（含子路径）"
+    },
+    {
+      "prefix": "/api/asset/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：资产（含子路径）"
+    },
+    {
+      "prefix": "/assets/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台静态资产"
+    },
+    {
+      "prefix": "/projects/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台项目静态目录"
+    },
+    {
+      "prefix": "/vendor/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台前端第三方库"
+    },
+    {
+      "prefix": "/api/faceqc",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：人脸质检"
+    },
+    {
+      "prefix": "/api/facefix",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：人脸修复"
+    },
+    {
+      "prefix": "/api/agnes/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：AGNES 透传（含子路径）"
+    },
+    {
+      "prefix": "/api/vision/",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：视觉（含子路径）"
+    },
+    {
+      "prefix": "/api/log",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：日志单点（与 /api/logs 为独立端点，路径段感知校验不冲突）"
+    },
+    {
+      "prefix": "/api/logs",
+      "target": "http://127.0.0.1:8777",
+      "kind": "studio",
+      "flags": {},
+      "note": "工作台 API：日志列表"
+    },
+    {
+      "prefix": "/board",
+      "target": "http://127.0.0.1:8788",
+      "kind": "board",
+      "flags": {
+        "board_token_inject": true,
+        "rewrite_html_api": true
+      },
+      "note": "共享看板：X-Board-Token 自动注入 + 转发 HTML 时 /api/→/board/api/ 改写（保留原语义）"
+    },
+    {
+      "prefix": "/demo",
+      "target": "http://127.0.0.1:8779",
+      "kind": "generic",
+      "demo": true,
+      "flags": {},
+      "note": "AC-1.5 演示条目：新服务加一行即通。8779 通常未启动，命中返回 502/503 属预期（注册表已生效的柔性证据）"
+    }
+  ],
+  "examples": [
+    {
+      "_doc": "以下仅为「新增服务」写法示例，不会被加载（examples 字段仅供阅读）。复制到 routes 数组并重启 8787 即激活：",
+      "prefix": "/myapp",
+      "target": "http://127.0.0.1:9000",
+      "kind": "generic",
+      "flags": {
+        "board_token_inject": false,
+        "rewrite_html_api": false
+      },
+      "note": "示例：新服务 = 注册表加一行（target 一律 127.0.0.1，不新增对外端口）"
+    }
+  ]
+}
