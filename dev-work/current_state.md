@@ -344,6 +344,11 @@
 | 2026-08-13 | 主理人(合伙人) | T-20260813-04 取消鉴权+8787系统自启 | 进行中→完成 | 老板决策"仅本地单人·默认取消鉴权·3一样不做"；回退令牌闸(dec5ce9·34行纯删除·py_compile过·残留清空)；注册 schtasks AgnesPortal(onlogon) + start_portal.bat(托管python+崩溃重启)；杀旧PID6336→新PID26296接管8787；无token全通(200/200/400业务层/200)；8777自愈200；AC-1~5 全 PASS；rev2 修 schtasks 交互任务被父会话 ^C 回收致 8787 失联(5b5e1aa·Start-Process 独立进程·T+19s 存活验证) |
 | 2026-08-13 | 开发(dev-t02) | T-20260813-02 8787 路由注册表收敛 | 派活→待验证 | **团队模式首次真实任务**（通道铁律§3.6第8层验证）；before 890f8ff + 完成 a9f47f4（route_registry.json 33路由+agnes_proxy 注册表驱动+回归脚本+自测脚本+design.md·仅入口层）；自测5 PASS |
 | 2026-08-13 | 主理人(合伙人) | T-20260813-02 | 待验证→完成 | 主理人复验：读盘核验双commit+diff范围；干净重启8787(杀21120→schtasks rev2→新PID30996)；主会话重跑回归抓真bug→回归脚本501断言误判(后端透传501当未转发)→续派dev-t02修54043c5→33路由全PASS exit0；AC-1.5 起真8779假服务铁证 GET/PUT/DELETE 全200(加一行即通)；AC-1.1~1.5 全 PASS 放行 |
+| 2026-08-13 | 开发(software-engineer-2) | T-20260813-06 P0-2 图视冲突预检 | 派活→待验证 | **新流程首次完整跑通**（老板18:09定：开发先写design+测试先写test+主理人双审过再实现）；design.md 审过(方案A独立端点主理人拍板)→实现 98807f5+c0cc2c4(precheck.py 287行+server路由+白名单双登记·生成链零改动)→自测4用例+真视觉match |
+| 2026-08-13 | QA(software-qa-engineer-3) | T-20260813-06 | 待验证→已验证 | 独立验收(fresh eyes)AC-1.1~1.5全PASS；**抓真缺陷BUG-1(P2·真视觉路径无test守卫可烧VIP·AGNES_TEST_MODE no-op证实)+OBS-1(P3裸路径)**；不修回报 |
+| 2026-08-13 | 开发(software-engineer-2) | T-20260813-06 BUG修复 | 已验证→待验证 | a04c8f1：ensure_test_mode硬守卫(仿l1_smoke)+端点默认dry_run=true+文档纠正+OBS-1裸路径判缺失；守卫自测4项+无key拦截证据 |
+| 2026-08-13 | 主理人(合伙人) | T-20260813-06 | 待验证→Round2 | 主理人核产(a04c8f1真实+最小集)+线上验证(端点默认零额度+守卫拦截blocked实测)+回归34PASS；派QA Round2 |
+| 2026-08-13 | QA(software-qa-engineer-3) | T-20260813-06 Round2 | 已验证→完成 | Round2 全PASS：BUG-1守卫拦截exit3+有key真视觉match零VIP、OBS-1裸路径warn、AC-1.1~1.5无回归；放行收尾 |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -351,6 +356,7 @@
 > 用法见 `short_drama_workflow/ops/judge_and_log.sh`（包装 judge_subagent.sh，零破坏）。
 
 <!-- JUDGE_LEDGER -->
+- 2026-08-13 18:32 | T-20260813-06 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收抓BUG-1烧VIP风险·a04c8f1修复·Round2全PASS
 - 2026-08-13 17:37 | T-20260813-02 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人复验·33路由PASS·AC-1.5真服务铁证200
 - 2026-08-13 17:14 | T-20260813-04 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实测·鉴权取消+服务自启全过
 - 2026-08-13 16:58 | T-20260813-03 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实跑·公网+localhost 双路径 401/200 全过
