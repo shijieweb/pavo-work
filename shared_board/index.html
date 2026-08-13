@@ -21,10 +21,12 @@
   .tri.open{transform:rotate(90deg)}
   .ttl{flex:1;font-weight:600;word-break:break-word}
   .badge{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap}
-  .todo{background:#f3f4f6;color:#6b7280}
-  .doing{background:#dbeafe;color:#1d4ed8}
-  .blocked{background:#fee2e2;color:#dc2626}
-  .done{background:#dcfce7;color:#16a34a}
+  .badge[data-status="待办"]{background:#f3f4f6;color:#6b7280}
+  .badge[data-status="进行中"]{background:#dbeafe;color:#1d4ed8}
+  .badge[data-status="待验证"]{background:#fef9c3;color:#a16207}
+  .badge[data-status="已验证"]{background:#e0e7ff;color:#4338ca}
+  .badge[data-status="完成"]{background:#dcfce7;color:#16a34a}
+  .badge[data-status="阻塞"]{background:#fee2e2;color:#dc2626}
   .pri{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap;font-weight:600}
   .p0{background:#fee2e2;color:#dc2626}   /* 紧急 */
   .p1{background:#ffedd5;color:#ea580c}   /* 高 */
@@ -76,8 +78,9 @@
   <div class="db">
     <div><label>标题</label><input id="d_title"></div>
     <div><label>状态</label><select id="d_status">
-      <option value="todo">待办</option><option value="doing">进行中</option>
-      <option value="blocked">阻塞</option><option value="done">完成</option></select></div>
+      <option value="待办">待办</option><option value="进行中">进行中</option>
+      <option value="待验证">待验证</option><option value="已验证">已验证</option>
+      <option value="完成">完成</option><option value="阻塞">阻塞</option></select></div>
     <div><label>优先级（紧急 &gt; 高 &gt; 中 &gt; 低）</label><select id="d_priority">
       <option value="紧急">紧急</option><option value="高">高</option>
       <option value="中">中</option><option value="低">低</option></select></div>
@@ -99,7 +102,6 @@ if(BOARD_TOKEN)localStorage.setItem('board_token',BOARD_TOKEN);
 const ERR=msg=>alert("操作失败："+msg+"\n请确认：①用 http://电脑局域网IP:8788 打开（不要双击文件）；②手机与电脑同一WiFi；③电脑防火墙允许8788入站");
 async function api(url,opt){opt=opt||{};if(BOARD_TOKEN){opt.headers=Object.assign({},opt.headers||{},{'X-Board-Token':BOARD_TOKEN});}try{const r=await fetch(API+url,opt);if(!r.ok)throw new Error("HTTP "+r.status);if(r.status===204)return{};return await r.json();}catch(e){ERR(e.message);throw e;}}
 let projects=[], tasks=[], cur=null, expanded=new Set(), curTask=null;
-const ST={todo:"待办",doing:"进行中",blocked:"阻塞",done:"完成"};
 
 async function load(){
   try{
@@ -190,7 +192,7 @@ function build(id){
     const tri=document.createElement("span"); tri.className="tri"+(expanded.has(t.id)?" open":""); tri.textContent="▶";
     const tt=document.createElement("span"); tt.className="ttl"; tt.textContent=t.title;
     const pr=document.createElement("span"); const priArr=["紧急","高","中","低"]; const pi=priArr.indexOf(t.priority); pr.className="pri p"+(pi>=0?pi:2); pr.textContent=t.priority||"中";
-    const b=document.createElement("span"); b.className="badge "+t.status; b.textContent=ST[t.status];
+    const b=document.createElement("span"); b.className="badge"; b.dataset.status=t.status; b.textContent=t.status;
     card.append(tri,tt,pr,b);
     const hasKids=tasks.some(k=>k.parent_id==t.id);
     card.onclick=()=>{ if(hasKids){expanded.has(t.id)?expanded.delete(t.id):expanded.add(t.id);render();} };

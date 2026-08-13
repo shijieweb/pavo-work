@@ -8,6 +8,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(HERE, "board.db")
 PORT = 8788
 
+# ── 状态/优先级枚举（T-20260813-07：中文 5 态 + 阻塞旁路；服务端校验用）──
+STATUS_ENUM = {"待办", "进行中", "待验证", "已验证", "完成", "阻塞"}
+PRIORITY_ENUM = {"紧急", "高", "中", "低"}
+
 # ── 服务端令牌门禁（上 VPS 前加固）──
 # BOARD_TOKEN 缺失时自动生成并持久化到 shared_board/.env；配置后所有写接口强制校验。
 # 读接口(GET)不校验，老板浏览器照常查看；写接口(POST/PUT/DELETE)须带 X-Board-Token 或 ?token=。
@@ -77,7 +81,7 @@ def db():
     c.execute("""CREATE TABLE IF NOT EXISTS tasks(
         id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER,
         parent_id INTEGER, title TEXT, detail TEXT,
-        status TEXT DEFAULT 'todo', author TEXT, updated TEXT,
+        status TEXT DEFAULT '待办', author TEXT, updated TEXT,
         priority TEXT DEFAULT '中')""")
     try:
         c.execute("ALTER TABLE projects ADD COLUMN owner TEXT DEFAULT '老板'")
@@ -120,6 +124,19 @@ def body(h):
     n = int(h.headers.get("Content-Length") or 0)
     return json.loads(h.rfile.read(n) or b"{}") if n else {}
 
+def validate_task_fields(d, partial=False):
+    """任务字段校验（T-20260813-07）：POST(partial=False) title 必填；
+    PUT(partial=True) 仅校验请求中出现的字段。
+    返回 None（通过）或中文错误串；调用方包成 400 {"error": <串>}。"""
+    if "title" in d or not partial:
+        if not isinstance(d.get("title"), str) or not d.get("title", "").strip():
+            return "title 不能为空"
+    if "priority" in d and d["priority"] not in PRIORITY_ENUM:
+        return "priority 非法，允许: 紧急/高/中/低"
+    if "status" in d and d["status"] not in STATUS_ENUM:
+        return "status 非法，允许: 待办/进行中/待验证/已验证/完成/阻塞"
+    return None
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_OPTIONS(self):
@@ -138,6 +155,13 @@ class H(BaseHTTPRequestHandler):
                            % json.dumps(BOARD_TOKEN)).encode("utf-8")
                     html = html.replace(b"</head>", tag + b"</head>", 1) \
                         if b"</head>" in html else tag + html
+                self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers(); self.wfile.write(html); return
+            if self.path in ("/docs", "/docs.html"):
+                # API 说明页（T-20260813-07）：只读 GET，无需令牌/令牌注入
+                with open(os.path.join(HERE, "docs.html"), "rb") as f:
+                    html = f.read()
                 self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers(); self.wfile.write(html); return
@@ -174,7 +198,7 @@ class H(BaseHTTPRequestHandler):
             if self.path.startswith("/api/ext/status"):
                 projs = c.execute("SELECT id,name,owner,created FROM projects ORDER BY id").fetchall()
                 inflight = c.execute("""SELECT id,parent_id,title,detail,status,author,updated,priority
-                    FROM tasks WHERE status<>'done'
+                    FROM tasks WHERE status IN ('进行中','待验证','已验证')
                     ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id""").fetchall()
                 recent = c.execute("SELECT ts,agent,action,target FROM audit ORDER BY id DESC LIMIT 8").fetchall()
                 send(self, 200, {
@@ -242,9 +266,12 @@ class H(BaseHTTPRequestHandler):
                 pid = d.get("project_id"); ow = proj_owner(c, pid)
                 if not allowed(agent, ow):
                     send(self, 403, {"error": f"无权限修改此项目(owner={ow})"}); c.close(); return
+                err = validate_task_fields(d, partial=False)
+                if err:
+                    send(self, 400, {"error": err}); c.close(); return
                 pri = d.get("priority") or "中"
                 cur = c.execute("INSERT INTO tasks(project_id,parent_id,title,detail,status,author,updated,priority) VALUES(?,?,?,?,?,?,?,?)",
-                          (d.get("project_id"), d.get("parent_id"), d.get("title", ""), d.get("detail", ""), d.get("status", "todo"), d.get("author", ""), now(), pri))
+                          (d.get("project_id"), d.get("parent_id"), d.get("title", ""), d.get("detail", ""), d.get("status", "待办"), d.get("author", ""), now(), pri))
                 c.commit(); 
                 if raw: audit(c, agent, "创建任务", f"项目{pid}/{d.get('title','')}", pid)
                 if raw: touch(c, raw)
@@ -291,6 +318,9 @@ class H(BaseHTTPRequestHandler):
                 tid = int(self.path.split("/")[-1]); ow = task_proj_owner(c, tid)
                 if not allowed(agent, ow):
                     send(self, 403, {"error": f"无权限修改此任务(owner={ow})"}); c.close(); return
+                err = validate_task_fields(d, partial=True)
+                if err:
+                    send(self, 400, {"error": err}); c.close(); return
                 sets = []; vals = []
                 for k in ("title", "detail", "status", "author", "priority"):
                     if k in d: sets.append(f"{k}=?"); vals.append(d[k])

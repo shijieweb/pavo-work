@@ -1,4 +1,4 @@
-﻿# check_wip.ps1 - WIP 机械检查：统计 board 项目 doing 任务数，超阈值红卡拦截
+﻿# check_wip.ps1 - WIP 机械检查：统计 board 项目在途任务数（进行中+待验证+已验证），超阈值红卡拦截
 # T-20260812-05 (O4 board 机械闸门)
 # 用法: .\check_wip.ps1 [-ProjectId 19] [-Limit 3] [-Owner 阿编]
 # 退出码: 0=放行(WIP PASS)  1=红卡拦截(WIP 超限)/服务异常
@@ -54,11 +54,12 @@ if ($null -eq $tasks) {
     exit 1
 }
 
-# ---- 统计 doing ----
-$doing = @($tasks | Where-Object {
-    $_.status -eq "doing" -and ($Owner -eq "" -or $_.author -eq $Owner)
+# ---- 统计在途（进行中 + 待验证 + 已验证）----
+$wipStates = @("进行中", "待验证", "已验证")
+$wip = @($tasks | Where-Object {
+    $wipStates -contains $_.status -and ($Owner -eq "" -or $_.author -eq $Owner)
 })
-$n = $doing.Count
+$n = $wip.Count
 
 # ---- 判定 ----
 if ($n -le $Limit) {
@@ -66,6 +67,6 @@ if ($n -le $Limit) {
     exit 0
 } else {
     Write-Host "[FAIL] WIP 超限 ($n/$Limit)" -ForegroundColor Red
-    $doing | ForEach-Object { Write-Host "  - $($_.title)" -ForegroundColor Yellow }
+    $wip | ForEach-Object { Write-Host "  - $($_.title)" -ForegroundColor Yellow }
     exit 1
 }

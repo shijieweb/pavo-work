@@ -197,10 +197,49 @@ def _load_route_registry(path=None):
             "route_registry.json 前缀冲突：%r 与 %r 相等或互为路径前缀，会抢同一路径，请修正注册表" % conflict)
     return routes
 
+# ===== 路由注册表 mtime 惰性热加载（T-20260813-07 · 照抄 _BOARD_TOKEN_CACHE 模式 L63-86）=====
+# 每次路由匹配 stat route_registry.json 的 mtime，变化才重载（缓存秒级）；
+# 冲突/解析失败/空 → 拒绝加载、沿用旧路由（原子性：要么全新要么全旧，不能半套）；
+# 代码逻辑变更仍走干净重启（工程铁律）。
+_ROUTE_REGISTRY_CACHE = {"val": None, "mtime": None, "error": None}
+
+def _get_route_registry():
+    """mtime 惰性重载 route_registry.json（照抄 _board_token L63-86）：
+    - 每次调用 stat mtime，与缓存一致直接返回（stat 一次，开销可忽略，秒级生效）；
+    - 不一致才重新 _load_route_registry()；
+    - 冲突(RouteRegistryError) → 拒绝加载、沿用旧路由；
+    - 解析失败/空 routes → 返回 None（回退硬编码白名单，兼容不崩）。"""
+    try:
+        mt = os.path.getmtime(ROUTE_REGISTRY_FILE)
+    except OSError:
+        return _ROUTE_REGISTRY_CACHE["val"]
+    if _ROUTE_REGISTRY_CACHE["mtime"] == mt:
+        return _ROUTE_REGISTRY_CACHE["val"]
+    try:
+        routes = _load_route_registry()
+    except RouteRegistryError as e:
+        if _ROUTE_REGISTRY_CACHE["error"] != str(e):
+            print("[route_registry] 热加载冲突，沿用旧路由：%s" % e)
+        _ROUTE_REGISTRY_CACHE["error"] = str(e)
+        _ROUTE_REGISTRY_CACHE["mtime"] = mt
+        return _ROUTE_REGISTRY_CACHE["val"]
+    _ROUTE_REGISTRY_CACHE["val"] = routes
+    _ROUTE_REGISTRY_CACHE["mtime"] = mt
+    _ROUTE_REGISTRY_CACHE["error"] = None
+    if routes is not None:
+        print("[route_registry] 热重载成功：%d 条路由" % len(routes))
+    return routes
+
 try:
     _ROUTE_REGISTRY = _load_route_registry()
 except RouteRegistryError as e:
     raise SystemExit("[route_registry] " + str(e))
+# 启动播种：缓存 mtime，使首请求零重读；运行时变更由 _get_route_registry() 惰性接管
+try:
+    _ROUTE_REGISTRY_CACHE["val"] = _ROUTE_REGISTRY
+    _ROUTE_REGISTRY_CACHE["mtime"] = os.path.getmtime(ROUTE_REGISTRY_FILE)
+except OSError:
+    pass
 
 def _route_matches(path, route):
     """单条路由匹配：board 需边界（/board、/board/、/board.html、/board/*），其余 == 或 startswith。"""
@@ -211,9 +250,10 @@ def _route_matches(path, route):
 
 def _route_for(path):
     """注册表驱动：返回命中的第一条路由；无注册表时返回 None（走硬编码回退）。"""
-    if _ROUTE_REGISTRY is None:
+    reg = _get_route_registry()
+    if reg is None:
         return None
-    for route in _ROUTE_REGISTRY:
+    for route in reg:
         if _route_matches(path, route):
             return route
     return None
@@ -376,7 +416,8 @@ class H(BaseHTTPRequestHandler):
 
     def _route_dispatch(self, path, method, data):
         """注册表驱动路由判定：命中返回 True 并转发；未命中/无注册表回退硬编码，均返回 False。"""
-        if _ROUTE_REGISTRY is not None:
+        reg = _get_route_registry()
+        if reg is not None:
             route = _route_for(path)
             if route is not None:
                 if route["kind"] == "studio":
@@ -815,8 +856,9 @@ if __name__ == "__main__":
     print("   └─ 工作台     /studio      (反向代理 -> :%d)" % STUDIO_PORT)
     print("=" * 58)
     print("密钥留在服务端 | ffmpeg: %s" % (ff if ff else "未找到（视频拼接不可用）"))
-    if _ROUTE_REGISTRY is not None:
-        print("   路由注册表   route_registry.json  (%d 条路由·单一事实源)" % len(_ROUTE_REGISTRY))
+    _rr = _get_route_registry()
+    if _rr is not None:
+        print("   路由注册表   route_registry.json  (%d 条路由·单一事实源)" % len(_rr))
     else:
         print("   路由注册表   缺失/解析失败 → 回退硬编码白名单（兼容模式）")
     # 默认拉起共享看板（8788）：手机经 8787 入口可一键直达，跨设备看进度预览

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>看板 API 说明页 · /docs</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,system-ui,"PingFang SC",sans-serif;background:#f5f6f8;color:#222;font-size:15px;line-height:1.7}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:#6b7280;font-size:13px;margin-bottom:20px}
+  h2{font-size:17px;margin:30px 0 10px;padding-bottom:6px;border-bottom:2px solid #e5e7eb}
+  h3{font-size:15px;margin:18px 0 6px}
+  table{border-collapse:collapse;width:100%;margin:10px 0;background:#fff;font-size:13px}
+  th,td{border:1px solid #e5e7eb;padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f3f4f6;font-weight:600;white-space:nowrap}
+  code,pre{font-family:Consolas,Menlo,monospace;font-size:12.5px}
+  code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px}
+  pre{background:#111827;color:#d1d5db;padding:12px 14px;border-radius:8px;overflow-x:auto;margin:8px 0}
+  pre code{background:none;color:inherit;padding:0}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;margin-right:6px}
+  .get{background:#dcfce7;color:#16a34a}
+  .post{background:#fef9c3;color:#a16207}
+  .put{background:#e0e7ff;color:#4338ca}
+  .del{background:#fee2e2;color:#dc2626}
+  .note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:13px;margin:10px 0}
+  .pathbox{font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>看板 API 说明页</h1>
+  <div class="sub">任务看板（board）接入规范 · 本页即规范载体 · 更新于 T-20260813-07</div>
+  <div class="note">
+    <b>访问路径</b>：本地直连 <code>http://&lt;IP&gt;:8788/docs</code>；外部经统一网关 <code>http://agnes.owen1.de5.net/board/docs</code>。
+    写接口须带令牌；外部经 8787 代理访问时令牌自动注入，网页端零配置。
+  </div>
+
+  <h2>一、状态枚举（中文 5 态 + 阻塞旁路）</h2>
+  <table>
+    <tr><th>状态</th><th>含义</th><th>在途？</th></tr>
+    <tr><td><code>待办</code></td><td>已建卡未开工</td><td>否</td></tr>
+    <tr><td><code>进行中</code></td><td>正在执行</td><td><b>是</b></td></tr>
+    <tr><td><code>待验证</code></td><td>产出待独立验证（对齐验收链）</td><td><b>是</b></td></tr>
+    <tr><td><code>已验证</code></td><td>验证通过待收尾</td><td><b>是</b></td></tr>
+    <tr><td><code>完成</code></td><td>已闭环</td><td>否</td></tr>
+    <tr><td><code>阻塞</code></td><td>卡点挂起（旁路态，可提交）</td><td>否</td></tr>
+  </table>
+  <p class="pathbox">在途统计口径（check_wip / /ext/status）= <code>进行中</code> + <code>待验证</code> + <code>已验证</code>。</p>
+
+  <h2>二、优先级枚举</h2>
+  <table>
+    <tr><th>优先级</th><th>排序</th></tr>
+    <tr><td><code>紧急</code></td><td>0（最高）</td></tr>
+    <tr><td><code>高</code></td><td>1</td></tr>
+    <tr><td><code>中</code></td><td>2（默认）</td></tr>
+    <tr><td><code>低</code></td><td>3</td></tr>
+  </table>
+
+  <h2>三、服务端校验规则（非法 → 400）</h2>
+  <table>
+    <tr><th>字段</th><th>规则</th><th>违规响应</th></tr>
+    <tr><td><code>title</code></td><td>必填，非空字符串</td><td><code>{"error":"title 不能为空"}</code></td></tr>
+    <tr><td><code>priority</code></td><td>∈ {紧急,高,中,低}；缺省 <code>中</code></td><td><code>{"error":"priority 非法，允许: 紧急/高/中/低"}</code></td></tr>
+    <tr><td><code>status</code></td><td>∈ 5 态+阻塞；缺省 <code>待办</code></td><td><code>{"error":"status 非法，允许: 待办/进行中/待验证/已验证/完成/阻塞"}</code></td></tr>
+  </table>
+  <p class="pathbox">POST /api/tasks 全量校验；PUT /api/tasks/&lt;id&gt; 仅校验请求中出现的字段（部分更新）。校验失败不写库、不记审计。</p>
+
+  <h2>四、端点表</h2>
+  <table>
+    <tr><th>方法</th><th>本地（8788）</th><th>网关（8787）</th><th>说明</th><th>必带字段</th></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/projects[?owner=]</code></td><td><code>/board/api/projects</code></td><td>项目列表</td><td>-</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/tasks?project_id=N</code></td><td><code>/board/api/tasks?project_id=N</code></td><td>任务树</td><td>project_id</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/presence</code></td><td><code>/board/api/presence</code></td><td>在线状态</td><td>-</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/audit[?project_id=N]</code></td><td><code>/board/api/audit</code></td><td>操作日志（最近 20 条）</td><td>-</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/ext/status</code></td><td><code>/ext/status</code></td><td>总览：全部项目 + 在途任务 + 最近审计 8 条</td><td>-</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/ext/projects</code></td><td><code>/ext/projects</code></td><td>项目列表（外部）</td><td>-</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/ext/tasks?project_id=N</code></td><td><code>/ext/tasks?project_id=N</code></td><td>任务树（外部）</td><td>project_id</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/ext/audit[?project_id=N]</code></td><td><code>/ext/audit</code></td><td>操作日志（外部）</td><td>-</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/ext/presence</code></td><td><code>/ext/presence</code></td><td>在线状态（外部）</td><td>-</td></tr>
+    <tr><td><span class="tag get">GET</span></td><td><code>/api/ext/notes[?project_id=N]</code></td><td><code>/ext/notes</code></td><td>指导留言列表</td><td>-</td></tr>
+    <tr><td><span class="tag post">POST</span></td><td><code>/api/tasks</code></td><td><code>/board/api/tasks</code></td><td>建任务</td><td>title, priority, project_id</td></tr>
+    <tr><td><span class="tag put">PUT</span></td><td><code>/api/tasks/&lt;id&gt;</code></td><td><code>/board/api/tasks/&lt;id&gt;</code></td><td>改任务</td><td>至少一个字段</td></tr>
+    <tr><td><span class="tag del">DELETE</span></td><td><code>/api/tasks/&lt;id&gt;</code></td><td><code>/board/api/tasks/&lt;id&gt;</code></td><td>删任务（含子任务）</td><td>-</td></tr>
+    <tr><td><span class="tag post">POST</span></td><td><code>/api/ext/notes</code></td><td><code>/ext/notes</code></td><td>远程指导留言</td><td>project_id, text</td></tr>
+    <tr><td><span class="tag post">POST</span></td><td><code>/api/projects</code></td><td><code>/board/api/projects</code></td><td>建项目</td><td>name</td></tr>
+  </table>
+  <p class="pathbox">说明：外部指导 API（/ext/*）免鉴权直达；看板写接口（POST/PUT/DELETE）须带 <code>X-Board-Token</code>（经 8787 代理自动注入）。</p>
+
+  <h2>五、curl 示例</h2>
+  <h3>5.1 本地写（带 X-Agent + X-Board-Token）</h3>
+<pre><code>curl.exe -H "X-Agent: 阿编" -H "X-Board-Token: &lt;TOKEN&gt;" -X POST http://127.0.0.1:8788/api/tasks \
+  -H "Content-Type: application/json" \
+  -d "{\"project_id\":19,\"title\":\"新任务\",\"priority\":\"高\",\"status\":\"待办\"}"</code></pre>
+  <h3>5.2 本地读（GET 免 token）</h3>
+<pre><code>curl.exe "http://127.0.0.1:8788/api/tasks?project_id=19"</code></pre>
+  <h3>5.3 经网关看板路径（代理自动注入令牌）</h3>
+<pre><code>curl.exe -H "X-Agent: 阿编" "http://127.0.0.1:8787/board/api/tasks?project_id=19"</code></pre>
+  <h3>5.4 外部指导（/ext 免鉴权）</h3>
+<pre><code>curl.exe "http://127.0.0.1:8787/ext/status"
+curl.exe -X POST http://127.0.0.1:8787/ext/notes -H "Content-Type: application/json" \
+  -d "{\"project_id\":19,\"text\":\"远程指导留言\"}"</code></pre>
+  <p class="pathbox">令牌来源：<code>shared_board/.env</code> 的 <code>BOARD_TOKEN</code>（首次启动自动生成并持久化）。</p>
+
+  <h2>六、身份与规则</h2>
+  <table>
+    <tr><th>规则</th><th>说明</th></tr>
+    <tr><td><code>X-Agent</code> 身份头</td><td>带身份头的读写会记在线状态与审计；不带 = 视为「老板」全权</td></tr>
+    <tr><td>owner 写锁</td><td>写接口只能改 <code>owner==自己</code> 的项目/任务；改他人 → <b>403</b>（老板豁免）</td></tr>
+    <tr><td>审计自动记</td><td>带 X-Agent 的写操作自动记一条审计（谁/何时/动作/目标）</td></tr>
+    <tr><td>外部 /ext</td><td>只读 + 留言（POST /ext/notes），无鉴权直达（老板决策，商用前再评估）</td></tr>
+  </table>
+
+  <div class="note">本页即接入规范载体（不另造 md 重复文档）。规则以服务端为准：非法输入会被 400 拒绝，请按枚举提交。</div>
+</div>
+</body>
+</html>
