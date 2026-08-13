@@ -1,0 +1,44 @@
+{
+  "mode_before": "test(forced)",
+  "mode_after": "test",
+  "result": {
+    "ok": true,
+    "empty_shot": false,
+    "dry_run": false,
+    "model": "agnes-2.5-flash",
+    "inputs": {
+      "shot_id": 1,
+      "strategy": "reference",
+      "prompt": "Wide establishing shot of a Chinese city street at night, wet asphalt reflecting neon and street lights, a lone man in his late twenties walks out of a tall glass office building into the frame from b",
+      "first": "short_drama_workflow/scripts/diag/experiments/ep_0811_145935/shot1_v2/s1_0.png",
+      "last": "short_drama_workflow/scripts/diag/experiments/ep_0811_145935/shot1_v2/s1_5_8.png"
+    },
+    "precheck": "warn",
+    "reason": "部分元素缺失/不明确，建议确认",
+    "prompt_frame_match": {
+      "overall": "warn",
+      "opening": {
+        "verdict": "pass",
+        "issues": []
+      },
+      "ending": {
+        "verdict": "warn",
+        "issues": [
+          {
+            "type": "景别不符",
+            "severity": "low",
+            "desc": "提示词要求medium close-up（中近景），但尾帧图为更近的close-up特写，景别偏大，人物面部占比过大，未呈现提示词中'shoulders slumping'的肩部姿态信息"
+          }
+        ]
+      }
+    },
+    "conflicts": [
+      {
+        "stage": "ending",
+        "type": "景别不符",
+        "severity": "low",
+        "desc": "提示词要求medium close-up（中近景），但尾帧图为更近的close-up特写，景别偏大，人物面部占比过大，未呈现提示词中'shoulders slumping'的肩部姿态信息"
+      }
+    ]
+  }
+}
