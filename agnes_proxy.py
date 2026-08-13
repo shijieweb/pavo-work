@@ -21,11 +21,15 @@ AGNES 轻量代理（同源本地服务器 + 资产库视频拼接）
 运行：python agnes_proxy.py  （默认 8787 端口）
 使用：浏览器打开 http://localhost:8787/ 即可（页面内所有请求同源转发）
 """
-import os, sys, json, re, time, shutil, subprocess, tempfile, urllib.request, urllib.error
+import os, sys, json, re, time, shutil, subprocess, tempfile, urllib.request, urllib.error, urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
 
 API_ROOT = "https://apihub.agnes-ai.cn"
 PORT = int(os.environ.get("AGNES_PROXY_PORT", "8787"))
+# ===== 对外入口令牌闸（T-20260813-03）：公网隧道可达 + 0.0.0.0 监听 + /studio 无鉴权 → 必须加 auth =====
+# 设 PORTAL_TOKEN 后，受保护路由（/studio + /api/* + /v1 + /agnesapi + /console + /merge）需带 ?token= 或 X-Portal-Token 头；
+# 未设则维持原开放行为（本地向后兼容）。token 经 _load_env 从 ~/.workbuddy/.env 注入，不进代码、可随时轮换。
+# 注意：PORTAL_TOKEN 必须在 _load_env() 之后读取（见下方），否则拿到空串、闸门形同虚设。
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HTML_FILE = os.path.join(SCRIPT_DIR, "agnes_console.html")
 HUB_FILE = os.path.join(SCRIPT_DIR, "hub.html")
@@ -131,6 +135,12 @@ def _launch_board():
 def _is_studio(path):
     return any(path == p or path.startswith(p) for p in STUDIO_PREFIXES)
 
+def _is_protected(path):
+    """令牌闸覆盖面：工作台全路由 + AGNES 转发(服务端KEY/额度) + 调试台 + 文件拼接写本地。"""
+    if _is_studio(path):
+        return True
+    return path.startswith(("/v1", "/agnesapi", "/console", "/merge"))
+
 def _is_board(path):
     return path in ("/board", "/board/", "/board.html") or path.startswith("/board/")
 # 服务端持久化文件：资产库 + 设置。使 localhost 与 127.0.0.1 访问同一份数据（同源共享）
@@ -155,6 +165,7 @@ def _load_env():
             pass
 
 _load_env()
+PORTAL_TOKEN = os.environ.get("PORTAL_TOKEN", "").strip()  # 必须在 _load_env() 之后读（env 由文件注入）
 KEYS = os.environ.get("AGNES_API_KEYS") or os.environ.get("AGNES_API_KEY", "")
 KEY = KEYS.split(",")[0].strip() if KEYS else ""
 
@@ -218,8 +229,25 @@ class H(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._send(204, b"")
 
+    def _authorized(self):
+        if not PORTAL_TOKEN:
+            return True
+        q = self.path.split("?", 1)[1] if "?" in self.path else ""
+        tok = dict(urllib.parse.parse_qsl(q)).get("token") or self.headers.get("X-Portal-Token")
+        return tok == PORTAL_TOKEN
+
+    def _guard(self):
+        """受保护路由无令牌 → 401 并短路。返回 True 表示已拦截。"""
+        p = self.path.split("?")[0]
+        if _is_protected(p) and not self._authorized():
+            self._send(401, json.dumps({"error": "未授权：请带 ?token= 或 X-Portal-Token 头"}))
+            return True
+        return False
+
     def do_GET(self):
         path = self.path.split("?")[0]
+        if self._guard():
+            return
         if path in ("/", "/index.html", "/hub", "/hub.html"):
             self._serve_html(HUB_FILE)          # 导航首页：选调试台 or 工作台
             return
@@ -262,6 +290,8 @@ class H(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length) if length else None
         path = self.path.split("?")[0]
+        if self._guard():
+            return
         if _is_board(path):
             self._proxy_board("POST", data)
             return
@@ -286,6 +316,8 @@ class H(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length) if length else None
         path = self.path.split("?")[0]
+        if self._guard():
+            return
         if _is_board(path):
             self._proxy_board("PUT", data)
             return
@@ -298,6 +330,8 @@ class H(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length) if length else None
         path = self.path.split("?")[0]
+        if self._guard():
+            return
         if _is_board(path):
             self._proxy_board("DELETE", data)
             return
