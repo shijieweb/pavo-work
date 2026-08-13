@@ -5,61 +5,166 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>任务看板</title>
 <style>
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  body{margin:0;font-family:-apple-system,system-ui,"PingFang SC",sans-serif;background:#f5f6f8;color:#222;font-size:16px}
-  header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 14px;z-index:10}
+  *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  /* ── 设计令牌 · 亮（参考 kanban.html L9-18） ── */
+  :root{
+    --bg:#f0f2f5;--card-bg:#fff;--text:#1a1a2e;--text2:#666;--border:#e2e8f0;
+    --col-hd-bg:#fff;--btn-bg:#fff;--btn-hover:#f0f2f5;--btn-active:#e0e7ff;
+    --shadow:0 1px 3px rgba(0,0,0,.06);--shadow-lg:0 2px 8px rgba(0,0,0,.1);
+    --p-high:#ef4444;--p-high-bg:#fef2f2;--p-med:#f59e0b;--p-med-bg:#fffbeb;--p-low:#22c55e;--p-low-bg:#f0fdf4;
+    --p-crit:#dc2626;--p-crit-bg:#fef2f2;
+    --done-bg:#f0fdf4;--blocked-bg:#fef2f2;--prog-bg:#e2e8f0;--prog-fill:#3b82f6;
+    --tag-bg:#f0f4ff;--tag-text:#4f46e5;
+    /* 6 态状态色 · 亮（T-08a 新增：待验证 amber / 已验证 purple） */
+    --st-todo:#6b7280;--st-todo-bg:#f3f4f6;
+    --st-doing:#1d4ed8;--st-doing-bg:#dbeafe;
+    --st-verify:#a16207;--st-verify-bg:#fef9c3;
+    --st-verified:#4338ca;--st-verified-bg:#e0e7ff;
+    --st-done:#16a34a;--st-done-bg:#dcfce7;
+    --st-blocked:#dc2626;--st-blocked-bg:#fee2e2;
+    --accent:#2563eb;--accent-bg:#eef2ff;--danger:#dc2626;--muted:#9ca3af;
+    --drawer-bg:#fff;--input-bg:#fff;
+  }
+  /* ── 设计令牌 · 暗（参考 .dark L19-28） ── */
+  .dark{
+    --bg:#0f172a;--card-bg:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--border:#334155;
+    --col-hd-bg:#1e293b;--btn-bg:#1e293b;--btn-hover:#334155;--btn-active:#3730a3;
+    --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 2px 8px rgba(0,0,0,.5);
+    --p-high-bg:rgba(239,68,68,.1);--p-med-bg:rgba(245,158,11,.1);--p-low-bg:rgba(34,197,94,.1);
+    --p-crit-bg:rgba(220,38,38,.15);
+    --done-bg:rgba(34,197,94,.1);--blocked-bg:rgba(239,68,68,.1);
+    --prog-bg:#334155;--tag-bg:rgba(79,70,229,.15);
+    /* 6 态状态色 · 暗（亮字 + rgba 浅底，对照参考暗色手法） */
+    --st-todo:#94a3b8;--st-todo-bg:rgba(148,163,184,.15);
+    --st-doing:#60a5fa;--st-doing-bg:rgba(59,130,246,.15);
+    --st-verify:#fbbf24;--st-verify-bg:rgba(245,158,11,.15);
+    --st-verified:#a5b4fc;--st-verified-bg:rgba(99,102,241,.15);
+    --st-done:#4ade80;--st-done-bg:rgba(34,197,94,.15);
+    --st-blocked:#f87171;--st-blocked-bg:rgba(239,68,68,.15);
+    --accent:#60a5fa;--accent-bg:rgba(59,130,246,.15);--danger:#f87171;--muted:#64748b;
+    --drawer-bg:#1e293b;--input-bg:#0f172a;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:16px}
+  header{position:sticky;top:0;background:var(--card-bg);border-bottom:1px solid var(--border);padding:10px 14px;z-index:10}
   .topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  select,input,button{font-size:16px;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;background:#fff;min-height:44px}
-  button{background:#2563eb;color:#fff;border:none;cursor:pointer;font-weight:600}
-  button.ghost{background:#eef2ff;color:#2563eb}
-  button.danger{background:#fee2e2;color:#dc2626}
-  .wrap{padding:14px;max-width:760px;margin:0 auto}
+  select,input{font-size:14px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);min-height:38px}
+  button{font-size:14px;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--btn-bg);color:var(--text);cursor:pointer;font-weight:600;transition:.15s;min-height:38px}
+  button:hover{background:var(--btn-hover)}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.primary:hover{filter:brightness(.95);background:var(--accent)}
+  button.ghost{background:var(--accent-bg);color:var(--accent);border-color:transparent}
+  button.ghost:hover{background:var(--btn-hover)}
+  button.active{background:var(--btn-active);border-color:#818cf8;font-weight:600}
+  .spacer{flex:1}
+  /* ── 进度概览统计条（K1 renderProg 迁移 · 参考 .stats 形态） ── */
+  .progbar{margin-top:8px;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-size:13px;padding:6px 12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .stat b{font-weight:700;color:var(--text)}
+  .stat.st-doing b{color:var(--st-doing)}
+  .stat.st-verify b{color:var(--st-verify)}
+  .stat.st-blocked b{color:var(--st-blocked)}
+  .stat.st-done b{color:var(--st-done)}
+  /* ── 在线 👤 条（老板 22:26 补充：人头+名字，谁在线一眼可见） ── */
+  .presbar{background:var(--accent-bg);color:var(--accent);font-size:13px;padding:6px 14px;border-bottom:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap;align-items:center;z-index:9}
+  .person{display:inline-flex;align-items:center;gap:5px}
+  .person .avatar{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex:none}
+  .avatar.on{box-shadow:0 0 0 2px var(--st-done)}
+  .avatar.off{opacity:.4;filter:grayscale(1)}
+  .person .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot.on{background:var(--st-done)}.dot.off{background:var(--muted)}
+  .person.off{opacity:.65}
+  .av-pm{background:#8b5cf6}.av-fe{background:#3b82f6}.av-be{background:#f59e0b}.av-qa{background:#22c55e}.av-boss{background:#e11d48}
+  /* ── 视图切换（泳道 ⇄ 树） ── */
+  .view-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:none}
+  .view-toggle button{border:none;border-radius:0;min-height:36px}
+  /* ── 泳道 board（6 列横向滚动） ── */
+  .board{display:flex;overflow-x:auto;gap:12px;padding:14px;align-items:flex-start;max-width:1560px;margin:0 auto;scrollbar-width:thin}
+  .col{flex:0 0 260px;display:flex;flex-direction:column;min-height:200px}
+  .col-header{display:flex;align-items:center;gap:6px;padding:10px 14px;background:var(--col-hd-bg);border-radius:10px 10px 0 0;font-size:14px;font-weight:600;border:1px solid var(--border);border-bottom:none}
+  .col-header .count{margin-left:auto;font-size:12px;color:var(--text2);background:var(--btn-bg);padding:2px 8px;border-radius:10px}
+  .col-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .col-dot.st-todo{background:var(--st-todo)}
+  .col-dot.st-doing{background:var(--st-doing)}
+  .col-dot.st-verify{background:var(--st-verify)}
+  .col-dot.st-verified{background:var(--st-verified)}
+  .col-dot.st-done{background:var(--st-done)}
+  .col-dot.st-blocked{background:var(--st-blocked)}
+  .col-body{flex:1;padding:8px;border:1px solid var(--border);border-top:none;min-height:200px;border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px}
+  /* ── 卡片（参考 L53-61，状态色边条 + 优先级徽章 + 子任务计数） ── */
+  .card{background:var(--card-bg);border-radius:8px;padding:12px;border:1px solid var(--border);box-shadow:var(--shadow);transition:.2s;cursor:pointer;position:relative;border-left:3px solid var(--st-todo)}
+  .card:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+  .card:active{background:var(--btn-hover)}
+  .card.st-doing{border-left-color:var(--st-doing)}
+  .card.st-verify{border-left-color:var(--st-verify)}
+  .card.st-verified{border-left-color:var(--st-verified)}
+  .card.st-done{border-left-color:var(--st-done)}
+  .card.st-blocked{border-left-color:var(--st-blocked);border-width:2px;border-color:var(--st-blocked);animation:block-pulse 2s infinite}
+  @keyframes block-pulse{0%,100%{border-color:var(--st-blocked)}50%{border-color:#fca5a5}}
+  .card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:6px}
+  .card-id{font-size:11px;font-weight:600;color:var(--text2)}
+  .card-title{font-size:14px;font-weight:600;line-height:1.4;margin-bottom:8px;word-break:break-word}
+  .card-meta{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text2)}
+  .card-meta span{display:flex;align-items:center;gap:4px}
+  .assignee .avatar{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+  .pri{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;white-space:nowrap}
+  .p0{color:#991b1b;background:var(--p-crit-bg)}.p1{color:#991b1b;background:var(--p-high-bg)}.p2{color:#92400e;background:var(--p-med-bg)}.p3{color:#166534;background:var(--p-low-bg)}
+  /* ── 子任务（方案 A：全量平铺 + 父引用 chip + 计数徽章） ── */
+  .child-card{margin-left:10px;border-left:3px solid var(--border)}
+  .parent-ref{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 5px;border-radius:3px;font-weight:600}
+  .subcount{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 5px;border-radius:3px;font-weight:600}
+  /* ── 状态徽章（树视图/通用） ── */
+  .badge{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .badge[data-status="待办"]{background:var(--st-todo-bg);color:var(--st-todo)}
+  .badge[data-status="进行中"]{background:var(--st-doing-bg);color:var(--st-doing)}
+  .badge[data-status="待验证"]{background:var(--st-verify-bg);color:var(--st-verify)}
+  .badge[data-status="已验证"]{background:var(--st-verified-bg);color:var(--st-verified)}
+  .badge[data-status="完成"]{background:var(--st-done-bg);color:var(--st-done)}
+  .badge[data-status="阻塞"]{background:var(--st-blocked-bg);color:var(--st-blocked)}
+  /* ── 树视图（保留 T-07 交互） ── */
+  .wrap{padding:14px;max-width:1200px;margin:0 auto}
   .node{margin:6px 0}
-  .card{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;cursor:pointer}
-  .card:active{background:#f0f4ff}
-  .tri{width:18px;color:#9ca3af;flex:none;transition:transform .2s;font-size:12px}
+  .tcard{display:flex;align-items:center;gap:10px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer}
+  .tcard:active{background:var(--btn-hover)}
+  .tri{width:18px;color:var(--muted);flex:none;transition:transform .2s;font-size:12px}
   .tri.open{transform:rotate(90deg)}
   .ttl{flex:1;font-weight:600;word-break:break-word}
-  .badge{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap}
-  .badge[data-status="待办"]{background:#f3f4f6;color:#6b7280}
-  .badge[data-status="进行中"]{background:#dbeafe;color:#1d4ed8}
-  .badge[data-status="待验证"]{background:#fef9c3;color:#a16207}
-  .badge[data-status="已验证"]{background:#e0e7ff;color:#4338ca}
-  .badge[data-status="完成"]{background:#dcfce7;color:#16a34a}
-  .badge[data-status="阻塞"]{background:#fee2e2;color:#dc2626}
-  .pri{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap;font-weight:600}
-  .p0{background:#fee2e2;color:#dc2626}   /* 紧急 */
-  .p1{background:#ffedd5;color:#ea580c}   /* 高 */
-  .p2{background:#f3f4f6;color:#6b7280}   /* 中 */
-  .p3{background:#f8fafc;color:#94a3b8}   /* 低 */
-  .meta{font-size:11px;color:#9ca3af;margin-left:28px}
+  .meta{font-size:11px;color:var(--muted);margin-left:28px}
   .children{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
   .children.open{grid-template-rows:1fr}
-  .children>div{overflow:hidden;padding-left:22px;border-left:2px solid #eef2f7;margin-left:8px}
-  .addbtn{font-size:13px;color:#2563eb;background:none;border:none;padding:6px 4px;min-height:auto}
-  .dbtn{font-size:12px;color:#2563eb;background:#eef2ff;border:none;padding:6px 10px;min-height:auto;border-radius:8px;flex:none}
-  /* drawer */
+  .children>div{overflow:hidden;padding-left:22px;border-left:2px solid var(--border);margin-left:8px}
+  .addbtn{font-size:13px;color:var(--accent);background:none;border:none;padding:6px 4px;min-height:auto}
+  .dbtn{font-size:12px;color:var(--accent);background:var(--accent-bg);border:none;padding:6px 10px;min-height:auto;border-radius:8px;flex:none}
+  .dbtn:hover{background:var(--btn-hover)}
+  /* ── drawer ── */
   .mask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
   .mask.show{display:block}
-  .drawer{position:fixed;top:0;right:0;height:100%;width:min(420px,92vw);background:#fff;z-index:21;transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(420px,92vw);background:var(--drawer-bg);color:var(--text);z-index:21;transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column}
   .drawer.show{transform:translateX(0)}
-  .dh{padding:14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;font-weight:700}
+  .dh{padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:700}
   .db{padding:14px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:12px}
-  .db label{font-size:13px;color:#6b7280;display:block;margin-bottom:4px}
+  .db label{font-size:13px;color:var(--text2);display:block;margin-bottom:4px}
   .db textarea,.db input,.db select{width:100%}
   .db textarea{min-height:90px;resize:vertical}
-  .empty{color:#9ca3af;text-align:center;margin-top:40px}
-  .presbar{position:sticky;top:0;background:#eef2ff;color:#3730a3;font-size:13px;padding:6px 14px;border-bottom:1px solid #e0e7ff;display:flex;gap:16px;flex-wrap:wrap;align-items:center;z-index:9}
-  .presbar .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
-  .dot.on{background:#16a34a}.dot.off{background:#cbd5e1}
-  .progbar{margin-top:8px;background:#eef2ff;border:1px solid #e0e7ff;border-radius:10px;color:#3730a3;font-size:13px;padding:6px 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-  .progbar b{font-weight:700}
-  .auditbox{margin-top:26px;border-top:1px solid #eee;padding-top:12px}
-  .ahead{font-weight:700;color:#374151;margin-bottom:8px;font-size:14px}
-  .arow{font-size:12px;color:#6b7280;padding:4px 0;border-bottom:1px solid #f3f4f6;word-break:break-all}
-  .muted{color:#9ca3af}
-  .delbtn{background:none;border:none;color:#dc2626;font-size:12px;padding:6px 4px;min-height:auto;font-weight:400;cursor:pointer;opacity:.75;text-decoration:underline}
+  /* ── 审计 ── */
+  .auditwrap{max-width:1200px;margin:0 auto;padding:0 14px}
+  .auditbox{margin-top:26px;border-top:1px solid var(--border);padding-top:12px}
+  .ahead{font-weight:700;color:var(--text);margin-bottom:8px;font-size:14px}
+  .arow{font-size:12px;color:var(--text2);padding:4px 0;border-bottom:1px solid var(--border);word-break:break-all}
+  .muted{color:var(--muted)}
+  /* ── 删除弱化（T-08 P0×3 保留） ── */
+  .delbtn{background:none;border:none;color:var(--danger);font-size:12px;padding:6px 4px;min-height:auto;font-weight:400;cursor:pointer;opacity:.75;text-decoration:underline}
   .delbtn:hover{opacity:1}
+  /* ── 空态 / toast / flash ── */
+  .empty{text-align:center;padding:40px 16px;color:var(--text2);font-size:13px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:8px 20px;border-radius:8px;font-size:13px;z-index:99;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .toast.show{opacity:1}
+  .flash{animation:flash 2s ease-out}
+  @keyframes flash{0%{background:rgba(59,130,246,.2)}100%{background:transparent}}
+  /* ── 响应式：横向滚动优先（6 列不降列堆叠） ── */
+  @media(max-width:600px){
+    .col{flex:0 0 80vw}
+    .topbar{gap:6px}
+    .progbar{font-size:12px}
+  }
 </style>
 </head>
 <body>
@@ -71,12 +176,24 @@
     <button class="ghost" onclick="addProject()">+ 建项目</button>
     <button class="ghost" onclick="changeOwner()">改归属</button>
     <button class="ghost" onclick="copyDispatch()">复制派单</button>
-    <button onclick="addRoot()">+ 主任务</button>
+    <button class="primary" onclick="addRoot()">+ 主任务</button>
+    <span class="spacer"></span>
+    <div class="view-toggle" id="viewToggle" title="泳道=按状态分组视图；树=层级展开视图">
+      <button class="active" data-view="kanban">泳道</button>
+      <button data-view="tree">树</button>
+    </div>
+    <button id="btnRefresh" title="强制刷新">🔄 刷新</button>
+    <button id="btnDark" title="暗色模式">🌙</button>
   </div>
   <div id="prog" class="progbar"></div>
 </header>
 <div id="presence" class="presbar"><span class="muted">无 agent 在线</span></div>
-<div class="wrap"><div id="tree"></div><div id="empty" class="empty">先建一个项目，再开始加任务</div><div id="audit" class="auditbox"></div></div>
+<div class="board" id="board"></div>
+<div class="wrap" id="treeWrap" hidden>
+  <div id="tree"></div>
+  <div id="empty" class="empty">先建一个项目，再开始加任务</div>
+</div>
+<div class="auditwrap"><div id="audit" class="auditbox"></div></div>
 
 <div class="mask" id="mask" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
@@ -92,14 +209,15 @@
       <option value="中">中</option><option value="低">低</option></select></div>
     <div><label>详情</label><textarea id="d_detail"></textarea></div>
     <div style="display:flex;gap:8px">
-      <button style="flex:1" onclick="saveDrawer()">保存</button>
+      <button class="primary" style="flex:1" onclick="saveDrawer()">保存</button>
       <button class="ghost" style="flex:1" onclick="addChild()">+ 子任务</button>
     </div>
-    <div style="border-top:1px solid #f3f4f6;margin-top:4px;padding-top:10px">
+    <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:10px">
       <button class="delbtn" onclick="delTask()">删除此任务及子任务</button>
     </div>
   </div>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
 if(location.protocol==="file:"){document.body.innerHTML='<div style="padding:24px;color:#dc2626;line-height:1.7">请通过 <b>http://电脑局域网IP:8788</b> 打开此页面（手机与电脑连同一 WiFi，用电脑的 IP 访问），<br>不要直接双击 html 文件，否则前端连不上服务。</div>';}
@@ -107,15 +225,46 @@ const API=location.origin;
 // 看板令牌：优先 ?token=，其次服务端注入的 window.__BOARD_TOKEN__（本地自用零配置），再退回 localStorage
 let BOARD_TOKEN=new URLSearchParams(location.search).get('token')||window.__BOARD_TOKEN__||localStorage.getItem('board_token')||'';
 if(BOARD_TOKEN)localStorage.setItem('board_token',BOARD_TOKEN);
-const ERR=msg=>alert("操作失败："+msg+"\n请确认：①用 http://电脑局域网IP:8788 打开（不要双击文件）；②手机与电脑同一WiFi；③电脑防火墙允许8788入站");
+// toast（参考 kanban.html L293-297 · 替代 alert）
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>t.classList.remove('show'),2000);
+}
+function ERR(msg){ showToast("操作失败："+msg); }
 async function api(url,opt){opt=opt||{};if(BOARD_TOKEN){opt.headers=Object.assign({},opt.headers||{},{'X-Board-Token':BOARD_TOKEN});}try{const r=await fetch(API+url,opt);if(!r.ok)throw new Error("HTTP "+r.status);if(r.status===204)return{};return await r.json();}catch(e){ERR(e.message);throw e;}}
-let projects=[], tasks=[], cur=null, expanded=new Set(), curTask=null;
+let projects=[], tasks=[], cur=null, expanded=new Set(), curTask=null, viewMode='kanban';
+
+// 泳道 6 列（5 态 + 阻塞旁路，status→列 1:1 直映射，无 fallback）
+const COLUMNS=[
+  {key:'待办',label:'📋 待办',cls:'st-todo'},
+  {key:'进行中',label:'🔄 进行中',cls:'st-doing'},
+  {key:'待验证',label:'🔍 待验证',cls:'st-verify'},
+  {key:'已验证',label:'✅ 已验证',cls:'st-verified'},
+  {key:'完成',label:'🏁 完成',cls:'st-done'},
+  {key:'阻塞',label:'⚠️ 阻塞',cls:'st-blocked'}
+];
+const STATUS_CLS={'待办':'todo','进行中':'doing','待验证':'verify','已验证':'verified','完成':'done','阻塞':'blocked'};
+const AVATAR_INIT={'老板':'老','PM':'PM','产品经理':'产','前端研发':'前','后端研发':'后','测试工程师':'测'};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+function statusToColumn(s){return s;}
+function statusCls(s){return STATUS_CLS[s]||'todo';}
+function avatarInit(name){return AVATAR_INIT[name]||String(name==null?'?':name).charAt(0);}
+function avatarClass(name){
+  if(name==='老板')return 'av-boss';
+  if(name==='PM'||(name||'').indexOf('产品')>=0)return 'av-pm';
+  if((name||'').indexOf('前端')>=0)return 'av-fe';
+  if((name||'').indexOf('后端')>=0)return 'av-be';
+  if((name||'').indexOf('测试')>=0||(name||'').indexOf('QA')>=0)return 'av-qa';
+  return 'av-pm';
+}
 
 async function load(){
   try{
     projects=await api("/api/projects");
     const sel=document.getElementById("projSel");
-    sel.innerHTML='<option value="">— 选择项目 —</option>'+projects.map(p=>`<option value="${p.id}">${p.name}${p.owner&&p.owner!=="老板"?" ("+p.owner+")":""}</option>`).join("");
+    sel.innerHTML='<option value="">— 选择项目 —</option>'+projects.map(p=>`<option value="${p.id}">${esc(p.name)}${p.owner&&p.owner!=="老板"?" ("+esc(p.owner)+")":""}</option>`).join("");
     if(cur) sel.value=cur;
     if(cur) tasks=await api("/api/tasks?project_id="+cur);
     render();
@@ -126,59 +275,61 @@ document.getElementById("projSel").onchange=e=>{ setProj(e.target.value); const 
 
 async function addProject(){
   const n=document.getElementById("projName").value.trim();
-  if(!n) return alert("输入项目名");
+  if(!n) return showToast("请输入项目名");
   const owner=document.getElementById("projOwner").value.trim()||"老板";
   try{
     const r=await api("/api/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n,owner:owner})});
-    document.getElementById("projName").value=""; cur=r.id; await load(); alert("已创建项目："+n+"（归属："+owner+"）");
+    document.getElementById("projName").value=""; cur=r.id; await load(); showToast("已创建项目："+n+"（归属："+owner+"）");
   }catch(e){}
 }
 async function changeOwner(){
-  if(!cur) return alert("先选择项目");
+  if(!cur) return showToast("先选择项目");
   const owner=document.getElementById("projOwner").value.trim()||"老板";
   try{
     await api("/api/projects/"+cur,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({owner:owner})});
-    await load(); alert("已改归属："+owner);
+    await load(); showToast("已改归属："+owner);
   }catch(e){}
 }
 async function copyDispatch(){
-  if(!cur) return alert("先选择项目");
+  if(!cur) return showToast("先选择项目");
   const p=projects.find(x=>x.id==cur); if(!p) return;
   const owner=p.owner||"老板";
   const txt="【派单】项目："+p.name+"\n负责人(owner)："+owner+"\n请按 owner="+owner+" 拉取此项目，先查看你的任务清单与计划，按优先级（紧急>高>中>低）从高到低推进，先做优先级高的任务；每做完一步用 PUT 更新状态并定时回报进度。";
-  try{ await navigator.clipboard.writeText(txt); alert("已复制派单信息，粘贴给 agent 即可：\n\n"+txt); }
+  try{ await navigator.clipboard.writeText(txt); showToast("已复制派单信息，粘贴给 agent 即可"); }
   catch(e){ fallbackCopy(txt); }
 }
 function fallbackCopy(txt){
   const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
   document.body.appendChild(ta); ta.select();
-  try{ document.execCommand("copy"); alert("已复制派单信息：\n\n"+txt); }
-  catch(e){ alert("复制失败，请手动复制：\n\n"+txt); }
+  try{ document.execCommand("copy"); showToast("已复制派单信息，粘贴给 agent 即可"); }
+  catch(e){ showToast("复制失败，请手动复制派单文本"); }
   document.body.removeChild(ta);
 }
 async function addRoot(){
-  if(!cur) return alert("先建/选项目");
+  if(!cur) return showToast("先建/选项目");
   try{ await api("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({project_id:cur,parent_id:null,title:"新任务",detail:"",author:"老板",priority:"高"})});
-  await load(); }catch(e){}
+  await load(); showToast("已添加主任务"); }catch(e){}
 }
 async function addChild(){
   if(!curTask) return;
   try{ await api("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({project_id:cur,parent_id:curTask.id,title:"子任务",detail:"",author:"老板",priority:"高"})});
-  expanded.add(curTask.id); await load(); openDrawer(curTask.id); }catch(e){}
+  expanded.add(curTask.id); await load(); openDrawer(curTask.id); showToast("已添加子任务"); }catch(e){}
 }
 async function delTask(){
   if(!curTask) return; if(!confirm("删除此任务及所有子任务？")) return;
-  try{ await api("/api/tasks/"+curTask.id,{method:"DELETE"}); closeDrawer(); await load(); }catch(e){}
+  const id=curTask.id;
+  try{ await api("/api/tasks/"+id,{method:"DELETE"}); closeDrawer(); await load(); showToast("已删除 #"+id); }catch(e){}
 }
 function saveDrawer(){
   if(!curTask) return;
+  const id=curTask.id;
   const d={title:document.getElementById("d_title").value,
            status:document.getElementById("d_status").value,
            priority:document.getElementById("d_priority").value,
            detail:document.getElementById("d_detail").value};
-  api("/api/tasks/"+curTask.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(()=>{closeDrawer();load();}).catch(()=>{});
+  api("/api/tasks/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(()=>{closeDrawer();load();showToast("已保存 #"+id);}).catch(()=>{});
 }
 function openDrawer(id){
   curTask=tasks.find(t=>t.id==id); if(!curTask) return;
@@ -191,12 +342,44 @@ function openDrawer(id){
 }
 function closeDrawer(){document.getElementById("drawer").classList.remove("show");document.getElementById("mask").classList.remove("show");curTask=null;}
 
+// ── 泳道渲染（T-08a） ──
+function renderCard(t){
+  const isChild=t.parent_id!=null;
+  const priArr=["紧急","高","中","低"]; const pi=priArr.indexOf(t.priority);
+  const priCls="p"+(pi>=0?pi:2);
+  const kids=tasks.filter(x=>x.parent_id==t.id);
+  const subHtml=kids.length?'<span class="subcount">👥 '+kids.length+' 子任务</span>':'';
+  const parentHtml=isChild?'<span class="parent-ref">↳ 父 #'+t.parent_id+'</span>':'';
+  const cls='card st-'+statusCls(t.status)+(isChild?' child-card':'')+(t.status==='阻塞'?' blocked':'');
+  const author=t.author||'老板';
+  return '<div class="'+cls+'" id="card-'+t.id+'" onclick="openDrawer('+t.id+')">'
+    +'<div class="card-header"><span class="card-id">#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span></span>'
+    +'<button class="dbtn" onclick="event.stopPropagation();openDrawer('+t.id+')">详情</button></div>'
+    +'<div class="card-title">'+esc(t.title)+'</div>'
+    +'<div class="card-meta">'
+    +'<span class="assignee"><span class="avatar '+avatarClass(author)+'">'+avatarInit(author)+'</span> '+esc(author)+'</span>'
+    +'<span>🕐 '+esc(t.updated||'')+'</span>'
+    +(subHtml||parentHtml?'<span>'+subHtml+parentHtml+'</span>':'')
+    +'</div></div>';
+}
+function renderBoard(){
+  const board=document.getElementById("board");
+  const groups={}; COLUMNS.forEach(c=>groups[c.key]=[]);
+  tasks.forEach(t=>{ const k=statusToColumn(t.status); if(groups[k]) groups[k].push(t); });
+  board.innerHTML=COLUMNS.map(col=>{
+    const cards=groups[col.key];
+    const html=cards.length?cards.map(renderCard).join(''):'<div class="empty">暂无任务</div>';
+    return '<div class="col"><div class="col-header"><span class="col-dot '+col.cls+'"></span>'+col.label+' <span class="count">'+cards.length+'</span></div><div class="col-body">'+html+'</div></div>';
+  }).join('');
+}
+
+// ── 树视图（保留 T-07：单击展开/双击/长按/详情按钮/子任务） ──
 function build(id){
   const kids=tasks.filter(t=>t.parent_id==id);
   const box=document.createElement("div");
   kids.forEach(t=>{
     const node=document.createElement("div"); node.className="node";
-    const card=document.createElement("div"); card.className="card";
+    const card=document.createElement("div"); card.className="tcard";
     const tri=document.createElement("span"); tri.className="tri"+(expanded.has(t.id)?" open":""); tri.textContent="▶";
     const tt=document.createElement("span"); tt.className="ttl"; tt.textContent=t.title;
     const pr=document.createElement("span"); const priArr=["紧急","高","中","低"]; const pi=priArr.indexOf(t.priority); pr.className="pri p"+(pi>=0?pi:2); pr.textContent=t.priority||"中";
@@ -223,22 +406,40 @@ function build(id){
   });
   return box;
 }
+
+// ── 进度概览统计条（K1 renderProg 迁移 · 口径=含子任务，与 T-07 一致） ──
 function renderProg(){
   const box=document.getElementById("prog");
   if(!cur){box.innerHTML="";return;}
   const c={}; tasks.forEach(t=>{c[t.status]=(c[t.status]||0)+1;});
-  const total=tasks.length;
-  box.innerHTML='<b>'+(c["进行中"]||0)+' 进行中</b> · '+(c["待验证"]||0)+' 待验证 · '+(c["完成"]||0)+' 已完成 / '+total
-    +'<span class="muted">（待办 '+(c["待办"]||0)+' · 已验证 '+(c["已验证"]||0)+' · 阻塞 '+(c["阻塞"]||0)+'）</span>';
+  const n=k=>c[k]||0;
+  box.innerHTML='<span class="stat">总计 <b>'+tasks.length+'</b></span>'
+    +'<span class="stat st-doing">进行中 <b>'+n("进行中")+'</b></span>'
+    +'<span class="stat st-verify">待验证 <b>'+n("待验证")+'</b></span>'
+    +'<span class="stat st-blocked">阻塞 <b>'+n("阻塞")+'</b></span>'
+    +'<span class="stat st-done">完成 <b>'+n("完成")+'</b></span>'
+    +'<span class="muted">（待办 '+n("待办")+' · 已验证 '+n("已验证")+'）</span>';
 }
 function render(){
   renderProg();
-  const tree=document.getElementById("tree"); tree.innerHTML="";
-  if(!cur){document.getElementById("empty").style.display="block";return;}
-  document.getElementById("empty").style.display="none";
-  const roots=tasks.filter(t=>t.parent_id==null);
-  if(!roots.length){tree.innerHTML='<div class="empty">这个项目还没有任务，点上方「+ 主任务」</div>';return;}
-  tree.append(build(null));
+  const board=document.getElementById("board");
+  const treeWrap=document.getElementById("treeWrap");
+  if(!cur){
+    if(viewMode==='tree'){ board.style.display='none'; treeWrap.hidden=false; document.getElementById("tree").innerHTML=""; document.getElementById("empty").style.display="block"; }
+    else { treeWrap.hidden=true; board.style.display='block'; board.innerHTML='<div class="empty">先建一个项目，再开始加任务</div>'; }
+    return;
+  }
+  if(viewMode==='tree'){
+    board.style.display='none'; treeWrap.hidden=false;
+    const tree=document.getElementById("tree"); tree.innerHTML="";
+    document.getElementById("empty").style.display="none";
+    const roots=tasks.filter(t=>t.parent_id==null);
+    if(!roots.length){ tree.innerHTML='<div class="empty">这个项目还没有任务，点上方「+ 主任务」</div>'; return; }
+    tree.append(build(null));
+  } else {
+    treeWrap.hidden=true; board.style.display='block';
+    renderBoard();
+  }
 }
 async function loadPresence(){
   try{ const list=await api("/api/presence"); renderPresence(list); }catch(e){}
@@ -255,15 +456,38 @@ function renderPresence(list){
     const diff=Math.max(0,Math.floor((now-t)/60000));
     const online=diff<=5;
     const ago=diff===0?"刚刚":(diff+"分钟前");
-    return '<span><span class="dot '+(online?"on":"off")+'"></span>'+a.agent+" · "+ago+"</span>";
+    return '<span class="person'+(online?'':' off')+'"><span class="avatar '+avatarClass(a.agent)+' '+(online?'on':'off')+'">'+avatarInit(a.agent)+'</span><span class="dot '+(online?'on':'off')+'"></span>'+esc(a.agent)+' · '+ago+'</span>';
   }).join("");
 }
 function renderAudit(list){
   const box=document.getElementById("audit");
   const head='<div class="ahead">操作日志'+(cur?'（本项目）':'（全部）')+'</div>';
   if(!list||!list.length){ box.innerHTML=head+'<div class="muted">暂无记录</div>'; return; }
-  box.innerHTML=head+list.slice(0,20).map(r=>'<div class="arow">['+r.ts+'] '+r.agent+" "+r.action+" "+r.target+"</div>").join("");
+  box.innerHTML=head+list.slice(0,20).map(r=>'<div class="arow">['+esc(r.ts)+'] '+esc(r.agent)+' '+esc(r.action)+' '+esc(r.target)+'</div>').join("");
 }
+
+// ── 视图切换（泳道 ⇄ 树，默认泳道） ──
+document.getElementById("viewToggle").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(viewMode===b.dataset.view) return;
+  viewMode=b.dataset.view;
+  document.querySelectorAll("#viewToggle button").forEach(x=>x.classList.toggle("active",x===b));
+  render();
+});
+
+// ── 暗色模式（参考 kanban.html L313-319 · localStorage 持久化） ──
+const isDark=localStorage.getItem('kanban-dark')==='1';
+if(isDark){ document.body.classList.add('dark'); document.getElementById('btnDark').textContent='☀️'; }
+document.getElementById('btnDark').addEventListener('click',()=>{
+  const dark=document.body.classList.toggle('dark');
+  localStorage.setItem('kanban-dark',dark?'1':'0');
+  document.getElementById('btnDark').textContent=dark?'☀️':'🌙';
+});
+
+// ── 手动刷新 ──
+document.getElementById('btnRefresh').addEventListener('click',()=>{ load(); showToast('已刷新'); });
+
+// ── 自动刷新（保留 5s；T-08b 13 加开关） ──
 setInterval(()=>{if(cur) load(); loadPresence(); loadAudit();},5000);
 load(); loadPresence(); loadAudit();
 </script>
