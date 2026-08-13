@@ -52,6 +52,26 @@ def get_env(key: str) -> str:
     return os.environ.get(key, "")
 
 
+def persist_env(key: str, value: str):
+    """把解析到的 app_token 等写回 ~/.workbuddy/.env，避免每次重跑 setup 都建新表。"""
+    try:
+        with open(ENV_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        lines = []
+    out, found = [], False
+    for line in lines:
+        if line.strip().startswith(key + "="):
+            out.append(f"{key}={value}\n")
+            found = True
+        else:
+            out.append(line)
+    if not found:
+        out.append(f"{key}={value}\n")
+    with open(ENV_FILE, "w", encoding="utf-8") as f:
+        f.writelines(out)
+
+
 # ---------------------------------------------------------------------------
 # 低层 HTTP
 # ---------------------------------------------------------------------------
@@ -95,8 +115,8 @@ def get_tenant_access_token(app_id: str = None, app_secret: str = None) -> str:
 def ensure_app(token: str, app_token: str = None, name: str = "项目看板") -> str:
     """返回可用的 app_token；若未提供则自动创建一个新多维表格。"""
     if app_token:
-        # 探活：能读到 meta 即有效
-        r = _request("GET", f"/open-apis/bitable/v1/apps/{app_token}/meta", token=token)
+        # 探活：能读到 app 信息即有效（注意端点不是 /meta）
+        r = _request("GET", f"/open-apis/bitable/v1/apps/{app_token}", token=token)
         if r.get("code") == 0:
             return app_token
         print(f"[warn] 提供的 app_token 无效({r.get('msg')})，将自动创建新表")
@@ -147,7 +167,7 @@ BOARD_FIELDS = [
     ("截止", 5, None),
     ("完成时间", 5, None),
     ("备注", 1, None),
-    ("关联文档", 15, None),
+    ("关联文档", 1, None),
 ]
 
 
@@ -159,6 +179,13 @@ def ensure_fields(token: str, app_token: str, table_id: str):
         raise RuntimeError(f"读取字段失败: {r}")
     existing = {f["field_name"]: f for f in r["data"]["items"]}
     for fname, ftype, options in BOARD_FIELDS:
+        # 类型不匹配（如之前误建为 url 现改文本）：删旧建新
+        if fname in existing and existing[fname].get("type") != ftype:
+            fid = existing[fname]["field_id"]
+            _request("DELETE",
+                     f"/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{fid}",
+                     token=token)
+            del existing[fname]
         if fname in existing:
             continue
         body = {"field_name": fname, "type": ftype}
@@ -211,11 +238,8 @@ def list_records(token: str, app_token: str, table_id: str, page_size: int = 100
 
 def upsert_by_task_id(token: str, app_token: str, table_id: str,
                       task_id: str, fields: dict):
-    """按 任务ID 唯一键 upsert。"""
-    filt = urllib.parse.quote(json.dumps(
-        {"conjunction": "and",
-         "conditions": [{"field": "任务ID", "operator": "is",
-                         "value": [task_id]}]}, ensure_ascii=False))
+    """按 任务ID 唯一键 upsert。空值(None/空串)不传，避免日期等字段校验失败。"""
+    fields = {k: v for k, v in fields.items() if v not in (None, "")}
     existing = list_records(token, app_token, table_id, page_size=100)
     match = None
     for rec in existing:
@@ -235,26 +259,50 @@ def upsert_by_task_id(token: str, app_token: str, table_id: str,
 
 
 # ---------------------------------------------------------------------------
+def purge_junk(token: str, app_token: str, table_id: str):
+    """删除无任务ID/测试残留记录，保证 sync 幂等、不产生垃圾。"""
+    try:
+        items = list_records(token, app_token, table_id, page_size=200)
+    except Exception:
+        return
+    junk = [it["record_id"] for it in items
+            if (it.get("fields", {}).get("任务ID") in (None, "", "__test__"))]
+    for rid in junk:
+        try:
+            _request("DELETE",
+                     f"/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/{rid}",
+                     token=token)
+        except Exception:
+            pass
+    if junk:
+        print(f"[clean] 已清理 {len(junk)} 条垃圾/测试记录")
+
+
 # CLI
 # ---------------------------------------------------------------------------
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "sync"
     token = get_tenant_access_token()
-    app_token = ensure_app(token, get_env("FEISHU_BASE_TOKEN"))
-    table_id = ensure_table(token, app_token, get_env("FEISHU_BASE_TABLE"))
 
     if cmd == "token":
         print("tenant_access_token OK:", token[:12] + "...")
         return
+
+    app_token = ensure_app(token, get_env("FEISHU_BASE_TOKEN"))
+    if not get_env("FEISHU_BASE_TOKEN"):
+        persist_env("FEISHU_BASE_TOKEN", app_token)
+    table_id = ensure_table(token, app_token, get_env("FEISHU_BASE_TABLE"))
+
     if cmd == "setup":
         ensure_fields(token, app_token, table_id)
         ensure_kanban_view(token, app_token, table_id)
         print(f"\n[完成] 多维表格已就绪：")
         print(f"  app_token = {app_token}")
         print(f"  table_id  = {table_id}")
-        print(f"  打开：https://{app_token.split('_')[0] and 'www'}.feishu.cn/base/{app_token}  (或在飞书搜索表名)")
+        print(f"  打开：https://www.feishu.cn/base/{app_token}  (或在飞书搜索表名)")
         return
     if cmd == "sync":
+        purge_junk(token, app_token, table_id)
         # 延迟导入，避免无 dev-work 时也能跑 setup
         from feishu_import import build_records
         records = build_records()
