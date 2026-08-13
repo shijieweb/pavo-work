@@ -12,6 +12,7 @@ feishu_import.py - 从本地 dev-work 解析任务，生成飞书多维表格记
 """
 import os
 import re
+import time
 
 DEV_WORK = os.path.dirname(os.path.abspath(__file__))
 CURRENT_STATE = os.path.join(DEV_WORK, "current_state.md")
@@ -51,6 +52,19 @@ def _priority(name: str) -> str:
     return m.group(0) if m else "P2"
 
 
+def _to_ts(s: str):
+    """飞书日期字段要整数 Unix 时间戳（秒），字符串会被拒。空/非法返回 None。"""
+    if not s:
+        return None
+    s = s.strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return int(time.mktime(time.strptime(s, fmt)))
+        except ValueError:
+            continue
+    return None
+
+
 def _title_from_prd(task_id: str) -> str:
     prd = os.path.join(DEV_WORK, "tasks", task_id, "PRD.md")
     if not os.path.exists(prd):
@@ -82,7 +96,7 @@ def build_records() -> list:
         cells = [c.strip() for c in s.strip("|").split("|")]
         if len(cells) < 5:
             continue
-        task_raw, status_change, operator = cells[2], cells[3], cells[1]
+        date_raw, operator, task_raw, status_change = cells[0], cells[1], cells[2], cells[3]
         m = re.match(r"(T-\d{8}-\d+)", task_raw)
         if not m:
             continue
@@ -92,6 +106,7 @@ def build_records() -> list:
             "name": task_raw,
             "operator": operator,
             "status_change": status_change,
+            "date": date_raw.split(" ")[0],  # YYYY-MM-DD
         }
 
     # 2) 也解析「当前任务」表（带 状态/开发/测试 列），补充负责人与状态
@@ -126,7 +141,7 @@ def build_records() -> list:
             "类型": "主任务",
             "父任务": "",
             "截止": "",
-            "完成时间": info.get("time", "").split(" ")[0] if status == "完成" else "",
+            "完成时间": _to_ts(info.get("date")) if status in ("完成", "已验证") else None,
             "备注": (info["status_change"] + " | " + name)[-200:],
             "关联文档": f"dev-work/tasks/{tid}/PRD.md",
         }
@@ -151,7 +166,7 @@ def build_records() -> list:
                     "类型": "主任务",
                     "父任务": "",
                     "截止": "",
-                    "完成时间": "",
+                    "完成时间": None,
                     "备注": ow.get("name", "未在状态台登记"),
                     "关联文档": f"dev-work/tasks/{tid}/PRD.md",
                 })
