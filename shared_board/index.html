@@ -37,6 +37,7 @@
   .children.open{grid-template-rows:1fr}
   .children>div{overflow:hidden;padding-left:22px;border-left:2px solid #eef2f7;margin-left:8px}
   .addbtn{font-size:13px;color:#2563eb;background:none;border:none;padding:6px 4px;min-height:auto}
+  .dbtn{font-size:12px;color:#2563eb;background:#eef2ff;border:none;padding:6px 10px;min-height:auto;border-radius:8px;flex:none}
   /* drawer */
   .mask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
   .mask.show{display:block}
@@ -51,10 +52,14 @@
   .presbar{position:sticky;top:0;background:#eef2ff;color:#3730a3;font-size:13px;padding:6px 14px;border-bottom:1px solid #e0e7ff;display:flex;gap:16px;flex-wrap:wrap;align-items:center;z-index:9}
   .presbar .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
   .dot.on{background:#16a34a}.dot.off{background:#cbd5e1}
+  .progbar{margin-top:8px;background:#eef2ff;border:1px solid #e0e7ff;border-radius:10px;color:#3730a3;font-size:13px;padding:6px 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .progbar b{font-weight:700}
   .auditbox{margin-top:26px;border-top:1px solid #eee;padding-top:12px}
   .ahead{font-weight:700;color:#374151;margin-bottom:8px;font-size:14px}
   .arow{font-size:12px;color:#6b7280;padding:4px 0;border-bottom:1px solid #f3f4f6;word-break:break-all}
   .muted{color:#9ca3af}
+  .delbtn{background:none;border:none;color:#dc2626;font-size:12px;padding:6px 4px;min-height:auto;font-weight:400;cursor:pointer;opacity:.75;text-decoration:underline}
+  .delbtn:hover{opacity:1}
 </style>
 </head>
 <body>
@@ -68,6 +73,7 @@
     <button class="ghost" onclick="copyDispatch()">复制派单</button>
     <button onclick="addRoot()">+ 主任务</button>
   </div>
+  <div id="prog" class="progbar"></div>
 </header>
 <div id="presence" class="presbar"><span class="muted">无 agent 在线</span></div>
 <div class="wrap"><div id="tree"></div><div id="empty" class="empty">先建一个项目，再开始加任务</div><div id="audit" class="auditbox"></div></div>
@@ -84,12 +90,14 @@
     <div><label>优先级（紧急 &gt; 高 &gt; 中 &gt; 低）</label><select id="d_priority">
       <option value="紧急">紧急</option><option value="高">高</option>
       <option value="中">中</option><option value="低">低</option></select></div>
-    <div><label>详情（长按卡片看这里）</label><textarea id="d_detail"></textarea></div>
+    <div><label>详情</label><textarea id="d_detail"></textarea></div>
     <div style="display:flex;gap:8px">
       <button style="flex:1" onclick="saveDrawer()">保存</button>
       <button class="ghost" style="flex:1" onclick="addChild()">+ 子任务</button>
     </div>
-    <button class="danger" onclick="delTask()">删除此任务及子任务</button>
+    <div style="border-top:1px solid #f3f4f6;margin-top:4px;padding-top:10px">
+      <button class="delbtn" onclick="delTask()">删除此任务及子任务</button>
+    </div>
   </div>
 </div>
 
@@ -193,7 +201,9 @@ function build(id){
     const tt=document.createElement("span"); tt.className="ttl"; tt.textContent=t.title;
     const pr=document.createElement("span"); const priArr=["紧急","高","中","低"]; const pi=priArr.indexOf(t.priority); pr.className="pri p"+(pi>=0?pi:2); pr.textContent=t.priority||"中";
     const b=document.createElement("span"); b.className="badge"; b.dataset.status=t.status; b.textContent=t.status;
-    card.append(tri,tt,pr,b);
+    const dt=document.createElement("button"); dt.className="dbtn"; dt.textContent="详情";
+    dt.onclick=(e)=>{e.stopPropagation();openDrawer(t.id);};
+    card.append(tri,tt,pr,b,dt);
     const hasKids=tasks.some(k=>k.parent_id==t.id);
     card.onclick=()=>{ if(hasKids){expanded.has(t.id)?expanded.delete(t.id):expanded.add(t.id);render();} };
     // 长按看详情（移动端）
@@ -213,7 +223,16 @@ function build(id){
   });
   return box;
 }
+function renderProg(){
+  const box=document.getElementById("prog");
+  if(!cur){box.innerHTML="";return;}
+  const c={}; tasks.forEach(t=>{c[t.status]=(c[t.status]||0)+1;});
+  const total=tasks.length;
+  box.innerHTML='<b>'+(c["进行中"]||0)+' 进行中</b> · '+(c["待验证"]||0)+' 待验证 · '+(c["完成"]||0)+' 已完成 / '+total
+    +'<span class="muted">（待办 '+(c["待办"]||0)+' · 已验证 '+(c["已验证"]||0)+' · 阻塞 '+(c["阻塞"]||0)+'）</span>';
+}
 function render(){
+  renderProg();
   const tree=document.getElementById("tree"); tree.innerHTML="";
   if(!cur){document.getElementById("empty").style.display="block";return;}
   document.getElementById("empty").style.display="none";
