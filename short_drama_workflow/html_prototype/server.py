@@ -4830,6 +4830,8 @@ class Handler(BaseHTTPRequestHandler):
             # 【P0-2 图视冲突预检·T-20260813-06】生成前预检：prompt vs 首尾帧图（复用 prompt_frame_match）。
             # 方案 A（主理人拍板）：独立端点手动触发，生成链零改动；dry_run=true 零 AGNES 调用（AC-1.3）；
             # 空镜→n/a 免检（AC-1.2）；失败=拦截提示不阻塞生成（AC-1.3）。结果写回 shot.precheck。
+            # 【BUG-1 修复】dry_run 默认 TRUE：不带 dry_run 的 POST 默认零额度；
+            #   要真视觉必须显式传 "dry_run": false 且过 precheck.ensure_test_mode（test 模式免费 key）守卫。
             try:
                 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "scripts", "diag")))
                 from precheck import precheck_shot, render_final_prompt
@@ -4841,7 +4843,7 @@ class Handler(BaseHTTPRequestHandler):
                 _pv = data.get("prompt") or render_final_prompt(shot) or shot.get("video_prompt") or ""
                 _res = precheck_shot(shot, first=data.get("first"), last=data.get("last"),
                                      prompt=_pv, model=data.get("model") or "agnes-2.5-flash",
-                                     dry_run=bool(data.get("dry_run", False)))
+                                     dry_run=bool(data.get("dry_run", True)))
                 if _res.get("ok"):
                     shot["precheck"] = {k: _res.get(k) for k in
                                         ("precheck", "reason", "conflicts", "empty_shot",
