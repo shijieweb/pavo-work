@@ -185,8 +185,6 @@
   .progress-label{font-size:10px;color:var(--text2);margin-top:2px}
   .parent-ref{cursor:pointer}
   .parent-ref:hover{text-decoration:underline}
-  .dep-tag{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 5px;border-radius:3px;font-weight:600;cursor:pointer}
-  .dep-tag:hover{text-decoration:underline}
   /* ── 指导留言栏（T-08b 11，复用审计块样式） ── */
   .notes-toggle{cursor:pointer}
   /* ── 响应式：横向滚动优先（6 列不降列堆叠） ── */
@@ -229,7 +227,7 @@
 <div class="filterbar" id="filterbar">
   <div class="fgroup"><span class="flabel">状态</span><span id="fStatus"></span></div>
   <div class="fgroup"><span class="flabel">优先级</span><span id="fPriority"></span></div>
-  <div class="fgroup"><span class="flabel">作者</span><span id="fAuthor"></span></div>
+  <div class="fgroup"><span class="flabel">负责人</span><span id="fAuthor"></span></div>
   <button class="freset" onclick="resetFilters()">✕ 清除筛选</button>
 </div>
 <div class="board" id="board"></div>
@@ -254,9 +252,11 @@
       <option value="完成">完成</option><option value="阻塞">阻塞</option></select></div>
     <div><label>优先级（紧急 &gt; 高 &gt; 中 &gt; 低）</label><select id="d_priority">
       <option value="紧急">紧急</option><option value="高">高</option>
-      <option value="中">中</option><option value="低">低</option></select></div>
+      <option value="中">中</option>      <option value="低">低</option></select></div>
+    <div><label>负责人</label><select id="d_author"><option value="老板">老板</option><option value="PM">PM</option><option value="产品经理">产品经理</option><option value="前端研发">前端研发</option><option value="后端研发">后端研发</option><option value="测试工程师">测试工程师</option></select></div>
     <div><label>截止日期</label><input id="d_deadline" type="date"></div>
     <div><label>阻塞原因（状态=阻塞时填写）</label><input id="d_block"></div>
+    <div><label>进度(0-100)</label><input id="d_progress" type="number" min="0" max="100"></div>
     <div><label>详情</label><textarea id="d_detail"></textarea></div>
     <div style="display:flex;gap:8px">
       <button class="primary" style="flex:1" onclick="saveDrawer()">保存</button>
@@ -364,13 +364,13 @@ function fallbackCopy(txt){
 async function addRoot(){
   if(!cur) return showToast("先建/选项目");
   try{ await api("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({project_id:cur,parent_id:null,title:"新任务",detail:"",author:"老板",priority:"高"})});
+    body:JSON.stringify({project_id:cur,parent_id:null,title:"新任务",detail:"",author:(filterAuthor||"老板"),priority:"高"})});
   await load(); showToast("已添加主任务"); }catch(e){}
 }
 async function addChild(){
   if(!curTask) return;
   try{ await api("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({project_id:cur,parent_id:curTask.id,title:"子任务",detail:"",author:"老板",priority:"高"})});
+    body:JSON.stringify({project_id:cur,parent_id:curTask.id,title:"子任务",detail:"",author:(filterAuthor||"老板"),priority:"高"})});
   expanded.add(curTask.id); await load(); openDrawer(curTask.id); showToast("已添加子任务"); }catch(e){}
 }
 async function delTask(){
@@ -383,10 +383,12 @@ function saveDrawer(){
   const id=curTask.id;
   const d={title:document.getElementById("d_title").value,
            status:document.getElementById("d_status").value,
+           author:document.getElementById("d_author").value,
            priority:document.getElementById("d_priority").value,
            detail:document.getElementById("d_detail").value,
            deadline:document.getElementById("d_deadline").value,
-           block_reason:document.getElementById("d_block").value};
+           block_reason:document.getElementById("d_block").value,
+           progress:parseInt(document.getElementById("d_progress").value||"0",10)};
   api("/api/tasks/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(()=>{closeDrawer();load();showToast("已保存 #"+id);}).catch(()=>{});
 }
 function openDrawer(id){
@@ -394,9 +396,11 @@ function openDrawer(id){
   document.getElementById("d_title").value=curTask.title;
   document.getElementById("d_status").value=curTask.status;
   document.getElementById("d_priority").value=curTask.priority||"中";
+  document.getElementById("d_author").value=curTask.author||"老板";
   document.getElementById("d_detail").value=curTask.detail||"";
   document.getElementById("d_deadline").value=curTask.deadline||"";
   document.getElementById("d_block").value=curTask.block_reason||"";
+  document.getElementById("d_progress").value=curTask.progress||0;
   document.getElementById("drawer").classList.add("show");
   document.getElementById("mask").classList.add("show");
 }
