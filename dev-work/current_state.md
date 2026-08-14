@@ -64,6 +64,8 @@
 | T-10 看板全局闭环(G6+S1+S2) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | AC-1.1~1.7（7阶段里程碑门禁·自动初始化幂等·任务挂接·阶段聚合·UI面板·双入口一致·QA独立验收 ALL_PASS） |
 
 | T-12 8787门户补两入口(音效台+看板API说明) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ 1.6✓ 1.7✓（主理人读盘核产 + QA独立验收 ALL_PASS·零BUG·零越界·深度回归docs未被篡改） |
+| T-14 看板Hotfix标签+P0-4跨seed+S4 YAML warning(#2-4 backlog) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | AC-A.1~A.4✓ B.1~B.4✓ C.1~C.3✓（11/11 QA独立验收全PASS·研发/测试分离铁律已守·主理人读盘核产三件真落地） |
+| T-15 训练线采纳面板HTML(全量54图+采纳开关) | 🟡 进行中(团队构建中) | software-engineer | — | AC-1.1~1.10（显示全部测试数据+采纳开关+筛选+批量+统计+持久化+角色参考图） |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -377,7 +379,10 @@
 | 2026-08-14 | QA(software-qa-engineer-4) | T-11 | 待验证→已验证 | 独立验收AC-1.1~1.7全PASS(隔离8801幂等+8802旧库迁移安全·20任务0丢·milestone_id列加回；双入口8788/8787-board字节一致·7阶段+overall 12/10/83；前端9/9面板标记命中；红线扫描仅milestone改动)·无P0/P1·commit c340fec(验收文档250行) |
 | 2026-08-14 | 主理人(合伙人) | T-11 | 待验证→完成 | 主理人把关：自跑双入口一致+代码grep(milestones/milestone_id各15处)+commit f321806/c340fec核验+ps确认live 8788 PPID=1在线；读盘核产发现工程师"已重启8788"不实(in-process随子会话死)→nohup+disown脱离会话真拉起复验通过；AC-1.1~1.7全PASS·研发/测试分离铁律已守·放行完成 |
 | 2026-08-14 | 主理人(合伙人) | T-12 8787门户补两入口(音效台+看板API说明) | 待验证→完成 | 老板授权(q-0亲签闸1)补两缺失入口；工程师d1a4b99(agnes_proxy.py +5 /soundsfree路由落_route_dispatch前 + hub.html +20 两卡片·5→7)；design 408e9ad；主理人§4.3读盘核产(8入口全200+内容真页面+端口卫生8787=24436唯一/8788=32924/8777=29296未误杀+git仅2文件25行零越界)后派QA独立验收；QA 42dc338(AC-1.1~1.7全PASS·含深度回归/board/docs与直连8788/docs diff=0未被/api/→/board/api/重写篡改·7阶段里程碑+overall 12/10/83一致·/api/spec 200 studio反代完好·前端TC-8 node --check SYNTAX_OK)·零BUG·研发/测试分离铁律已守·主理人亲curl复验8入口全200·放行完成 |
-| 2026-08-14 | 主理人(合伙人) | T-13 全局回顾(只读调研) | 待办→完成 | 老板"无新任务就全局回顾"；走 software-team-dispatch 技能(TeamCreate software-board-93bc→Agent team_name 派 software-engineer/software-qa-engineer→SendMessage派活→§4.3读config.json核验真入队)；队友回报文字未传回通道(仅完成信号)→主理人§4.3第4步读盘核产亲跑只读核查取真据(I-5)：主项目5/5 curl=200(8787=24436 agnes_proxy/8788=32924 board/8777=29296 studio)端口干净无僵尸·T-12两新入口可达；训练项目batch-001 out/ 56张PNG+prompts.csv已落盘=跑完·采纳记录.md仅示例无真登记→卡"采纳"前(待②裁判校准→③老板抽验→④进采纳区)。遗留团队按老板21:15约定不手动清(交技能reuse-or-create)；本会话队graceful shutdown后TeamDelete。纪要dev-work/tasks/T-13-global-review/回顾纪要.md |
+| 2026-08-14 | 主理人(合伙人) | T-13 全局回顾(只读调研) | 待办→完成 | 老板"无新任务就全局回顾"；走 software-team-dispatch 技能(TeamCreate software-board-93bc→Agent team_name 派 software-engineer/software-qa-engineer→SendMessage派活→§4.3读config.json核验真入队)；队友回报文字未传回通道(仅完成信号)→主理人§4.3第4步读盘核产亲跑只读核查取真据(I-5)：主项目5/5 curl=200(8787=24436 agnes_proxy/8788=32924 board/8777=29296 studio)端口干净无僵尸·T-12两新入口可达；训练项目batch-001 out/ 54张PNG(写法号1-27各2张)+prompts.csv已落盘=跑完·采纳记录.md仅示例无真登记→卡"采纳"前(待②裁判校准→③老板抽验→④进采纳区)。遗留团队按老板21:15约定不手动清(交技能reuse-or-create)；本会话队graceful shutdown后TeamDelete。纪要dev-work/tasks/T-13-global-review/回顾纪要.md |
+| 2026-08-14 | 开发(software-engineer) | T-14 #2-4 backlog（G4 Hotfix标签+P0-4跨seed一致性+S4 YAML warning） | 派活→待验证 | 团队模式(software-board-045d)；before b913e39 + 实现 de08a7f（shared_board/index.html+server.py+board.db schema / prompt_training.py / design.md+hotfix_preview.html）；自测全PASS |
+| 2026-08-14 | QA(software-qa-engineer) | T-14 | 待验证→已验证 | 独立验收 11/11 AC全PASS（临时库 round-trip+跨seed+warning实跑·未碰生产）·无P0/P1·2项S4非阻塞记备注 |
+| 2026-08-14 | 主理人(合伙人) | T-14 | 待验证→完成 | 主理人§4.3读盘核产三件真落地(board.db is_hotfix列+index.html 🚨×3+server.py接入15处 / 跨seed all_consistent=True+报告JSON落盘 / 缺字段4条WARNING+正常零warning)+QA独立验收11/11全PASS·研发/测试分离铁律已守·放行完成 |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -420,7 +425,7 @@
 | G1 | **逾期检测 + 逾期高亮 + 逾期统计**（`isOverdue` 红标题 + ⚠️逾期 tag + statOverdue） | 无 deadline 字段（server.py schema 与 index.html 均无），无法判逾期 | 🔴 高（商用看板刚需） | schema 加 `deadline`；前端 `isOverdue()` + 红标题/标签 + 统计条加「逾期」 | **→ T-09 已验收放行(2026-08-14 · judge=PASS)** |
 | G2 | **阻塞原因展示**（`blockedBy` 字符串 + `.block-reason`） | 有「阻塞」态但 server.py 无 `blocked_by` 字段，记不了"为什么卡" | 🔴 高 | schema 加 `block_reason`；卡片阻塞时显示原因 | **→ T-09 已验收放行(2026-08-14 · judge=PASS)** |
 | G3 | **里程碑阶段门禁 + 视图面板**（done/active/pending 状态 + 任务挂接 + 阶段进度聚合 + 面板 UI） | 原无里程碑视图（我们是任务树） | 🟡 中 | 7 阶段自动初始化幂等 + 任务挂接 milestone_id + 阶段聚合 + 前端面板 | **→ T-11 已验收放行(2026-08-14 · judge=PASS)**（阶段门禁/聚合/面板 UI 全部落地；纯时间轴横向视觉为可选增强，非阻塞） |
-| G4 | **Hotfix 热修标签**（`isHotfix` 红左边框 + 🚨） | 无 hotfix 概念 | 🟢 低 | 加 `is_hotfix` 标记 + 样式（可映射到"🔥紧急"） |
+| G4 | **Hotfix 热修标签**（`isHotfix` 红左边框 + 🚨） | ✅ 已落地（T-14 · 2026-08-14：`shared_board/server.py` 加 `is_hotfix` 列 + `index.html` 红左边框 + 🚨 角标，研发/测试分离闭环） | 🟢 低(已完成) | `is_hotfix` 标记 + 样式已就位（可映射到"🔥紧急"） |
 | G5 | **卡片列内按优先级排序**（紧急>高>中>低 再 id） | `renderBoard` 按 `tasks` 数组序入列——但 `tasks` 来自后端 `ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id`（server.py:198/241 已落地），GET 返回即按优先级序，前端照序渲染 | ✅ 已满足（非缺口·2026-08-14 校验 server.py 确认） | 无需再改（若前端另要"拖拽手动调序"属新需求，不在此列） |
 | G6 | **任务级负责人指派**（抽屉可指定执行人 + 快速新建不再硬编码老板） | 抽屉有 `d_author` 下拉，但 `addRoot`/`addChild` 快速新建硬编码 `author:"老板"`，快速路径绕过指派 | 🔴 高（老板最初"按负责接入人筛选"的真缺口=指派瓤无） | 抽屉 `d_author` 显式指派 + `addRoot`/`addChild` 改 `filterAuthor||"老板"` + 后端 `author` 存读通用 | **→ T-10 已验收放行(2026-08-14 · judge=PASS)** |
 ### 二 参考有但我们更强（非缺口，已对齐/超越）
@@ -431,10 +436,11 @@
 
 ### 三 处置建议
 - G1/G2 最贴近「商用标准看板」刚需，建议作为 **T-09 候选**（逾期 + 阻塞原因）。
-- G3/G4/G5 为体验增强，可并入 T-09 或独立低优任务。
+- G3/G4/G5 为体验增强：G4 Hotfix 标签已于 **T-14 闭环（✅ 完成）**；G3 里程碑 = T-11 已闭环；G5 优先级排序已满足（非缺口）。三项均不再需要新任务，本小节留痕备查。
 - 老板确认是否开 T-09；不开则本小节作为永久留痕，禁止把「负责接入人筛选」误登记为缺口。
 
 <!-- JUDGE_LEDGER -->
+- 2026-08-14 23:10 | T-14 | judge=✅ PASS（主理人读盘核产+） | #2-4 backlog：G4 Hotfix(is_hotfix列+红边🚨·server.py:143-144幂等ALTER+SELECT/POST/PUT+index.html L103/465) / P0-4跨seed(--cross-seed all_consistent=True+报告JSON落盘) / S4 YAML warning(缺字段4条WARNING+正常零warning)；before b913e39 + de08a7f；QA 11/11 PASS·研发/测试分离铁律已守·主理人放行完成 |
 - 2026-08-14 19:55 | T-11 | judge=✅ PASS（主理人读盘核验+QA独立验收AC-1.1~1.7全过） | 里程碑阶段门禁(7阶段选题→发布·自动初始化幂等·任务挂接milestone_id·阶段进度聚合·UI面板·迁移安全幂等·双入口8788/8787-board字节一致)；server.py f321806(113行·milestones表+tasks.milestone_id+GET/PUT接口+白名单)+index.html(76行·面板/抽屉下拉/卡片徽章/实时刷新)·grep milestones/milestone_id各15处·生成链路零改动；live 8788 经 nohup+disown 脱离会话真拉起(工程师"已重启"不实已修正)·双入口7阶段+overall 12/10/83一致；QA software-qa-engineer-4 独立验收 c340fec(验收文档250行)·研发/测试分离铁律已守·主理人放行完成 |
 - 2026-08-14 20:05 | T-12 | judge=✅ PASS（主理人读盘核产+QA独立验收 AC-1.1~1.7 全过·零BUG） | 8787门户补两缺失入口：/soundsfree(agnes_proxy.py 新增 SOUNDSFREE_FILE + do_GET 分支·落 _route_dispatch 前避免被反代吞) + /board/docs(经现有 board 反代已200·零后端改动)；hub.html 新增 cardSoundsfree/cardDocs 两卡片(5→7)·复用.card结构无JS探活依赖；主理人亲curl 8入口全200+内容真页面(标题SoundsFree/看板API说明页)+端口卫生(8787=24436唯一/8788=32924/8777=29296未误杀)；QA 42dc338 独立验收 AC-1.1~1.7 全PASS·含深度回归(/board/docs与直连8788/docs diff=0未被/api/→/board/api/重写篡改·7阶段里程碑+overall一致·/api/spec 200 studio反代完好·前端TC-8 node --check SYNTAX_OK)·零BUG·研发/测试分离铁律已守·主理人放行完成 |
 - 2026-08-14 02:35 | T-10 | judge=✅ PASS（主理人R1/R2/R3三轮核验 + QA独立验收 ALL_PASS·含复验闭环G6快速新建硬编码 FAIL） | G6负责人指派(抽屉d_author下拉+openDrawer回填+saveDrawer提交；addRoot/addChild原硬编码author="老板"→改`filterAuthor||"老板"`·QA首轮抓1c FAIL→工程师commit 7c93064修复→QA复验全文`author:"老板"`字面量0命中·ALL_PASS) + S1进度字段(progress 0-100整数·server.py幂等迁移+校验400/200+GET回显+renderCard进度条progress-wrap真实渲染·ext接口带progress) + S2清dep-tag死CSS(全文0命中)；server.py 7处+index.html G6/S1/筛选标签/S2；双入口8788直连与8787/board网关真实PUT/GET一致·临时数据已还原；node --check通过·JS合法·8787/8777未误伤
