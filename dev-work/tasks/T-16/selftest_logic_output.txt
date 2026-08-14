@@ -1,0 +1,137 @@
+[训练线采纳面板 T-16] 图卡 = 54 / 数据项 = 54 / 分组 = 27 / 参考图 = 2
+
+=== T-16 面板逻辑自测 ===
+
+[0] 面板 JS 载入
+  [PASS] JS 语法正确并成功执行 (无异常)
+  [PASS] ITEMS 条数
+  [PASS] GROUP_KEYS 组数
+
+[1] 初始状态
+  [PASS] 初始 stat-total
+  [PASS] 初始已采纳图 = 0
+  [PASS] 初始未采纳图 = 54
+  [PASS] 初始写法号采纳数 = 0/27
+  [PASS] 初始双图优数 = 0
+  [PASS] 初始图状态 = discard
+  [PASS] 初始组状态 = pending
+
+[2] AC-4 单张标好: 不触发自动采纳
+  [PASS] w01_1 = primary
+  [PASS] 组1 仍为 pending (仅 1 张好图, 非双图优)
+  [PASS] 组1 主图数 = 1
+  [PASS] 组1 未判定为双图优
+
+[3] AC-4 两张都好 -> 自动「采纳·双图优」+ 强制唯一主图
+  [PASS] 组1 自动升为 adopt
+  [PASS] 组1 双图优 = true
+  [PASS] 组1 主图恰好 1 张
+  [PASS] 组1 主图 = w01_1.png
+  [PASS] 组1 备选 = w01_2.png
+  [PASS] 双图优角标已显示
+  [PASS] 组状态角标文案
+  [PASS] 组 meta 含主图/备选文件名
+
+[4] AC-4 唯一主图: 改设另一张为主图 -> 原主图自动降为备选
+  [PASS] w01_2 = primary
+  [PASS] w01_1 自动降级为 backup
+  [PASS] 组1 主图仍恰好 1 张
+  [PASS] 组1 仍为 adopt
+  [PASS] 组1 仍双图优
+
+[5] AC-4 两张都标「备选」-> 仍强制恰好 1 张主图
+  [PASS] 组2 自动 adopt
+  [PASS] 组2 双图优
+  [PASS] 组2 主图恰好 1 张 (首张好图自动升主图)
+  [PASS] 组2 好图数 = 2
+
+[6] AC-4 采纳门槛: 无好图不得采纳
+  [PASS] 弹出阻断提示
+  [PASS] 组5 仍为 pending (采纳被拒绝)
+
+[7] AC-4 单张备选 + 手工采纳 -> 自动补主图 (保证导出必有主图)
+  [PASS] 组6 = adopt
+  [PASS] 组6 主图恰好 1 张
+  [PASS] 组6 主图 = w06_1.png
+  [PASS] 组6 非双图优 (只有 1 张好图)
+  [PASS] 组6 导出主图非空
+
+[8] AC-4 双图优改判: confirm=false 不改动
+  [PASS] 取消后组1 状态不变
+
+[9] AC-4 双图优改判: confirm=true -> 图片重置并改判
+  [PASS] 组1 = reject
+  [PASS] 组1 图片重置为 discard
+  [PASS] 组1 不再双图优
+  [PASS] 组1 好图数 = 0
+
+[10] AC-6 持久化
+  [PASS] localStorage 已写入
+  [PASS] 含 imgState 键
+  [PASS] 含 groupState 键
+  [PASS] 持久化的组1决策
+
+[11] AC-3/5 批量全选采纳
+  [PASS] 已采纳图 = 54
+  [PASS] 未采纳图 = 0
+  [PASS] 采纳率 = 100%
+  [PASS] 写法号采纳数 = 27/27
+  [PASS] 双图优数 = 27
+  [PASS] 全部 27 组均恰好 1 张主图 (不变量)
+  [PASS] 所有采纳组均有唯一主图
+
+[12] AC-6 导出 CSV: 1 行/组
+  [PASS] CSV 行数 = 1 表头 + 27 组
+  [PASS] CSV 表头
+  [PASS] CSV 列数 = 6
+  [PASS] CSV 首行组决策含「采纳」与「双图优」
+  [PASS] CSV 首行含主图文件名 w01_
+  [PASS] CSV 带 UTF-8 BOM (Excel 中文不乱码)
+
+[13] AC-6 导出 JSON: 含组层级 + 图层级
+  [PASS] groups 长度 = 27
+  [PASS] images 长度 = 54
+  [PASS] summary.total_groups
+  [PASS] summary.adopted_groups
+  [PASS] summary.dual_good_groups
+  [PASS] summary.adopted_images
+  [PASS] 组记录含 写法号/决策/主图/备选
+  [PASS] 组记录主图非空
+  [PASS] 组记录备选数 = 1
+  [PASS] 图记录含中文 prompt (自 DOM 读取)
+  [PASS] 图记录含英文 prompt (自 DOM 读取)
+
+[14] AC-1 lightbox
+  [PASS] 初始 lightbox 隐藏
+  [PASS] 打开后 lightbox 可见
+  [PASS] 大图 src 指向该图相对路径
+  [PASS] lightbox 文件名
+  [PASS] lightbox 显示中文 prompt
+  [PASS] lightbox 显示英文 prompt
+  [PASS] lightbox meta 含写法号与状态
+  [PASS] 打开时锁定 body 滚动
+  [PASS] ESC 关闭 lightbox
+  [PASS] 关闭后恢复 body 滚动
+  [PASS] 再次打开
+  [PASS] 点空白处关闭 lightbox
+  [PASS] 点缩略图经事件委托打开 lightbox
+  [PASS] lightbox 文件名 = w07_1.png
+
+[15] 事件委托: 图/组三态按钮
+  [PASS] 点「主图」按钮生效
+  [PASS] 点组「不采纳」按钮生效
+
+[16] 批量全部清除 + 不变量总扫
+  [PASS] 清除后已采纳图 = 0
+  [PASS] 清除后写法号采纳数 = 0/27
+  [PASS] 清除后双图优数 = 0
+  [PASS] 清除后 localStorage 已移除
+  [PASS] 全部 54 图回到 discard
+  [PASS] 400 次随机操作后: 无组出现多主图
+  [PASS] 400 次随机操作后: 采纳组必有唯一主图
+  [PASS] 400 次随机操作后: 双图优组必为采纳
+
+===== 汇总 =====
+通过: 95 条
+失败: 0 条
+[结果] T-16 面板逻辑自测全部通过 ✔
