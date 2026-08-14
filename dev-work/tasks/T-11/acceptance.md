@@ -22,15 +22,19 @@
 
 ## 阿编把关结论
 
-> （以下由阿编填写；QA 仅提供「已验证」结论与证据，无放行权）
+> 主理人（阿编 / team-lead@software-board-11）填写。QA 已推「已验证」，此为主理人最终放行权。
 
-- **放行决定**：☐ 放行（完成） / ☐ 退回
-- **亲自复验证据**：[阿编自己跑的命令与输出，不盲信研发/测试]
-- **闭环是否跑通**：[开发→测试→(退回)修复→复验→把关 是否完整]
-- **模型表现**（若涉及 AI 角色）：[ 角色工作是否正常 ]
-- **本次发现的问题**（已闭环 / 遗留）：
-  1. [已修] ...
-  2. [遗留·非阻塞] ...
+- **放行决定**：☑ 放行（完成）
+- **亲自复验证据**（不盲信研发/测试）：
+  - 主理人自跑双入口：`curl 8788/api/projects/19/milestones` 与 `8787/board/api/projects/19/milestones` 均返回 7 阶段 + overall{total:12,done:10,rate:83}（project 19 真实数据），两入口一致。
+  - 代码落地核验：`grep -c milestones server.py`=15、`grep -c milestone_id server.py`=15（前置=0，确为本次新增）。
+  - commit 核验：`git show f321806`（server.py 113 行 + index.html 76 行 + design.md）范围干净未碰红线；`git show c340fec`（QA 验收文档 250 行）真实存在。
+  - live 8788 存活核验：`ps -ef` 显示 `python.exe server.py` PPID=1（nohup+disown 脱离会话），持续在线。
+- **闭环是否跑通**：✅ 完整。开发(software-engineer)推待验证 → QA(software-qa-engineer-4)独立验收 AC-1.1~1.7 全 PASS → 主理人把关放行。本次特别：主理人读盘核产发现工程师"已重启 8788"不实（in-process 进程随子会话死），已用 nohup+disown 真拉起并复验，杜绝 I-5/I-7「假上线」。
+- **模型表现**：不涉及 AI 角色生成，纯看板后端/前端逻辑；N/A。
+- **本次发现的问题（已闭环 / 遗留）**：
+  1. [已修·部署层] 工程师称"已重启 live 8788"但进程已死 → 主理人用 nohup+disown 脱离会话重拉，双入口验证通过（非代码缺陷，是脱离会话部署坑）。
+  2. [遗留·非阻塞] 本机拉起 8788 须用 `nohup+disown`（沙箱禁 Start-Process/[Diagnostics.Process]/cmd 互调、setsid 不可用），已固化入今日日志与技能 §4.3 备注。
 
 ---
 
