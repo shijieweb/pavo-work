@@ -195,6 +195,13 @@
     .topbar{gap:6px}
     .progbar{font-size:12px}
   }
+  /* ── T-09 G1/G2：逾期高亮 + 逾期标签 + 阻塞原因 ── */
+  .card.overdue .card-title{color:#ef4444}
+  .overdue-tag{font-size:9px;background:#fef2f2;color:#dc2626;padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px}
+  .block-reason{font-size:11px;color:#dc2626;background:rgba(239,68,68,.1);padding:4px 8px;border-radius:4px;margin-top:6px}
+  .stat.st-overdue b{color:#dc2626}
+  /* 暗色下保持红字清晰 */
+  .dark .block-reason{color:#f87171;background:rgba(239,68,68,.15)}
 </style>
 </head>
 <body>
@@ -248,6 +255,8 @@
     <div><label>优先级（紧急 &gt; 高 &gt; 中 &gt; 低）</label><select id="d_priority">
       <option value="紧急">紧急</option><option value="高">高</option>
       <option value="中">中</option><option value="低">低</option></select></div>
+    <div><label>截止日期</label><input id="d_deadline" type="date"></div>
+    <div><label>阻塞原因（状态=阻塞时填写）</label><input id="d_block"></div>
     <div><label>详情</label><textarea id="d_detail"></textarea></div>
     <div style="display:flex;gap:8px">
       <button class="primary" style="flex:1" onclick="saveDrawer()">保存</button>
@@ -375,7 +384,9 @@ function saveDrawer(){
   const d={title:document.getElementById("d_title").value,
            status:document.getElementById("d_status").value,
            priority:document.getElementById("d_priority").value,
-           detail:document.getElementById("d_detail").value};
+           detail:document.getElementById("d_detail").value,
+           deadline:document.getElementById("d_deadline").value,
+           block_reason:document.getElementById("d_block").value};
   api("/api/tasks/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(()=>{closeDrawer();load();showToast("已保存 #"+id);}).catch(()=>{});
 }
 function openDrawer(id){
@@ -384,12 +395,16 @@ function openDrawer(id){
   document.getElementById("d_status").value=curTask.status;
   document.getElementById("d_priority").value=curTask.priority||"中";
   document.getElementById("d_detail").value=curTask.detail||"";
+  document.getElementById("d_deadline").value=curTask.deadline||"";
+  document.getElementById("d_block").value=curTask.block_reason||"";
   document.getElementById("drawer").classList.add("show");
   document.getElementById("mask").classList.add("show");
 }
 function closeDrawer(){document.getElementById("drawer").classList.remove("show");document.getElementById("mask").classList.remove("show");curTask=null;}
 
 // ── 泳道渲染（T-08a） ──
+// T-09 G1：逾期判定（deadline=过去日期 且 状态≠完成/done）
+function isOverdue(t){ return t.deadline && new Date(t.deadline) < new Date(new Date().toDateString()) && t.status!=='完成' && t.status!=='done'; }
 function renderCard(t){
   const isChild=t.parent_id!=null;
   const priArr=["紧急","高","中","低"]; const pi=priArr.indexOf(t.priority);
@@ -397,7 +412,7 @@ function renderCard(t){
   const kids=tasks.filter(x=>x.parent_id==t.id);
   const subHtml=kids.length?'<span class="subcount">👥 '+kids.length+' 子任务</span>':'';
   const parentHtml=isChild?'<span class="parent-ref" onclick="event.stopPropagation();scrollToCard('+t.parent_id+')" title="点击定位父任务 #'+t.parent_id+'">↳ 父 #'+t.parent_id+'</span>':'';
-  const cls='card st-'+statusCls(t.status)+(isChild?' child-card':'')+(t.status==='阻塞'?' blocked':'');
+  const cls='card st-'+statusCls(t.status)+(isChild?' child-card':'')+(t.status==='阻塞'?' blocked':'')+(isOverdue(t)?' overdue':'');
   const author=t.author||'老板';
   // ① 完成时间戳徽章（done/完成 用 updated 近似）
   const doneHtml=(t.status==='完成'||t.status==='done')?'<span class="done-stamp">✅ '+esc(t.updated||'')+'</span>':'';
@@ -405,6 +420,10 @@ function renderCard(t){
   const prog=(typeof t.progress==='number')?'<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:'+t.progress+'%"></div></div><div class="progress-label">'+t.progress+'%</div></div>':'';
   // ⑩ 卡片状态徽章（可点快捷切换，不开 drawer）
   const stBadge='<span class="badge" data-status="'+esc(t.status)+'" onclick="event.stopPropagation();openStatusMenu('+t.id+',event)" title="点击快捷切换状态">'+esc(t.status)+'</span>';
+  // T-09 G1 逾期标签（deadline=过去日期 且 状态≠完成/done）
+  const overdueHtml=isOverdue(t)?'<span class="overdue-tag">⚠️ 逾期</span>':'';
+  // T-09 G2 阻塞原因（状态=阻塞 且 有原因）
+  const blockHtml=(t.status==='阻塞' && t.block_reason)?'<div class="block-reason">🚫 '+esc(t.block_reason)+'</div>':'';
   return '<div class="'+cls+'" id="card-'+t.id+'" onclick="openDrawer('+t.id+')">'
     +'<div class="card-header"><span class="card-id">#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span> '+stBadge+'</span>'
     +'<button class="dbtn" onclick="event.stopPropagation();openDrawer('+t.id+')">详情</button></div>'
@@ -413,8 +432,11 @@ function renderCard(t){
     +'<div class="card-meta">'
     +'<span class="assignee"><span class="avatar '+avatarClass(author)+'">'+avatarInit(author)+'</span> '+esc(author)+'</span>'
     +'<span>🕐 '+esc(t.updated||'')+'</span>'
-    +(subHtml||parentHtml||doneHtml?'<span>'+subHtml+parentHtml+doneHtml+'</span>':'')
-    +'</div></div>';
+    +'<span>⏰ '+esc(t.deadline||'无截止')+'</span>'
+    +(subHtml||parentHtml||doneHtml||overdueHtml?'<span>'+subHtml+parentHtml+doneHtml+overdueHtml+'</span>':'')
+    +'</div>'
+    +blockHtml
+    +'</div>';
 }
 function renderBoard(){
   const board=document.getElementById("board");
@@ -472,11 +494,13 @@ function renderProg(){
   const ft=tasks.filter(matchFilter);
   const c={}; ft.forEach(t=>{c[t.status]=(c[t.status]||0)+1;});
   const n=k=>c[k]||0;
+  const overdueN = ft.filter(isOverdue).length;
   box.innerHTML='<span class="stat">总计 <b>'+ft.length+'</b></span>'
     +'<span class="stat st-doing">进行中 <b>'+n("进行中")+'</b></span>'
     +'<span class="stat st-verify">待验证 <b>'+n("待验证")+'</b></span>'
     +'<span class="stat st-blocked">阻塞 <b>'+n("阻塞")+'</b></span>'
     +'<span class="stat st-done">完成 <b>'+n("完成")+'</b></span>'
+    +'<span class="stat st-overdue">逾期 <b>'+overdueN+'</b></span>'
     +'<span class="muted">（待办 '+n("待办")+' · 已验证 '+n("已验证")+'）</span>';
 }
 function render(){
