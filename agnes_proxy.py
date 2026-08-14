@@ -30,6 +30,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HTML_FILE = os.path.join(SCRIPT_DIR, "agnes_console.html")
 HUB_FILE = os.path.join(SCRIPT_DIR, "hub.html")
 LOGS_FILE = os.path.join(SCRIPT_DIR, "logs.html")
+# 音效台静态页（T-12）：SoundsFree 离线程序化音效生成器，与 /logs、/training 同构走 _serve_html
+SOUNDSFREE_FILE = os.path.join(SCRIPT_DIR, "soundsfree_home.html")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
 
 # ===== 统一门户：8787 作为唯一入口，工作台(8777)整段反向代理过来 =====
@@ -355,6 +357,9 @@ class H(BaseHTTPRequestHandler):
             return
         if path in ("/training", "/training.html"):
             self._serve_html(TRAIN_FILE)        # 提示词训练营看板（实验过程/结果/方案审查）
+            return
+        if path in ("/soundsfree", "/soundsfree.html"):
+            self._serve_html(SOUNDSFREE_FILE)   # 音效台（T-12：SoundsFree 本地静态页，_route_dispatch 之前，避免被反代吞掉）
             return
         if path == "/training/api/experiments":
             self._train_experiments()
