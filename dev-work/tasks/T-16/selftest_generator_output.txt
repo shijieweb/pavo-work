@@ -1,0 +1,65 @@
+[信息] 项目根       : C:\Users\67972\projects\short-drama-training
+[信息] 英文 CSV     : C:\Users\67972\projects\short-drama-training\01_配方训练\实验批次\batch-001\out\prompts.csv
+[信息] 中文 CSV     : C:\Users\67972\projects\short-drama-training\01_配方训练\实验批次\batch-001\out\prompts_zh.csv
+[信息] 图片目录     : C:\Users\67972\projects\short-drama-training\01_配方训练\实验批次\batch-001\out
+[信息] 参考图目录   : C:\Users\67972\projects\short-drama-training\01_配方训练\角色参考图
+[信息] 英文数据行   : 54
+[信息] 中文数据行   : 54
+[信息] PNG 文件数   : 54
+[信息] 参考图数量   : 2 -> ['charA_front.png', 'charA_side.png']
+[信息] 写法号分组数 : 27
+====================================================================
+[自检] T-16 开始验证 (铁律: 54 张全量显示, 一张不漏)
+--------------------------------------------------------------------
+  内联索引 ITEMS 长度           = 54
+  磁盘 PNG 实际数量             = 54
+  缩略图 img.thumb[data-role]   = 54 (期望 54)
+  参考图 class=ref-img          = 2 (期望 2)
+  HTML <img 标签总数            = 56 (期望 56)
+  唯一 wXX_Y.png 文件名         = 54 (期望 54)
+  base64 内嵌图片出现次数       = 0 (必须为 0)
+  文件名全部出现在 HTML         = 54/54
+  英文 prompt 全文未截断        = 54/54
+  中文 prompt 全文未截断        = 54/54
+  中文块 data-role=prompt-zh    = 54 (期望 54)
+  英文块 data-role=prompt-en    = 54 (期望 54)
+  中文锚点「同一个齐肩黑发」出现  = 54 (期望 54)
+  中文缺失降级为英文的条数      = 0 (期望 0)
+  data-writing 去重             = 27 (期望 27)
+  分组容器 .group               = 27 (期望 27)
+  lightbox 容器 id="lightbox"    = True (必须 True)
+  lightbox 关闭钩子 lb-close       = True (必须 True)
+  lightbox 舞台 lb-stage         = True (必须 True)
+  lightbox 中文位 lb-zh           = True (必须 True)
+  lightbox 英文位 lb-en           = True (必须 True)
+  组三态按钮 adopt            = 27 (期望 27)
+  组三态按钮 pending          = 27 (期望 27)
+  组三态按钮 reject           = 27 (期望 27)
+  组状态角标                  = 27 (期望 27)
+  双图优角标                  = 27 (期望 27)
+  图状态角标                  = 54 (期望 54)
+  图三态按钮 primary          = 54 (期望 54)
+  图三态按钮 backup           = 54 (期望 54)
+  图三态按钮 discard          = 54 (期望 54)
+  统计-总图数               = True (必须 True)
+  统计-已采纳图              = True (必须 True)
+  统计-未采纳图              = True (必须 True)
+  统计-采纳率               = True (必须 True)
+  统计-写法号采纳数            = True (必须 True)
+  统计-双图优数              = True (必须 True)
+  导出 JSON 按钮           = True (必须 True)
+  导出 CSV 按钮            = True (必须 True)
+  筛选-写法号               = True (必须 True)
+  筛选-图片状态              = True (必须 True)
+  筛选-组决策               = True (必须 True)
+  批量-全选采纳              = True (必须 True)
+  批量-全部清除              = True (必须 True)
+  阶段说明区                = True (必须 True)
+  角色参考图区               = True (必须 True)
+  相对路径可解析且文件存在      = 54/54
+--------------------------------------------------------------------
+[自检] 全部通过 ✔  (54 图全量 / 中英齐备 / 无 base64 / T-16 控件就位)
+====================================================================
+[产出] C:\Users\67972\projects\short-drama-training\training_panel.html
+[产出] HTML 大小    : 163729 bytes (159.9 KB)
+[产出] HTML < 5MB ✔ (图片走本地相对路径, 未内嵌)
