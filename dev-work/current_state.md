@@ -66,6 +66,7 @@
 | T-12 8787门户补两入口(音效台+看板API说明) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ 1.6✓ 1.7✓（主理人读盘核产 + QA独立验收 ALL_PASS·零BUG·零越界·深度回归docs未被篡改） |
 | T-14 看板Hotfix标签+P0-4跨seed+S4 YAML warning(#2-4 backlog) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | AC-A.1~A.4✓ B.1~B.4✓ C.1~C.3✓（11/11 QA独立验收全PASS·研发/测试分离铁律已守·主理人读盘核产三件真落地） |
 | T-15 训练线采纳面板HTML(全量54图+采纳开关) | ✅ 完成(主理人把关·2026-08-14) | engineer-t15 | qa-t15 | AC-1.1~1.10（54图全显+采纳三态开关+筛选+批量+统计+持久化+导出+角色参考图+阶段说明 ALL_PASS·QA独立验收10/10无BUG·主理人读盘核产） |
+| T-16 训练面板三项优化(点击放大/中英对照/写法号层级采纳+双图处理) | ✅ 完成(主理人把关·2026-08-15) | software-engineer | software-qa-engineer | AC-1~8（lightbox放大+中文prompt对照+组层级采纳+双图处理方案+统计新增+持久化+54图全显铁律+阶段说明保留 ALL_PASS·QA独立验收188断言0FAIL·主理人读盘核产） |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -384,6 +385,9 @@
 | 2026-08-14 | QA(software-qa-engineer) | T-14 | 待验证→已验证 | 独立验收 11/11 AC全PASS（临时库 round-trip+跨seed+warning实跑·未碰生产）·无P0/P1·2项S4非阻塞记备注 |
 | 2026-08-14 | 主理人(合伙人) | T-14 | 待验证→完成 | 主理人§4.3读盘核产三件真落地(board.db is_hotfix列+index.html 🚨×3+server.py接入15处 / 跨seed all_consistent=True+报告JSON落盘 / 缺字段4条WARNING+正常零warning)+QA独立验收11/11全PASS·研发/测试分离铁律已守·放行完成 |
 | 2026-08-14 | 主理人(合伙人) | T-15 训练线采纳面板HTML | 待验证→完成 | 主理人读盘核产(56 img=54缩略图+2参考图·54唯一wXX_Y 0缺失·0 base64内嵌·0 prompt截断·27写法号分组1-27·git 0151ddb) + QA独立验收10/10 AC PASS·无BUG(qa-t15 重跑无头测试35断言0FAIL + 自写脚本交叉验证54图全显/导出JSON54条/CSV55行BOM)·研发/测试分离铁律已守·放行完成 |
+| 2026-08-15 | 开发(software-engineer) | T-16 训练面板三项优化(点击放大/中英对照/写法号层级采纳+双图处理) | 派活→待验证 | 团队模式(software-board-045d)；before 沿用 88d24aa；实现：build_training_panel.py 合并 prompts_zh.csv(中文)+lightbox 放大+normalizeGroup 写法号层级三态采纳+组内主图/备选/弃+双图优(强制恰好1主图)+统计6格+导出组层级；training_panel.html 163,729B 自包含；研发自测(46生成器自检+95 JS逻辑)全PASS·自抓 thumb 计数假阳性已修 |
+| 2026-08-15 | QA(software-qa-engineer) | T-16 | 待验证→已验证 | 独立验收188断言0FAIL(研发95逻辑+QA 40结构+53行为·手法刻意不同保证独立)；双图处理1200次fuzz+脏localStorage注入零不变量违例；0 BUG·4观察项非缺陷；建议放行 |
+| 2026-08-15 | 主理人(合伙人) | T-16 | 待验证→完成 | 主理人§4.3读盘核产(163729B·56img=54缩略图+2参考图·tag级data-role=thumb 54·54唯一wXX_Y 0缺失·base64 0·中文锚点同一个齐肩黑发54·data-writing去重27·lightbox/normalizeGroup/双图优/主图/备选/弃均在)+QA独立验收188/0·研发/测试分离铁律已守·放行完成 |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -443,6 +447,7 @@
 <!-- JUDGE_LEDGER -->
 - 2026-08-14 23:10 | T-14 | judge=✅ PASS（主理人读盘核产+） | #2-4 backlog：G4 Hotfix(is_hotfix列+红边🚨·server.py:143-144幂等ALTER+SELECT/POST/PUT+index.html L103/465) / P0-4跨seed(--cross-seed all_consistent=True+报告JSON落盘) / S4 YAML warning(缺字段4条WARNING+正常零warning)；before b913e39 + de08a7f；QA 11/11 PASS·研发/测试分离铁律已守·主理人放行完成 |
 - 2026-08-14 15:03 | T-15 | judge=✅ PASS（主理人读盘核产+QA独立验收10/10） | 训练线采纳面板：build_training_panel.py(生成器)+training_panel.html(108KB自包含·56 img=54缩略图+2参考图·0 base64内嵌·54图全显0缺失0截断·27写法号分组·三态采纳开关+localStorage+导出JSON/CSV+写法号/状态筛选+批量+实时统计+角色参考图区+顶部阶段说明门槛)；engineer-t15 构建(0151ddb design已提交·训练项目无git仅落盘) + qa-t15 独立验收 PASS·研发/测试分离铁律守·主理人放行完成 |
+- 2026-08-15 00:09 | T-16 | judge=✅ PASS（主理人读盘核产+QA独立验收188/0） | 训练面板三项优化：①lightbox点击放大(点空白/ESC关·中英双栏·DOM动态createElement不破坏铁律锚点) ②中英对照(主理人译prompts_zh.csv 54行·中文绿边上英文蓝边下·全文0截断·写法号24源数据本就中英混排忠实透传) ③写法号层级采纳(组三态×27+图主图/备选/弃×54·两张都好自动「采纳·双图优」强制恰好1主图·导出CSV27行带主图文件名·JSON「采纳无主图」=0)；统计6格(含写法号采纳数/双图优数)；铁律保住(56img/54唯一/0base64/0截断/27组)；189d24aa design已提交·训练项目无git仅落盘；engineer-t16构建+qa-t16独立验收188断言0FAIL(含1200次fuzz不变量零违例)·研发/测试分离铁律守·主理人放行完成 |
 - 2026-08-14 19:55 | T-11 | judge=✅ PASS（主理人读盘核验+QA独立验收AC-1.1~1.7全过） | 里程碑阶段门禁(7阶段选题→发布·自动初始化幂等·任务挂接milestone_id·阶段进度聚合·UI面板·迁移安全幂等·双入口8788/8787-board字节一致)；server.py f321806(113行·milestones表+tasks.milestone_id+GET/PUT接口+白名单)+index.html(76行·面板/抽屉下拉/卡片徽章/实时刷新)·grep milestones/milestone_id各15处·生成链路零改动；live 8788 经 nohup+disown 脱离会话真拉起(工程师"已重启"不实已修正)·双入口7阶段+overall 12/10/83一致；QA software-qa-engineer-4 独立验收 c340fec(验收文档250行)·研发/测试分离铁律已守·主理人放行完成 |
 - 2026-08-14 20:05 | T-12 | judge=✅ PASS（主理人读盘核产+QA独立验收 AC-1.1~1.7 全过·零BUG） | 8787门户补两缺失入口：/soundsfree(agnes_proxy.py 新增 SOUNDSFREE_FILE + do_GET 分支·落 _route_dispatch 前避免被反代吞) + /board/docs(经现有 board 反代已200·零后端改动)；hub.html 新增 cardSoundsfree/cardDocs 两卡片(5→7)·复用.card结构无JS探活依赖；主理人亲curl 8入口全200+内容真页面(标题SoundsFree/看板API说明页)+端口卫生(8787=24436唯一/8788=32924/8777=29296未误杀)；QA 42dc338 独立验收 AC-1.1~1.7 全PASS·含深度回归(/board/docs与直连8788/docs diff=0未被/api/→/board/api/重写篡改·7阶段里程碑+overall一致·/api/spec 200 studio反代完好·前端TC-8 node --check SYNTAX_OK)·零BUG·研发/测试分离铁律已守·主理人放行完成 |
 - 2026-08-14 02:35 | T-10 | judge=✅ PASS（主理人R1/R2/R3三轮核验 + QA独立验收 ALL_PASS·含复验闭环G6快速新建硬编码 FAIL） | G6负责人指派(抽屉d_author下拉+openDrawer回填+saveDrawer提交；addRoot/addChild原硬编码author="老板"→改`filterAuthor||"老板"`·QA首轮抓1c FAIL→工程师commit 7c93064修复→QA复验全文`author:"老板"`字面量0命中·ALL_PASS) + S1进度字段(progress 0-100整数·server.py幂等迁移+校验400/200+GET回显+renderCard进度条progress-wrap真实渲染·ext接口带progress) + S2清dep-tag死CSS(全文0命中)；server.py 7处+index.html G6/S1/筛选标签/S2；双入口8788直连与8787/board网关真实PUT/GET一致·临时数据已还原；node --check通过·JS合法·8787/8777未误伤
