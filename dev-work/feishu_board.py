@@ -202,19 +202,43 @@ def ensure_fields(token: str, app_token: str, table_id: str):
 
 def ensure_kanban_view(token: str, app_token: str, table_id: str,
                        group_field: str = "状态"):
-    # 尝试创建看板视图（按状态分组）。已存在则忽略。
-    body = {
-        "view_type": "kanban",
-        "view_name": "看板",
-        "property": {"group_field": group_field},
-    }
-    r = _request("POST",
-                 f"/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/views",
-                 token=token, json_body=body)
-    if r.get("code") == 0:
-        print(f"[ok] 已建看板视图（按「{group_field}」分组）")
+    """确保存在按「状态」分组的看板视图。
+
+    飞书创建视图 API 不支持在请求体设分组，必须创建后 PATCH property.group_field。
+    若应用未被授予多维表格「高级权限」，PATCH 会静默失败(group_field 仍为 None)，
+    此时需老板在飞书UI手动设分组，或在多维表格给应用开「可管理」高级权限后重跑 setup。
+    """
+    views = _request("GET",
+                     f"/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/views",
+                     token=token).get("data", {}).get("items", [])
+    kb = [v for v in views if v.get("view_type") == "kanban"]
+    if kb:
+        vid = kb[0]["view_id"]
     else:
-        print(f"[info] 看板视图：{r.get('msg')}（可忽略，也可在飞书UI手动切到看板视图）")
+        r = _request("POST",
+                     f"/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/views",
+                     token=token,
+                     json_body={"view_name": "看板", "view_type": "kanban"})
+        if r.get("code") != 0:
+            print(f"[warn] 建看板视图失败: {r.get('msg')}")
+            return
+        vid = r["data"]["view_id"]
+    # PATCH 设分组
+    _request("PATCH",
+             f"/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/views/{vid}",
+             token=token,
+             json_body={"property": {"group_field": group_field}})
+    # 复查
+    v2 = [v for v in _request("GET",
+             f"/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/views",
+             token=token).get("data", {}).get("items", [])
+          if v.get("view_type") == "kanban"]
+    if v2 and v2[0].get("property", {}).get("group_field") == group_field:
+        print(f"[ok] 看板视图已按「{group_field}」分组")
+    else:
+        print(f"[warn] 看板视图已存在但未按「{group_field}」分组："
+              f"请在该多维表格给应用开「可管理」高级权限后重跑 setup，"
+              f"或在飞书UI手动把看板分组字段设为「{group_field}」")
 
 
 # ---------------------------------------------------------------------------
