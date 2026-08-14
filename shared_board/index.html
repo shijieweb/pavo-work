@@ -99,6 +99,9 @@
   .card.st-done{border-left-color:var(--st-done)}
   .card.st-blocked{border-left-color:var(--st-blocked);border-width:2px;border-color:var(--st-blocked);animation:block-pulse 2s infinite}
   @keyframes block-pulse{0%,100%{border-color:var(--st-blocked)}50%{border-color:#fca5a5}}
+  /* ── T-14 #2 G4 Hotfix 热修标签：左侧红边框 + 🚨 角标（参照 dev-work/reference_kanban.html L72-73、L204、L225） ── */
+  .card.hotfix{border-left:3px solid #dc2626}
+  .card.hotfix .card-id, .card.hotfix .card-title{color:#dc2626}
   .card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:6px}
   .card-id{font-size:11px;font-weight:600;color:var(--text2)}
   .card-title{font-size:14px;font-weight:600;line-height:1.4;margin-bottom:8px;word-break:break-word}
@@ -444,7 +447,7 @@ function renderCard(t){
   const kids=tasks.filter(x=>x.parent_id==t.id);
   const subHtml=kids.length?'<span class="subcount">👥 '+kids.length+' 子任务</span>':'';
   const parentHtml=isChild?'<span class="parent-ref" onclick="event.stopPropagation();scrollToCard('+t.parent_id+')" title="点击定位父任务 #'+t.parent_id+'">↳ 父 #'+t.parent_id+'</span>':'';
-  const cls='card st-'+statusCls(t.status)+(isChild?' child-card':'')+(t.status==='阻塞'?' blocked':'')+(isOverdue(t)?' overdue':'');
+  const cls='card st-'+statusCls(t.status)+(isChild?' child-card':'')+(t.status==='阻塞'?' blocked':'')+(isOverdue(t)?' overdue':'')+(t.is_hotfix?' hotfix':'');
   const author=t.author||'老板';
   // ① 完成时间戳徽章（done/完成 用 updated 近似）
   const doneHtml=(t.status==='完成'||t.status==='done')?'<span class="done-stamp">✅ '+esc(t.updated||'')+'</span>':'';
@@ -458,8 +461,10 @@ function renderCard(t){
   const overdueHtml=isOverdue(t)?'<span class="overdue-tag">⚠️ 逾期</span>':'';
   // T-09 G2 阻塞原因（状态=阻塞 且 有原因）
   const blockHtml=(t.status==='阻塞' && t.block_reason)?'<div class="block-reason">🚫 '+esc(t.block_reason)+'</div>':'';
+  // T-14 #2 G4 Hotfix 角标（is_hotfix=true 时左侧 🚨，参照 reference_kanban.html L225 hotfixHtml）
+  const hotfixHtml=(t.is_hotfix)?'<span style="font-size:14px;line-height:1">🚨</span>':'';
   return '<div class="'+cls+'" id="card-'+t.id+'" onclick="openDrawer('+t.id+')">'
-    +'<div class="card-header"><span class="card-id">#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span> '+stBadge+msBadge+'</span>'
+    +'<div class="card-header"><span class="card-id">'+hotfixHtml+'#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span> '+stBadge+msBadge+'</span>'
     +'<button class="dbtn" onclick="event.stopPropagation();openDrawer('+t.id+')">详情</button></div>'
     +'<div class="card-title">'+esc(t.title)+'</div>'
     +prog
