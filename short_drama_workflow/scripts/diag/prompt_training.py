@@ -11,6 +11,15 @@
 """
 import base64, json, os, re, subprocess, sys, time, urllib.request
 import yaml
+import logging
+
+logger = logging.getLogger("prompt_training")
+# 确保 warning 级别有可见输出（自挂 handler，不依赖调用方/其它模块的 logging 配置）
+if not logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    logger.addHandler(_h)
+    logger.setLevel(logging.WARNING)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(HERE, "templates")
@@ -62,11 +71,109 @@ def build_variants(shot, ref, template="camera_move_v2"):
     if not os.path.isfile(tpl_path):
         raise FileNotFoundError("模板不存在: %s.yaml" % template)
     with open(tpl_path, encoding="utf-8") as f:
-        tpl = yaml.safe_load(f)
+        tpl = yaml.safe_load(f) or {}
+    # ── T-14 #4 S4：YAML 缺字段明确告警（不再静默返回空/{}）──
+    if not isinstance(tpl, dict):
+        logger.warning("YAML 模板 %s 解析结果非字典（疑似内容为空或格式错误），variants 将为空", template)
+    for _key in ("name", "variables", "constants", "variants"):
+        if _key not in tpl:
+            logger.warning("YAML 模板 %s 缺少关键字段 '%s'：将按默认值处理（variables={}, constants={}, variants={}），渲染可能为空", template, _key)
     variables = _resolve_variables(tpl.get("variables", {}), shot, ref)
     ctx = {**variables, **(tpl.get("constants") or {})}
-    return {name: _render_variant(vdef, ctx)
-            for name, vdef in (tpl.get("variants") or {}).items()}
+    variants = {name: _render_variant(vdef, ctx)
+                for name, vdef in (tpl.get("variants") or {}).items()}
+    if not variants:
+        logger.warning("YAML 模板 %s 未渲染出任何变体（variants 缺失或为空），请检查 variants 字段", template)
+    return variants
+
+
+def _locked_seed(writing_name, explicit_seed=None):
+    """seed 锁定：复刻 main() 的派生逻辑。
+
+    - explicit_seed 给定 -> 直接用（用户指定锁定）；
+    - 否则 -> 由写法号确定性派生（main() 现状）：1000 + Σord(c) % 9000，
+      保证同一写法号在跨生成/跨进程间可复现（seed 不随机漂移）。
+    返回 int 或 None(随机)。
+    """
+    if explicit_seed is not None:
+        try:
+            return int(explicit_seed)
+        except (TypeError, ValueError):
+            return None
+    return 1000 + sum(ord(c) for c in writing_name) % 9000
+
+
+def cross_seed_consistency_report(shot, ref, template="camera_move_v2", seed_strategies=None):
+    """P0-4 跨 seed 一致性校验（L0 静态/dry-run，不调 AGNES，不烧 VIP）。
+
+    ★ 定义（写入 design.md）：
+      - 跨 seed 指什么：对同一写法（写法号 / YAML variant，如 v0/v1/v4/v5）分别用多种
+        seed 策略做"生成"——['name-locked'(按写法号派生,默认), 'explicit-42'(用户指定),
+        'explicit-999'(用户指定), 'random'(不锁)]——校验写法本身渲染出的角色关键属性
+        是否随 seed 策略漂移。
+      - 角色关键属性（3 项）：① 人物描述(prompt) ② seed 锁定(seed) ③ 关键帧(keyframes)。
+      - 一致性判据：写法渲染出的 prompt / keyframes 内容在所有 seed 策略下**逐字符一致**
+        （AGNES seed 只影响生成随机性，不应改变写法本身的角色关键属性）；且 name-locked
+        seed 对同一写法号在多次生成间可复现（确定性）。
+
+    ★ 说明：build_variants 渲染 prompt/keyframes 不接收 seed（seed 仅在 gen_video 提交时生效），
+      故"跨 seed 渲染一致性"= 验证上述不变式：seed 策略改变不应让写法本身漂移。本检查为 L0
+      静态对比，不调用 AGNES/不烧 VIP，符合 I-2 例外（仅 L0 静态/dry-run 不改生成逻辑）。
+
+    返回 dict：{template, strategies, writings:[...], all_consistent}
+    """
+    if seed_strategies is None:
+        seed_strategies = [("name-locked", None), ("explicit-42", 42),
+                           ("explicit-999", 999), ("random", "random")]
+    variants = build_variants(shot, ref, template)
+    writings = list(variants.keys())
+    report_writings = []
+    all_consistent = True
+    for w in writings:
+        rendered = {}
+        seeds = {}
+        for sname, sval in seed_strategies:
+            vv = build_variants(shot, ref, template)[w]  # seed 不影响渲染（不变式待验证）
+            rendered[sname] = {
+                "prompt": vv.get("prompt", ""),
+                "keyframes": json.dumps(vv.get("keyframes", []), ensure_ascii=False, sort_keys=True),
+                "images": json.dumps(vv.get("images", []), ensure_ascii=False, sort_keys=True),
+            }
+            seeds[sname] = _locked_seed(w, None if sval == "random" else sval)
+        base_prompt = rendered[seed_strategies[0][0]]["prompt"]
+        base_kf = rendered[seed_strategies[0][0]]["keyframes"]
+        drift = []
+        prompt_consistent = True
+        keyframes_consistent = True
+        for sname, _ in seed_strategies[1:]:
+            if rendered[sname]["prompt"] != base_prompt:
+                prompt_consistent = False
+                drift.append("prompt@%s 与 %s 不同" % (sname, seed_strategies[0][0]))
+            if rendered[sname]["keyframes"] != base_kf:
+                keyframes_consistent = False
+                drift.append("keyframes@%s 与 %s 不同" % (sname, seed_strategies[0][0]))
+        # seed 锁定可复现：name-locked 两次调用一致
+        seed_locked = (seeds["name-locked"] == _locked_seed(w, None))
+        if not seed_locked:
+            drift.append("name-locked seed 不可复现")
+        ok = prompt_consistent and keyframes_consistent and seed_locked
+        if not ok:
+            all_consistent = False
+        report_writings.append({
+            "writing": w,
+            "prompt_consistent": prompt_consistent,
+            "keyframes_consistent": keyframes_consistent,
+            "seed_locked": seed_locked,
+            "seeds": seeds,
+            "drift": drift,
+            "consistent": ok,
+        })
+    return {
+        "template": template,
+        "strategies": [s[0] for s in seed_strategies],
+        "writings": report_writings,
+        "all_consistent": all_consistent,
+    }
 
 
 def _get_by_path(shot, ref, path):
@@ -314,17 +421,41 @@ def main():
     vset = None
     if "--variants" in args:
         vset = tuple(args[args.index("--variants") + 1].split(","))
-    if not pid:
-        print("用法: python prompt_training.py --project <id> --shot <n> [--variants v0,v1,v4,v5] [--template camera_move_v2|camera_move_v1] [--type 镜头类型]", file=sys.stderr)
+    if not pid and "--cross-seed" not in args:
+        print("用法: python prompt_training.py --project <id> --shot <n> [--variants v0,v1,v4,v5] [--template camera_move_v2|camera_move_v1] [--type 镜头类型] [--cross-seed]", file=sys.stderr)
         sys.exit(1)
 
-    server.load_spec(pid)
-    shot = server.find_shot(sid)
-    if shot is None:
-        print("shot %d 不存在" % sid, file=sys.stderr)
-        sys.exit(1)
-    ref = (server.SPEC.get("references") or {}).get(shot.get("ref") or "") or {}
+    if pid:
+        server.load_spec(pid)
+        shot = server.find_shot(sid)
+        if shot is None:
+            print("shot %d 不存在" % sid, file=sys.stderr)
+            sys.exit(1)
+        ref = (server.SPEC.get("references") or {}).get(shot.get("ref") or "") or {}
+    else:
+        # 无 --project：用合成 shot/ref 做纯模板级一致性校验（不依赖真实 spec，L0 静态）
+        shot = {"video_prompt": "A young man in a white shirt walks forward along the riverside, calm mood, soft identity lock.",
+                "ref": "hero", "cn_story": "合成测试镜头(无真实 spec)", "camera": "中景跟随"}
+        ref = {"remote_url": "https://example.com/anchor.png", "asset_image": "https://example.com/anchor.png"}
     anchor = (ref or {}).get("remote_url") or (ref or {}).get("asset_image") or shot.get("remote_image_ref") or ""
+
+    # ── T-14 #3 P0-4 跨 seed 一致性校验（L0 静态/dry-run：只渲染 YAML 对比，不调 AGNES，不烧 VIP）──
+    if "--cross-seed" in args:
+        rep = cross_seed_consistency_report(shot, ref, tpl)
+        print("\n" + "=" * 70)
+        print("P0-4 跨 seed 一致性报告（模板=%s）" % tpl)
+        print("=" * 70)
+        for w in rep["writings"]:
+            print("[%s] 一致=%s | prompt一致=%s keyframes一致=%s seed锁定=%s | 漂移=%s" % (
+                w["writing"], w["consistent"], w["prompt_consistent"],
+                w["keyframes_consistent"], w["seed_locked"], w["drift"] or "无"))
+        print("\n结论: all_consistent=%s" % rep["all_consistent"])
+        os.makedirs(EXPDIR, exist_ok=True)
+        _rep_path = os.path.join(EXPDIR, "cross_seed_consistency_%s.json" % time.strftime("%m%d_%H%M%S"))
+        with open(_rep_path, "w", encoding="utf-8") as f:
+            json.dump(rep, f, ensure_ascii=False, indent=2)
+        print("报告已存: %s" % _rep_path)
+        return
 
     variants = build_variants(shot, ref, tpl)
     if vset is None:
