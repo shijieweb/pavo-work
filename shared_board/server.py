@@ -99,6 +99,15 @@ def db():
         c.execute("ALTER TABLE audit ADD COLUMN project_id INTEGER")
     except Exception:
         pass  # 旧库已存在该列时忽略
+    # T-09：任务逾期检测 + 阻塞原因字段（幂等迁移，旧库已存在该列时忽略）
+    try:
+        c.execute("ALTER TABLE tasks ADD COLUMN deadline TEXT")
+    except Exception:
+        pass  # 旧库已存在该列时忽略
+    try:
+        c.execute("ALTER TABLE tasks ADD COLUMN block_reason TEXT")
+    except Exception:
+        pass
     # 外部指导留言（T-20260813-05）：远程指导角色经 8787 /ext/notes 写入，前端「指导留言」栏/审计流展示
     c.execute("""CREATE TABLE IF NOT EXISTS notes(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -179,8 +188,8 @@ class H(BaseHTTPRequestHandler):
                 send(self, 200, [{"id": r[0], "name": r[1], "owner": r[2], "created": r[3]} for r in rows]); c.close(); return
             if self.path.startswith("/api/tasks?"):
                 pid = int(self.path.split("project_id=")[1])
-                rows = c.execute("SELECT id,parent_id,title,detail,status,author,updated,priority FROM tasks WHERE project_id=? ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id", (pid,)).fetchall()
-                send(self, 200, [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中"} for r in rows]); c.close(); return
+                rows = c.execute("SELECT id,parent_id,title,detail,status,author,updated,priority,deadline,block_reason FROM tasks WHERE project_id=? ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id", (pid,)).fetchall()
+                send(self, 200, [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中", "deadline": r[8] or "", "block_reason": r[9] or ""} for r in rows]); c.close(); return
             if self.path.startswith("/api/presence"):
                 rows = c.execute("SELECT agent,last_seen FROM presence ORDER BY last_seen DESC").fetchall()
                 send(self, 200, [{"agent": r[0], "last_seen": r[1]} for r in rows]); c.close(); return
@@ -197,13 +206,13 @@ class H(BaseHTTPRequestHandler):
             # ---- 外部指导 API（T-20260813-05）：只读 + 留言，经 8787 /ext/* 访问，无鉴权直达 ----
             if self.path.startswith("/api/ext/status"):
                 projs = c.execute("SELECT id,name,owner,created FROM projects ORDER BY id").fetchall()
-                inflight = c.execute("""SELECT id,parent_id,title,detail,status,author,updated,priority
+                inflight = c.execute("""SELECT id,parent_id,title,detail,status,author,updated,priority,deadline,block_reason
                     FROM tasks WHERE status IN ('进行中','待验证','已验证')
                     ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id""").fetchall()
                 recent = c.execute("SELECT ts,agent,action,target FROM audit ORDER BY id DESC LIMIT 8").fetchall()
                 send(self, 200, {
                     "projects": [{"id": r[0], "name": r[1], "owner": r[2], "created": r[3]} for r in projs],
-                    "in_flight_tasks": [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中"} for r in inflight],
+                    "in_flight_tasks": [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中", "deadline": r[8] or "", "block_reason": r[9] or ""} for r in inflight],
                     "recent_audit": [{"ts": r[0], "agent": r[1], "action": r[2], "target": r[3]} for r in recent],
                     "generated_at": now(),
                 }); c.close(); return
@@ -222,8 +231,8 @@ class H(BaseHTTPRequestHandler):
                 pid = q.get("project_id", [None])[0]
                 if pid is None or not pid.isdigit():
                     send(self, 400, {"error": "project_id 必填且为整数"}); c.close(); return
-                rows = c.execute("SELECT id,parent_id,title,detail,status,author,updated,priority FROM tasks WHERE project_id=? ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id", (int(pid),)).fetchall()
-                send(self, 200, [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中"} for r in rows]); c.close(); return
+                rows = c.execute("SELECT id,parent_id,title,detail,status,author,updated,priority,deadline,block_reason FROM tasks WHERE project_id=? ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id", (int(pid),)).fetchall()
+                send(self, 200, [{"id": r[0], "parent_id": r[1], "title": r[2], "detail": r[3], "status": r[4], "author": r[5], "updated": r[6], "priority": r[7] or "中", "deadline": r[8] or "", "block_reason": r[9] or ""} for r in rows]); c.close(); return
             if self.path.startswith("/api/ext/audit"):
                 q = {}
                 if "?" in self.path:
@@ -270,8 +279,8 @@ class H(BaseHTTPRequestHandler):
                 if err:
                     send(self, 400, {"error": err}); c.close(); return
                 pri = d.get("priority") or "中"
-                cur = c.execute("INSERT INTO tasks(project_id,parent_id,title,detail,status,author,updated,priority) VALUES(?,?,?,?,?,?,?,?)",
-                          (d.get("project_id"), d.get("parent_id"), d.get("title", ""), d.get("detail", ""), d.get("status", "待办"), d.get("author", ""), now(), pri))
+                cur = c.execute("INSERT INTO tasks(project_id,parent_id,title,detail,status,author,updated,priority,deadline,block_reason) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                          (d.get("project_id"), d.get("parent_id"), d.get("title", ""), d.get("detail", ""), d.get("status", "待办"), d.get("author", ""), now(), pri, d.get("deadline", ""), d.get("block_reason", "")))
                 c.commit(); 
                 if raw: audit(c, agent, "创建任务", f"项目{pid}/{d.get('title','')}", pid)
                 if raw: touch(c, raw)
@@ -322,7 +331,7 @@ class H(BaseHTTPRequestHandler):
                 if err:
                     send(self, 400, {"error": err}); c.close(); return
                 sets = []; vals = []
-                for k in ("title", "detail", "status", "author", "priority"):
+                for k in ("title", "detail", "status", "author", "priority", "deadline", "block_reason"):
                     if k in d: sets.append(f"{k}=?"); vals.append(d[k])
                 sets.append("updated=?"); vals.append(now()); vals.append(tid)
                 c.execute(f"UPDATE tasks SET {','.join(sets)} WHERE id=?", vals)
