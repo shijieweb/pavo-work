@@ -43,3 +43,8 @@
 - 称呼「老板」，坐标南京。
 - 偏好 GitHub 开源自建能力，规避单一商业 SaaS 锁定。
 - 老板明确不愿本地部署（嫌装 ComfyUI/GPT-SoVITS 整合包麻烦），回归「全云 API」初心。
+
+## 执行纪律（老板 2026-08-14 定 · 机制化）
+- **接任何任务，第一步先读 `dev-work/执行流程.md`，按其中流程走**；不靠记忆、不临场自创 Agent 节奏。
+- 所有可复用动作已下沉为 skill（`~/.workbuddy/skills/`）与脚本（`short_drama_workflow/scripts/`），优先调已固化资产，不重复造。
+- 只读核查用 `bash short_drama_workflow/scripts/health_check.sh` 一键出真数据。
