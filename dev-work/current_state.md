@@ -61,6 +61,7 @@
 | T-20260812-03 运维脚本工作流(不建角色·固化脚本) | ✅ 完成(主理人把关·2026-08-12) | 开发Agent | 测试Agent | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ 1.6✓ |
 | T-20260812-04 框架加固 R1/R2/R3 + v4锚 + 改进文档 | ✅ 完成(主理人把关·2026-08-12) | — | — | 白名单硬卡/强制审计/WIP/v4锚/改进手册 |
 | T-20260812-05 O4 check_wip.ps1 WIP机械检查 | ✅ 完成(主理人把关·2026-08-13) | 主理人接手(Agent异常) | 主理人实证 | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ 1.6✓ |
+| T-10 看板全局闭环(G6+S1+S2) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | G6✓ S1✓ S2✓（主理人R1/R2/R3 + QA独立验收 ALL_PASS·含复验闭环G6快速新建硬编码） |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -368,14 +369,72 @@
 | 2026-08-13 | 主理人(合伙人) | T-20260813-08 | 待办→进行中→完成 | 老板19:57拍板"主题/搜索/保存挂起·其他开干"→只做看板P0×3(分析师#5)；design方案A审过(详情按钮stopPropagation+进度概览renderProg+删除.delbtn弱化·confirm保留)；实现bee5808仅index.html 22+/3-；主理人核产+线上验证(新标记10处生效·PID29144/13040零重启铁证·接口全200·server.py净)；QA独立验收AC-1.1~1.4全PASS无BUG·K1~K4全过·零写路径零污染 |
 | 2026-08-13 | 主理人(合伙人) | T-20260813-08a 视图重做 | 待办→进行中→完成 | 老板22:26五决策(K1迁移/K2拿参考改造/K3拆卡+前端角色frontend-dev/K4后端我定/K5筛选+状态快捷切换+在线样式)；design v2审过(同文件改造+子任务方案A全量平铺+保留泳道⇄树切换)；实现8206348(298+/74-仅index.html：6列泳道/统计条/暗色/toast/在线👤/6态配色)；QA独立验收Round1抓P0泳道布局bug(display:block覆盖flex·6列垂直堆叠)→4c9ddfa修复+WARN-1暗色徽章7.71:1；主理人Playwright亲测6列横向排列+可滚动；Round2全绿放行·K1~K5全过·零重启零污染 |
 | 2026-08-14 | 开发(software-engineer) | T-20260813-08b 看板功能融合 | 派活→待验证 | 团队模式(software-shortdrama-c107)；before 沿用 b6e6240(T-08a)；实现 64bf095(仅index.html 增量+design/test/acceptance 三文档·server.py 零改动)；六功能:筛选按钮组(状态/优先级/作者)/卡片状态徽章快切(PUT/api/tasks 不开drawer)/指导留言栏(GET/api/ext/notes)/自动刷新开关/flash定位+父任务引用/完成时间戳+进度字段位 |
-| 2026-08-14 | 主理人(合伙人) | T-20260813-08b | 待验证→完成 | 主理人3轮检查：R1抓写路径须真实PUT往返(令牌同源验证✅)+服务未持久化(工程师重启杀调度器托管进程致8788死→主理人PowerShell Start-Process脱离会话重建PID24444)；R2抓PRD偏离(状态筛选隐藏整列vs优先级/作者仅隐藏卡片→退回统一为保留全部列卡片级隐藏·64bf095落地);R3全绿(两入口页面含6新功能/JS合法/写路径仍通/留言GET 3条/8788+8787均200)；AC-1.1~1.12全PASS放行 |
+| 2026-08-14 | 主理人(合伙人) | T-20260813-08b | 待验证→完成 | 主理人3轮检查：R1抓写路径须真实PUT往返(令牌同源验证✅)+服务未持久化(工程师重启杀调度器托管进程致8788死→主理人PowerShell Start-Process脱离会话重建PID24444)；R2抓PRD偏离(状态筛选隐藏整列vs优先级/作者仅隐藏卡片→退回统一为保留全部列卡片级隐藏·64bf095落地);R3全绿(两入口页面含6新功能/JS合法/写路径仍通/留言GET 3条/8788+8787均200)；AC-1.1~1.12全PASS(主理人自检)；**QA独立验收回报=NoOne全过(12AC全PASS·无BUG·vm+DOM桩12组断言+真实curl双入口200+PUT改状态回显已还原+server.py零改动)→主理人最终放行完成**(04:02 研发/测试分离铁律已守) |
+| 2026-08-14 | QA(software-qa-engineer) | T-20260813-08b | 待验证→(QA独立验收) | 独立验收AC-1.1~1.12全PASS·NoOne路由·无BUG·vm+DOM桩12组断言全绿+真实curl双入口200+PUT改状态回显已还原+server.py零改动核验；可选观察P3父引用跨筛选不可达(可接受·T-09复用) |
+| 2026-08-14 | 开发(software-engineer) | T-11 看板里程碑阶段门禁 | 派活→待验证 | 团队模式(software-board-11)；before 沿用 T-10；实现 f321806(shared_board/server.py 113行·milestones表+任务milestone_id+tasks.milestone_id读写+GET/PUT里程碑接口+白名单+ensure_milestones幂等 + index.html 76行·里程碑面板/抽屉阶段下拉/卡片徽章/实时刷新 + design.md)；生成链路零改动；自测全PASS |
+| 2026-08-14 | QA(software-qa-engineer-4) | T-11 | 待验证→已验证 | 独立验收AC-1.1~1.7全PASS(隔离8801幂等+8802旧库迁移安全·20任务0丢·milestone_id列加回；双入口8788/8787-board字节一致·7阶段+overall 12/10/83；前端9/9面板标记命中；红线扫描仅milestone改动)·无P0/P1·commit c340fec(验收文档250行) |
+| 2026-08-14 | 主理人(合伙人) | T-11 | 待验证→完成 | 主理人把关：自跑双入口一致+代码grep(milestones/milestone_id各15处)+commit f321806/c340fec核验+ps确认live 8788 PPID=1在线；读盘核产发现工程师"已重启8788"不实(in-process随子会话死)→nohup+disown脱离会话真拉起复验通过；AC-1.1~1.7全PASS·研发/测试分离铁律已守·放行完成 |
 
 #### 子角色判定台账（judge，自动追加）
 
 > 纪律：每次派活收尾，主理人跑 `bash ops/judge_and_log.sh --task <T-id> --artifact <路径> [--expect ...] [--forbid ...] [--commit-dir ...]`，脚本自动在此追加一行。**结论来自主会话读盘（judge_subagent.sh），非子角色文本**——与上方状态推进表互为印证：状态表记"完成"前，此处须有对应 judge=PASS/WARN 结论。
 > 用法见 `short_drama_workflow/ops/judge_and_log.sh`（包装 judge_subagent.sh，零破坏）。
 
+---
+
+## 阿编把关结论（主理人·2026-08-14，T-10 看板全局闭环 G6+S1+S2）
+
+- **放行决定：✅ 放行（完成）**。G6 负责人指派 + S1 进度字段 + S2 清 dep-tag 死 CSS 全部闭环；QA 独立验收首轮抓出 G6 快速新建硬编码 FAIL，工程师修复后复验 ALL_PASS（研发/测试分离铁律已守，未漏 QA 闸）。
+- **主理人三轮检查（R1/R2/R3）证据**：
+  - R1 静态读盘：server.py 7 处（迁移/校验/GET×2/ext×2/POST/PUT 白名单）+ index.html 抽屉 G6/S1/筛选标签/S2 + dep-tag 删除，逐行核对。
+  - R2 动态双入口往返：8788 直连与 8787 `/board` 网关 POST/GET 回显一致（author/priority/deadline/block_reason/progress）；progress=200 拒 400、=0 接受、不传默认 0 非 null；临时测试任务已 DELETE 还原。
+  - R3 回归/JS：node --check 应用脚本 21537 字通过；8787/8777 端口未误伤（8787=29144/8777=29296 稳定）。
+- **QA 独立验收关键价值（首轮即抓真 FAIL）**：G6 的 `addRoot`/`addChild`(第 367/373 行) 仍硬编码 `author:"老板"`，快速新建绕过指派——工程师自测未暴露。工程师 commit `7c93064` 改为 `author:(filterAuthor||"老板")` 后，QA 复验全文 `author:"老板"` 字面量 **0 命中**、367/373 已变、`filterAuthor` 真实接入、JS 语法/双入口/回归全 PASS → ALL_PASS。这正是双角色闭环存在的意义。
+- **本次更正两处历史误判（已写入下方差距 backlog）**：
+  1. **G5 优先级排序**：原 backlog 误标"无优先级排序"为缺口；实测 server.py:198/241 已 `ORDER BY CASE priority ... END, id`，GET 返回即按优先级序，前端照序入列 → 改为「已满足·非缺口」。
+  2. **〇 易误判点校准**：原写"负责接入人筛选已覆盖"易让人以为全闭环；实则筛选壳在、指派瓤(G6)才是真缺口。T-10 已闭环 G6（抽屉显式指派 + 快速新建沿用 filterAuthor），现筛选+指派两层都就位。
+- **改动文件**：`shared_board/server.py`（7 处，before 快照 `63d277a`）+ `shared_board/index.html`（G6/S1/筛选标签/S2，修复 commit `7c93064`）。后端 8788 每次实时读 index.html，前端改动无需重启即生效。
+- **遗留（不阻塞·可并入 backlog）**：G3 里程碑时间轴 / G4 Hotfix 标签 仍属体验增强低优项，未做。
+
+---
+
+<!-- 参照看板差距 backlog（T-20260813-08b 融合后的剩余项 · 2026-08-14 盘清） -->
+## 参照看板差距 backlog（dev-work/reference_kanban.html 对账）
+
+> 来源：原始参考 UI `dev-work/reference_kanban.html`（4 列单文件看板）。T-08b 已把可见交互能力融合进 `shared_board/index.html`。本小节盘清「参考有、我们仍缺」的项，并澄清一处易误判点。
+
+### 〇 易误判点（请先读这条，2026-08-14 校准）
+- **参考 `ID=filters` DIV = 按「负责接入人(assignee)」筛选**：其按钮固定为「全部/产品经理/PM/后端研发/前端研发/测试工程师」，筛选逻辑 `card.assignee === currentFilter`。
+- **「筛选壳」我们一直有**：本地看板 `matchFilter` 的第 3 维度就是「作者」(`filterAuthor`)，`AVATAR_INIT` 角色值集与参考 `ASSIGNEE_ICONS` 完全同源（老板/PM/产品经理/前端研发/后端研发/测试工程师）+ 头像。这一层**确实已覆盖**，不要记为待实现。
+- **⚠️ 但「指派瓤」才是真缺口（G6）——已于 T-10 闭环**：此前抽屉虽有 `d_author` 下拉，但 `addRoot`/`addChild` 快速新建硬编码 `author:"老板"`，任何人点「新建」都强制归老板，等于「按负责人筛选能真实区分」在快速路径上被绕过。T-10 把 367/373 行改为 `author:(filterAuthor||"老板")`，快速新建沿用当前负责人筛选值、抽屉可显式指派——**筛选 + 指派 两层现在都闭环**。
+- **结论**：不要再误以为「筛选已覆盖=全闭环」。筛选壳≠指派瓤；G6（任务级负责人指派）是真缺口，现已随 T-10 放行。若未来要区分「创建者 vs 执行者」才需拆 `author`/`assignee` 两字段——当前非缺口。
+- 附带：参考的「单维筛选」我们升级成了「状态+优先级+作者 可叠加」，更强。
+
+### 一 真正缺口（参考有、我们无，按价值排序）
+| # | 参考能力 | 我们现状 | 缺口等级 | 落地所需 |
+|---|---|---|---|---|
+| G1 | **逾期检测 + 逾期高亮 + 逾期统计**（`isOverdue` 红标题 + ⚠️逾期 tag + statOverdue） | 无 deadline 字段（server.py schema 与 index.html 均无），无法判逾期 | 🔴 高（商用看板刚需） | schema 加 `deadline`；前端 `isOverdue()` + 红标题/标签 + 统计条加「逾期」 | **→ T-09 已验收放行(2026-08-14 · judge=PASS)** |
+| G2 | **阻塞原因展示**（`blockedBy` 字符串 + `.block-reason`） | 有「阻塞」态但 server.py 无 `blocked_by` 字段，记不了"为什么卡" | 🔴 高 | schema 加 `block_reason`；卡片阻塞时显示原因 | **→ T-09 已验收放行(2026-08-14 · judge=PASS)** |
+| G3 | **里程碑阶段门禁 + 视图面板**（done/active/pending 状态 + 任务挂接 + 阶段进度聚合 + 面板 UI） | 原无里程碑视图（我们是任务树） | 🟡 中 | 7 阶段自动初始化幂等 + 任务挂接 milestone_id + 阶段聚合 + 前端面板 | **→ T-11 已验收放行(2026-08-14 · judge=PASS)**（阶段门禁/聚合/面板 UI 全部落地；纯时间轴横向视觉为可选增强，非阻塞） |
+| G4 | **Hotfix 热修标签**（`isHotfix` 红左边框 + 🚨） | 无 hotfix 概念 | 🟢 低 | 加 `is_hotfix` 标记 + 样式（可映射到"🔥紧急"） |
+| G5 | **卡片列内按优先级排序**（紧急>高>中>低 再 id） | `renderBoard` 按 `tasks` 数组序入列——但 `tasks` 来自后端 `ORDER BY CASE priority WHEN '紧急' THEN 0 WHEN '高' THEN 1 WHEN '中' THEN 2 WHEN '低' THEN 3 ELSE 2 END, id`（server.py:198/241 已落地），GET 返回即按优先级序，前端照序渲染 | ✅ 已满足（非缺口·2026-08-14 校验 server.py 确认） | 无需再改（若前端另要"拖拽手动调序"属新需求，不在此列） |
+| G6 | **任务级负责人指派**（抽屉可指定执行人 + 快速新建不再硬编码老板） | 抽屉有 `d_author` 下拉，但 `addRoot`/`addChild` 快速新建硬编码 `author:"老板"`，快速路径绕过指派 | 🔴 高（老板最初"按负责接入人筛选"的真缺口=指派瓤无） | 抽屉 `d_author` 显式指派 + `addRoot`/`addChild` 改 `filterAuthor||"老板"` + 后端 `author` 存读通用 | **→ T-10 已验收放行(2026-08-14 · judge=PASS)** |
+### 二 参考有但我们更强（非缺口，已对齐/超越）
+- 全局统计条：参考仅 总计/进行中/阻塞/完成/逾期；我们为 总计/进行中/待验证/阻塞/完成 + 待办/已验证（口径更全）。
+- 暗色 + localStorage、响应式、flash 定位、依赖跳转、自动刷新(可关且不打断编辑)、toast：双方都有，我们交互更细。
+- 树视图、在线状态、审计日志、指导留言、复制派单、改项目归属：**我们独有**，参考无。
+- 优先级档位：参考 critical/致命 ≈ 我们 紧急（标签差异，非缺口）。
+
+### 三 处置建议
+- G1/G2 最贴近「商用标准看板」刚需，建议作为 **T-09 候选**（逾期 + 阻塞原因）。
+- G3/G4/G5 为体验增强，可并入 T-09 或独立低优任务。
+- 老板确认是否开 T-09；不开则本小节作为永久留痕，禁止把「负责接入人筛选」误登记为缺口。
+
 <!-- JUDGE_LEDGER -->
+- 2026-08-14 19:55 | T-11 | judge=✅ PASS（主理人读盘核验+QA独立验收AC-1.1~1.7全过） | 里程碑阶段门禁(7阶段选题→发布·自动初始化幂等·任务挂接milestone_id·阶段进度聚合·UI面板·迁移安全幂等·双入口8788/8787-board字节一致)；server.py f321806(113行·milestones表+tasks.milestone_id+GET/PUT接口+白名单)+index.html(76行·面板/抽屉下拉/卡片徽章/实时刷新)·grep milestones/milestone_id各15处·生成链路零改动；live 8788 经 nohup+disown 脱离会话真拉起(工程师"已重启"不实已修正)·双入口7阶段+overall 12/10/83一致；QA software-qa-engineer-4 独立验收 c340fec(验收文档250行)·研发/测试分离铁律已守·主理人放行完成 |
+- 2026-08-14 02:35 | T-10 | judge=✅ PASS（主理人R1/R2/R3三轮核验 + QA独立验收 ALL_PASS·含复验闭环G6快速新建硬编码 FAIL） | G6负责人指派(抽屉d_author下拉+openDrawer回填+saveDrawer提交；addRoot/addChild原硬编码author="老板"→改`filterAuthor||"老板"`·QA首轮抓1c FAIL→工程师commit 7c93064修复→QA复验全文`author:"老板"`字面量0命中·ALL_PASS) + S1进度字段(progress 0-100整数·server.py幂等迁移+校验400/200+GET回显+renderCard进度条progress-wrap真实渲染·ext接口带progress) + S2清dep-tag死CSS(全文0命中)；server.py 7处+index.html G6/S1/筛选标签/S2；双入口8788直连与8787/board网关真实PUT/GET一致·临时数据已还原；node --check通过·JS合法·8787/8777未误伤
+- 2026-08-14 15:00 | T-09 | judge=✅ PASS（主理人R1/R2/R3三轮核验 + QA独立验收8/8全过） | G1逾期(红标题+⚠️逾期tag+统计逾期数) + G2阻塞原因(状态=阻塞显红原因块)；server.py幂等迁移deadline/block_reason·GET10列·POST/PUT贯通；index.html抽屉+isOverdue+renderCard+renderProg+CSS；双入口8788/8787-board真实PUT/GET一致·临时数据已还原；可选隐患isOverdue时区边界(+0800不受影响·记T-09-followup)
+- 2026-08-14 01:15 | T-20260813-08b | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收全PASS·NoOne路由·12AC全过·vm+DOM桩12组断言+真实curl双入口200+PUT改状态回显已还原·server.py零改动·无BUG
 - 2026-08-13 23:16 | T-20260813-08a | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收抓P0泳道布局bug(display:block覆盖flex)·4c9ddfa修复·Round2全绿放行·主理人Playwright亲测横向布局生效
 - 2026-08-13 20:14 | T-20260813-08 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收全PASS·P0×3纯前端22行·K1~K4全过·零重启零污染·无BUG
 - 2026-08-13 19:16 | T-20260813-07 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收全PASS·5态中文+docs+校验+热加载·K1~K4全覆盖
