@@ -377,6 +377,7 @@
 | 2026-08-14 | QA(software-qa-engineer-4) | T-11 | 待验证→已验证 | 独立验收AC-1.1~1.7全PASS(隔离8801幂等+8802旧库迁移安全·20任务0丢·milestone_id列加回；双入口8788/8787-board字节一致·7阶段+overall 12/10/83；前端9/9面板标记命中；红线扫描仅milestone改动)·无P0/P1·commit c340fec(验收文档250行) |
 | 2026-08-14 | 主理人(合伙人) | T-11 | 待验证→完成 | 主理人把关：自跑双入口一致+代码grep(milestones/milestone_id各15处)+commit f321806/c340fec核验+ps确认live 8788 PPID=1在线；读盘核产发现工程师"已重启8788"不实(in-process随子会话死)→nohup+disown脱离会话真拉起复验通过；AC-1.1~1.7全PASS·研发/测试分离铁律已守·放行完成 |
 | 2026-08-14 | 主理人(合伙人) | T-12 8787门户补两入口(音效台+看板API说明) | 待验证→完成 | 老板授权(q-0亲签闸1)补两缺失入口；工程师d1a4b99(agnes_proxy.py +5 /soundsfree路由落_route_dispatch前 + hub.html +20 两卡片·5→7)；design 408e9ad；主理人§4.3读盘核产(8入口全200+内容真页面+端口卫生8787=24436唯一/8788=32924/8777=29296未误杀+git仅2文件25行零越界)后派QA独立验收；QA 42dc338(AC-1.1~1.7全PASS·含深度回归/board/docs与直连8788/docs diff=0未被/api/→/board/api/重写篡改·7阶段里程碑+overall 12/10/83一致·/api/spec 200 studio反代完好·前端TC-8 node --check SYNTAX_OK)·零BUG·研发/测试分离铁律已守·主理人亲curl复验8入口全200·放行完成 |
+| 2026-08-14 | 主理人(合伙人) | T-13 全局回顾(只读调研) | 待办→完成 | 老板"无新任务就全局回顾"；走 software-team-dispatch 技能(TeamCreate software-board-93bc→Agent team_name 派 software-engineer/software-qa-engineer→SendMessage派活→§4.3读config.json核验真入队)；队友回报文字未传回通道(仅完成信号)→主理人§4.3第4步读盘核产亲跑只读核查取真据(I-5)：主项目5/5 curl=200(8787=24436 agnes_proxy/8788=32924 board/8777=29296 studio)端口干净无僵尸·T-12两新入口可达；训练项目batch-001 out/ 56张PNG+prompts.csv已落盘=跑完·采纳记录.md仅示例无真登记→卡"采纳"前(待②裁判校准→③老板抽验→④进采纳区)。遗留团队按老板21:15约定不手动清(交技能reuse-or-create)；本会话队graceful shutdown后TeamDelete。纪要dev-work/tasks/T-13-global-review/回顾纪要.md |
 
 #### 子角色判定台账（judge，自动追加）
 
