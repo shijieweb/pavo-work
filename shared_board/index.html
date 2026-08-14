@@ -200,6 +200,25 @@
   .stat.st-overdue b{color:#dc2626}
   /* 暗色下保持红字清晰 */
   .dark .block-reason{color:#f87171;background:rgba(239,68,68,.15)}
+  /* ── T-11 里程碑阶段门禁面板 ── */
+  .msbar{background:var(--card-bg);border-bottom:1px solid var(--border);padding:10px 14px}
+  .ms-overall{font-size:13px;color:var(--text2);margin-bottom:10px}
+  .ms-overall b{color:var(--st-done);font-size:15px}
+  .ms-track{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+  .ms-stage{flex:0 0 200px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px;position:relative;border-top:3px solid var(--muted)}
+  .ms-stage.ms-pending{border-top-color:var(--st-todo)}
+  .ms-stage.ms-active{border-top-color:var(--st-doing)}
+  .ms-stage.ms-done{border-top-color:var(--st-done)}
+  .ms-stage .ms-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
+  .ms-stage .ms-order{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 6px;border-radius:8px}
+  .ms-stage .ms-status{font-size:11px;margin-left:auto;color:var(--text2)}
+  .ms-count{font-size:12px;color:var(--text2);margin:6px 0}
+  .ms-count b{color:var(--text)}
+  .ms-prog{height:6px;background:var(--prog-bg);border-radius:3px;overflow:hidden}
+  .ms-prog-fill{height:100%;background:var(--prog-fill);border-radius:3px;transition:width .3s}
+  .ms-empty{color:var(--text2);font-size:13px}
+  /* 卡片阶段徽章（AC-1.3） */
+  .stage-badge{font-size:10px;background:var(--tag-bg);color:var(--tag-text);padding:1px 6px;border-radius:4px;font-weight:600;margin-left:4px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -220,6 +239,7 @@
     <button id="btnRefresh" title="强制刷新">🔄 刷新</button>
     <button id="btnAuto" class="ghost active" title="自动刷新（开启时异步刷新数据，不打断抽屉编辑）">🔄 自动</button>
     <button id="btnDark" title="暗色模式">🌙</button>
+    <button id="btnMilestone" class="ghost active" title="里程碑阶段门禁面板（7 阶段流水线）">🏁 阶段</button>
   </div>
   <div id="prog" class="progbar"></div>
 </header>
@@ -231,6 +251,7 @@
   <button class="freset" onclick="resetFilters()">✕ 清除筛选</button>
 </div>
 <div class="board" id="board"></div>
+<div class="msbar" id="milestonePanel" hidden></div>
 <div class="wrap" id="treeWrap" hidden>
   <div id="tree"></div>
   <div id="empty" class="empty">先建一个项目，再开始加任务</div>
@@ -257,6 +278,7 @@
     <div><label>截止日期</label><input id="d_deadline" type="date"></div>
     <div><label>阻塞原因（状态=阻塞时填写）</label><input id="d_block"></div>
     <div><label>进度(0-100)</label><input id="d_progress" type="number" min="0" max="100"></div>
+    <div><label>阶段（里程碑门禁）</label><select id="d_milestone"><option value="">— 无 —</option></select></div>
     <div><label>详情</label><textarea id="d_detail"></textarea></div>
     <div style="display:flex;gap:8px">
       <button class="primary" style="flex:1" onclick="saveDrawer()">保存</button>
@@ -286,6 +308,7 @@ function showToast(msg){
 function ERR(msg){ showToast("操作失败："+msg); }
 async function api(url,opt){opt=opt||{};if(BOARD_TOKEN){opt.headers=Object.assign({},opt.headers||{},{'X-Board-Token':BOARD_TOKEN});}try{const r=await fetch(API+url,opt);if(!r.ok)throw new Error("HTTP "+r.status);if(r.status===204)return{};return await r.json();}catch(e){ERR(e.message);throw e;}}
 let projects=[], tasks=[], cur=null, expanded=new Set(), curTask=null, viewMode='kanban';
+let milestones=null, milestoneMap={}, msOpen=true;  // T-11 里程碑阶段门禁
 let filterStatus=null, filterPriority=null, filterAuthor=null, curStatusId=null, notesCache=[], notesOpen=true, autoOn=true, autoTimer=null;
 
 // 泳道 6 列（5 态 + 阻塞旁路，status→列 1:1 直映射，无 fallback）
@@ -321,7 +344,7 @@ async function load(){
     const sel=document.getElementById("projSel");
     sel.innerHTML='<option value="">— 选择项目 —</option>'+projects.map(p=>`<option value="${p.id}">${esc(p.name)}${p.owner&&p.owner!=="老板"?" ("+esc(p.owner)+")":""}</option>`).join("");
     if(cur) sel.value=cur;
-    if(cur) tasks=await api("/api/tasks?project_id="+cur);
+    if(cur){ tasks=await api("/api/tasks?project_id="+cur); await loadMilestones(); }
     render();
     loadNotes();
   }catch(e){}
@@ -388,7 +411,8 @@ function saveDrawer(){
            detail:document.getElementById("d_detail").value,
            deadline:document.getElementById("d_deadline").value,
            block_reason:document.getElementById("d_block").value,
-           progress:parseInt(document.getElementById("d_progress").value||"0",10)};
+           progress:parseInt(document.getElementById("d_progress").value||"0",10),
+           milestone_id:document.getElementById("d_milestone").value?parseInt(document.getElementById("d_milestone").value,10):null};
   api("/api/tasks/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(()=>{closeDrawer();load();showToast("已保存 #"+id);}).catch(()=>{});
 }
 function openDrawer(id){
@@ -401,6 +425,10 @@ function openDrawer(id){
   document.getElementById("d_deadline").value=curTask.deadline||"";
   document.getElementById("d_block").value=curTask.block_reason||"";
   document.getElementById("d_progress").value=curTask.progress||0;
+  // T-11 抽屉阶段选择器（7 阶段 + 无）
+  const ms=document.getElementById("d_milestone");
+  ms.innerHTML='<option value="">— 无 —</option>'+(milestones&&milestones.stages?milestones.stages.map(s=>'<option value="'+s.id+'">'+esc(s.stage_name)+'</option>').join(''):'');
+  ms.value=curTask.milestone_id||"";
   document.getElementById("drawer").classList.add("show");
   document.getElementById("mask").classList.add("show");
 }
@@ -424,12 +452,14 @@ function renderCard(t){
   const prog=(typeof t.progress==='number')?'<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:'+t.progress+'%"></div></div><div class="progress-label">'+t.progress+'%</div></div>':'';
   // ⑩ 卡片状态徽章（可点快捷切换，不开 drawer）
   const stBadge='<span class="badge" data-status="'+esc(t.status)+'" onclick="event.stopPropagation();openStatusMenu('+t.id+',event)" title="点击快捷切换状态">'+esc(t.status)+'</span>';
+  // T-11 阶段徽章（任务卡片显示所属阶段）
+  const msBadge=(t.milestone_id && milestoneMap[t.milestone_id])?'<span class="stage-badge" title="所属阶段：'+esc(milestoneMap[t.milestone_id].stage_name)+'">🏁'+esc(milestoneMap[t.milestone_id].stage_name)+'</span>':'';
   // T-09 G1 逾期标签（deadline=过去日期 且 状态≠完成/done）
   const overdueHtml=isOverdue(t)?'<span class="overdue-tag">⚠️ 逾期</span>':'';
   // T-09 G2 阻塞原因（状态=阻塞 且 有原因）
   const blockHtml=(t.status==='阻塞' && t.block_reason)?'<div class="block-reason">🚫 '+esc(t.block_reason)+'</div>':'';
   return '<div class="'+cls+'" id="card-'+t.id+'" onclick="openDrawer('+t.id+')">'
-    +'<div class="card-header"><span class="card-id">#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span> '+stBadge+'</span>'
+    +'<div class="card-header"><span class="card-id">#'+t.id+' <span class="pri '+priCls+'">'+esc(t.priority||'中')+'</span> '+stBadge+msBadge+'</span>'
     +'<button class="dbtn" onclick="event.stopPropagation();openDrawer('+t.id+')">详情</button></div>'
     +'<div class="card-title">'+esc(t.title)+'</div>'
     +prog
@@ -478,7 +508,7 @@ function build(id){
     card.ontouchend=()=>clearTimeout(timer);
     card.ondblclick=()=>openDrawer(t.id);
     const det=document.createElement("div"); det.className="meta";
-    det.textContent=(t.author?("👤 "+t.author+" · "):"")+(t.updated||"");
+    det.textContent=(t.author?("👤 "+t.author+" · "):"")+(t.updated||"")+((t.milestone_id&&milestoneMap[t.milestone_id])?(" · 🏁"+milestoneMap[t.milestone_id].stage_name):"");
     const ch=document.createElement("div"); ch.className="children"+(expanded.has(t.id)?" open":"");
     const inner=document.createElement("div"); inner.append(build(t.id));
     ch.append(inner);
@@ -507,8 +537,38 @@ function renderProg(){
     +'<span class="stat st-overdue">逾期 <b>'+overdueN+'</b></span>'
     +'<span class="muted">（待办 '+n("待办")+' · 已验证 '+n("已验证")+'）</span>';
 }
+// ── T-11 里程碑阶段门禁：数据加载 + 渲染 ──
+async function loadMilestones(){
+  if(!cur){ milestones=null; milestoneMap={}; renderMilestones(); return; }
+  try{ milestones=await api("/api/projects/"+cur+"/milestones"); }catch(e){ milestones=null; }
+  buildMilestoneMap(); renderMilestones();
+}
+function buildMilestoneMap(){
+  milestoneMap={};
+  if(milestones&&milestones.stages) milestones.stages.forEach(s=>milestoneMap[s.id]=s);
+}
+function renderMilestones(){
+  const panel=document.getElementById("milestonePanel");
+  if(!cur || !msOpen){ panel.hidden=true; return; }
+  panel.hidden=false;
+  if(!milestones || !milestones.stages){ panel.innerHTML='<div class="ms-empty">暂无里程碑数据</div>'; return; }
+  const ov=milestones.overall||{total:0,done:0,rate:0};
+  const overall='<div class="ms-overall">🏁 整体流水线完成率：<b>'+ov.rate+'%</b>（已完成 '+ov.done+' / 共 '+ov.total+' 任务）</div>';
+  const stTxt={'pending':'待开始','active':'进行中','done':'已完成'};
+  const track=milestones.stages.map(s=>{
+    const rate=s.rate||0, done=s.done||0, total=s.total||0;
+    return '<div class="ms-stage ms-'+s.status+'">'
+      +'<div class="ms-name"><span class="ms-order">'+s.stage_order+'</span>'+esc(s.stage_name)+'<span class="ms-status">'+(stTxt[s.status]||s.status)+'</span></div>'
+      +'<div class="ms-count">已完成 <b>'+done+'</b> / 共 <b>'+total+'</b> 任务</div>'
+      +'<div class="ms-prog"><div class="ms-prog-fill" style="width:'+rate+'%"></div></div>'
+      +'<div class="ms-count" style="margin:4px 0 0">完成率 '+rate+'%</div>'
+      +'</div>';
+  }).join('');
+  panel.innerHTML=overall+'<div class="ms-track">'+track+'</div>';
+}
 function render(){
   renderProg();
+  renderMilestones();
   renderFilterButtons();
   const board=document.getElementById("board");
   const treeWrap=document.getElementById("treeWrap");
@@ -634,7 +694,7 @@ function toggleNotes(){
 // ⑬ 自动刷新开关（默认开；异步刷数据，不打断抽屉编辑；关=停轮询）
 async function tick(){
   if(!autoOn) return;
-  if(cur){ try{ tasks=await api("/api/tasks?project_id="+cur); render(); }catch(e){} }
+  if(cur){ try{ tasks=await api("/api/tasks?project_id="+cur); await loadMilestones(); render(); }catch(e){} }
   loadPresence(); loadAudit(); loadNotes();
 }
 function startAuto(){ if(autoTimer) clearInterval(autoTimer); autoTimer=setInterval(tick,5000); }
@@ -667,6 +727,12 @@ document.getElementById('btnAuto').addEventListener('click',()=>{
   const b=document.getElementById('btnAuto');
   b.classList.toggle('active',autoOn);
   if(autoOn){ startAuto(); showToast('已开启自动刷新'); } else { stopAuto(); showToast('已关闭自动刷新'); }
+});
+// ── T-11 里程碑面板开关 ──
+document.getElementById('btnMilestone').addEventListener('click',()=>{
+  msOpen=!msOpen;
+  document.getElementById('btnMilestone').classList.toggle('active',msOpen);
+  renderMilestones();
 });
 if(autoOn) startAuto();
 load(); loadPresence(); loadAudit(); loadNotes();
