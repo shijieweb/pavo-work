@@ -33,6 +33,8 @@ LOGS_FILE = os.path.join(SCRIPT_DIR, "logs.html")
 # 音效台静态页（T-12）：SoundsFree 离线程序化音效生成器，与 /logs、/training 同构走 _serve_html
 SOUNDSFREE_FILE = os.path.join(SCRIPT_DIR, "soundsfree_home.html")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
+# batch 训练采纳面板（T-0815）：training_panel.html 整目录静态托管在 /batch（外网经 8787 可达）
+BATCH_PANEL_DIR = r"C:\Users\67972\projects\short-drama-training"
 
 # ===== 统一门户：8787 作为唯一入口，工作台(8777)整段反向代理过来 =====
 # 两个台的路由集经逐条核对【零冲突】，故无需改动任何前端请求路径即可共存：
@@ -361,6 +363,9 @@ class H(BaseHTTPRequestHandler):
         if path in ("/soundsfree", "/soundsfree.html"):
             self._serve_html(SOUNDSFREE_FILE)   # 音效台（T-12：SoundsFree 本地静态页，_route_dispatch 之前，避免被反代吞掉）
             return
+        if path.startswith("/batch"):
+            self._serve_batch(path)             # batch 训练采纳面板（T-0815）：整目录静态托管，外网经 8787 可达
+            return
         if path == "/training/api/experiments":
             self._train_experiments()
             return
@@ -649,6 +654,50 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(body)
         except Exception as e:
             self._send(500, json.dumps({"error": str(e)}), "application/json")
+
+    def _serve_batch(self, path):
+        """静态托管 batch 训练采纳面板（training_panel.html 及其相对资源）。
+        挂载前缀 /batch，根目录 = BATCH_PANEL_DIR；防目录穿越。
+        8787 已绑 0.0.0.0，外部经此入口即可访问面板，无需本机 file://。"""
+        rel = path[len("/batch"):].lstrip("/")
+        rel = urllib.parse.unquote(rel)    # HTTP 路径是百分号编码(中文目录→%XX)，必须解码才能匹配磁盘路径
+        norm_base = os.path.normpath(BATCH_PANEL_DIR)
+        if rel == "" or rel.endswith("/"):
+            rel = "training_panel.html"
+        full = os.path.normpath(os.path.join(norm_base, rel))
+        if full != norm_base and not full.startswith(norm_base + os.sep):
+            self._send(403, json.dumps({"error": "forbidden"}))
+            return
+        if not os.path.isfile(full):
+            self._send(404, json.dumps({"error": "not found: " + rel}))
+            return
+        ext = os.path.splitext(full)[1].lower()
+        ctype = {
+            ".html": "text/html; charset=utf-8",
+            ".htm": "text/html; charset=utf-8",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".webp": "image/webp",
+            ".json": "application/json",
+            ".css": "text/css",
+            ".js": "application/javascript",
+            ".csv": "text/csv; charset=utf-8",
+        }.get(ext, "application/octet-stream")
+        try:
+            with open(full, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as e:
+            self._send(500, json.dumps({"error": str(e)}))
 
     def _serve_train_video(self, rel):
         """训练实验视频（experiments 目录内 .mp4，防止目录穿越）。"""
