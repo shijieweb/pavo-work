@@ -61,7 +61,9 @@
 | T-20260812-03 运维脚本工作流(不建角色·固化脚本) | ✅ 完成(主理人把关·2026-08-12) | 开发Agent | 测试Agent | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ 1.6✓ |
 | T-20260812-04 框架加固 R1/R2/R3 + v4锚 + 改进文档 | ✅ 完成(主理人把关·2026-08-12) | — | — | 白名单硬卡/强制审计/WIP/v4锚/改进手册 |
 | T-20260812-05 O4 check_wip.ps1 WIP机械检查 | ✅ 完成(主理人把关·2026-08-13) | 主理人接手(Agent异常) | 主理人实证 | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ 1.6✓ |
-| T-10 看板全局闭环(G6+S1+S2) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | G6✓ S1✓ S2✓（主理人R1/R2/R3 + QA独立验收 ALL_PASS·含复验闭环G6快速新建硬编码） |
+| T-10 看板全局闭环(G6+S1+S2) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | AC-1.1~1.7（7阶段里程碑门禁·自动初始化幂等·任务挂接·阶段聚合·UI面板·双入口一致·QA独立验收 ALL_PASS） |
+
+| T-12 8787门户补两入口(音效台+看板API说明) | ✅ 完成(主理人把关·2026-08-14) | software-engineer | software-qa-engineer | AC-1.1✓ 1.2✓ 1.3✓ 1.4✓ 1.5✓ 1.6✓ 1.7✓（主理人读盘核产 + QA独立验收 ALL_PASS·零BUG·零越界·深度回归docs未被篡改） |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -374,6 +376,7 @@
 | 2026-08-14 | 开发(software-engineer) | T-11 看板里程碑阶段门禁 | 派活→待验证 | 团队模式(software-board-11)；before 沿用 T-10；实现 f321806(shared_board/server.py 113行·milestones表+任务milestone_id+tasks.milestone_id读写+GET/PUT里程碑接口+白名单+ensure_milestones幂等 + index.html 76行·里程碑面板/抽屉阶段下拉/卡片徽章/实时刷新 + design.md)；生成链路零改动；自测全PASS |
 | 2026-08-14 | QA(software-qa-engineer-4) | T-11 | 待验证→已验证 | 独立验收AC-1.1~1.7全PASS(隔离8801幂等+8802旧库迁移安全·20任务0丢·milestone_id列加回；双入口8788/8787-board字节一致·7阶段+overall 12/10/83；前端9/9面板标记命中；红线扫描仅milestone改动)·无P0/P1·commit c340fec(验收文档250行) |
 | 2026-08-14 | 主理人(合伙人) | T-11 | 待验证→完成 | 主理人把关：自跑双入口一致+代码grep(milestones/milestone_id各15处)+commit f321806/c340fec核验+ps确认live 8788 PPID=1在线；读盘核产发现工程师"已重启8788"不实(in-process随子会话死)→nohup+disown脱离会话真拉起复验通过；AC-1.1~1.7全PASS·研发/测试分离铁律已守·放行完成 |
+| 2026-08-14 | 主理人(合伙人) | T-12 8787门户补两入口(音效台+看板API说明) | 待验证→完成 | 老板授权(q-0亲签闸1)补两缺失入口；工程师d1a4b99(agnes_proxy.py +5 /soundsfree路由落_route_dispatch前 + hub.html +20 两卡片·5→7)；design 408e9ad；主理人§4.3读盘核产(8入口全200+内容真页面+端口卫生8787=24436唯一/8788=32924/8777=29296未误杀+git仅2文件25行零越界)后派QA独立验收；QA 42dc338(AC-1.1~1.7全PASS·含深度回归/board/docs与直连8788/docs diff=0未被/api/→/board/api/重写篡改·7阶段里程碑+overall 12/10/83一致·/api/spec 200 studio反代完好·前端TC-8 node --check SYNTAX_OK)·零BUG·研发/测试分离铁律已守·主理人亲curl复验8入口全200·放行完成 |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -432,6 +435,7 @@
 
 <!-- JUDGE_LEDGER -->
 - 2026-08-14 19:55 | T-11 | judge=✅ PASS（主理人读盘核验+QA独立验收AC-1.1~1.7全过） | 里程碑阶段门禁(7阶段选题→发布·自动初始化幂等·任务挂接milestone_id·阶段进度聚合·UI面板·迁移安全幂等·双入口8788/8787-board字节一致)；server.py f321806(113行·milestones表+tasks.milestone_id+GET/PUT接口+白名单)+index.html(76行·面板/抽屉下拉/卡片徽章/实时刷新)·grep milestones/milestone_id各15处·生成链路零改动；live 8788 经 nohup+disown 脱离会话真拉起(工程师"已重启"不实已修正)·双入口7阶段+overall 12/10/83一致；QA software-qa-engineer-4 独立验收 c340fec(验收文档250行)·研发/测试分离铁律已守·主理人放行完成 |
+- 2026-08-14 20:05 | T-12 | judge=✅ PASS（主理人读盘核产+QA独立验收 AC-1.1~1.7 全过·零BUG） | 8787门户补两缺失入口：/soundsfree(agnes_proxy.py 新增 SOUNDSFREE_FILE + do_GET 分支·落 _route_dispatch 前避免被反代吞) + /board/docs(经现有 board 反代已200·零后端改动)；hub.html 新增 cardSoundsfree/cardDocs 两卡片(5→7)·复用.card结构无JS探活依赖；主理人亲curl 8入口全200+内容真页面(标题SoundsFree/看板API说明页)+端口卫生(8787=24436唯一/8788=32924/8777=29296未误杀)；QA 42dc338 独立验收 AC-1.1~1.7 全PASS·含深度回归(/board/docs与直连8788/docs diff=0未被/api/→/board/api/重写篡改·7阶段里程碑+overall一致·/api/spec 200 studio反代完好·前端TC-8 node --check SYNTAX_OK)·零BUG·研发/测试分离铁律已守·主理人放行完成 |
 - 2026-08-14 02:35 | T-10 | judge=✅ PASS（主理人R1/R2/R3三轮核验 + QA独立验收 ALL_PASS·含复验闭环G6快速新建硬编码 FAIL） | G6负责人指派(抽屉d_author下拉+openDrawer回填+saveDrawer提交；addRoot/addChild原硬编码author="老板"→改`filterAuthor||"老板"`·QA首轮抓1c FAIL→工程师commit 7c93064修复→QA复验全文`author:"老板"`字面量0命中·ALL_PASS) + S1进度字段(progress 0-100整数·server.py幂等迁移+校验400/200+GET回显+renderCard进度条progress-wrap真实渲染·ext接口带progress) + S2清dep-tag死CSS(全文0命中)；server.py 7处+index.html G6/S1/筛选标签/S2；双入口8788直连与8787/board网关真实PUT/GET一致·临时数据已还原；node --check通过·JS合法·8787/8777未误伤
 - 2026-08-14 15:00 | T-09 | judge=✅ PASS（主理人R1/R2/R3三轮核验 + QA独立验收8/8全过） | G1逾期(红标题+⚠️逾期tag+统计逾期数) + G2阻塞原因(状态=阻塞显红原因块)；server.py幂等迁移deadline/block_reason·GET10列·POST/PUT贯通；index.html抽屉+isOverdue+renderCard+renderProg+CSS；双入口8788/8787-board真实PUT/GET一致·临时数据已还原；可选隐患isOverdue时区边界(+0800不受影响·记T-09-followup)
 - 2026-08-14 01:15 | T-20260813-08b | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | QA独立验收全PASS·NoOne路由·12AC全过·vm+DOM桩12组断言+真实curl双入口200+PUT改状态回显已还原·server.py零改动·无BUG
