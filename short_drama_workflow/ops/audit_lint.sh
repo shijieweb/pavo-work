@@ -80,6 +80,29 @@ for t in $ok_ids; do
   fi
 done
 
+# ===== 索引引用存在性检查（⑤ 2026-08-14：防索引死链/漏登记）=====
+# 解析 索引总览 里反引号引用的相对路径，检查 dev-work/ 下是否存在（WARN 级，不误伤跨目录/模板引用）
+IDX="dev-work/索引总览_出问题先看这里.md"
+if [ -f "$IDX" ]; then
+  missing=""
+  while read -r p; do
+    [ -z "$p" ] && continue
+    case "$p" in
+      http*|C:/*|~/*|*.env|*.db|ops/*|维护手册/*|short_drama_workflow/*|scripts/*|projects/*|*YYYY*|*\<*|*\>*|*\**) continue ;;
+    esac
+    p="${p%%#*}"
+    [ -z "$p" ] && continue
+    if [ ! -e "dev-work/$p" ]; then missing="$missing $p"; fi
+  done <<< "$(grep -oE '\`[^\`]+\`' "$IDX" | tr -d '\`' | sort -u)"
+  if [ -n "$missing" ]; then
+    echo "  ⚠️ 索引引用缺失（请登记/修正索引总览）:$missing"; warn=1
+  else
+    echo "  ✅ 索引引用全部存在"
+  fi
+else
+  echo "  ⚠️ 索引总览不存在（dev-work/索引总览_出问题先看这里.md）"; warn=1
+fi
+
 echo "==============================="
 
 if [ "$fail" -eq 1 ]; then
