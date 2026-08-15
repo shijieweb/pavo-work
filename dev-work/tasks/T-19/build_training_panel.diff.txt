@@ -1,0 +1,246 @@
+34a35
+> import argparse
+42c43
+< from typing import Dict, List, Tuple
+---
+> from typing import Dict, List, Optional, Tuple
+45a47
+> # 支持多批次: 通过 CURRENT_BATCH 切换 batch-001 / batch-002 / ... (T-19)
+49,51c51,63
+< BATCH_OUT_DIR: str = os.path.join(
+<     PROJECT_ROOT, "01_配方训练", "实验批次", "batch-001", "out"
+< )
+---
+> REF_DIR: str = os.path.join(PROJECT_ROOT, "01_配方训练", "角色参考图")
+> 
+> 
+> def _batch_out_dir(batch_id: str) -> str:
+>     """根据批次号返回该批次的 out 目录绝对路径."""
+>     return os.path.join(PROJECT_ROOT, "01_配方训练", "实验批次", batch_id, "out")
+> 
+> 
+> # 当前批次 (由 --batch 参数在 main 前通过 set_batch 覆写)
+> CURRENT_BATCH: str = "batch-001"
+> 
+> # 以下路径随 CURRENT_BATCH 变化, 由 set_batch 统一刷新
+> BATCH_OUT_DIR: str = _batch_out_dir(CURRENT_BATCH)
+55d66
+< REF_DIR: str = os.path.join(PROJECT_ROOT, "01_配方训练", "角色参考图")
+57a69,86
+> 
+> def set_batch(batch_id: str) -> None:
+>     """切换批次: 刷新全部依赖路径全局变量 + 输出文件名 (T-19 多批次支持).
+> 
+>     Args:
+>         batch_id: 批次目录名, 如 "batch-001" / "batch-002"。
+>     """
+>     global CURRENT_BATCH, BATCH_OUT_DIR, CSV_PATH, CSV_ZH_PATH
+>     global WRITING_PURPOSE_CSV, HTML_OUTPUT_PATH
+>     CURRENT_BATCH = batch_id
+>     BATCH_OUT_DIR = _batch_out_dir(batch_id)
+>     CSV_PATH = os.path.join(BATCH_OUT_DIR, "prompts.csv")
+>     CSV_ZH_PATH = os.path.join(BATCH_OUT_DIR, "prompts_zh.csv")
+>     WRITING_PURPOSE_CSV = os.path.join(BATCH_OUT_DIR, "writing_purpose.csv")
+>     # 默认批次输出 training_panel.html, 其余批次输出 training_panel_<batch>.html
+>     suffix = "" if batch_id == "batch-001" else ("_" + batch_id)
+>     HTML_OUTPUT_PATH = os.path.join(HTML_OUTPUT_DIR, f"training_panel{suffix}.html")
+> 
+80,82c109,116
+< def cand_url(file: str) -> str:
+<     """候选图 ASCII 资产 URL (经代理 /batch/__asset__/cand/<file>)."""
+<     return f"{ASSET_BASE}/cand/{file}"
+---
+> def cand_url(file: str, batch: Optional[str] = None) -> str:
+>     """候选图 ASCII 资产 URL (经代理 /batch/__asset__/<batch>/cand/<file>).
+> 
+>     T-19 泛化: URL 携带批次段, 使代理能按批次白名单映射到对应磁盘目录,
+>     彻底绕开中文目录 URL。batch 缺省取当前 CURRENT_BATCH。
+>     """
+>     b = batch or CURRENT_BATCH
+>     return f"{ASSET_BASE}/{b}/cand/{file}"
+85,87c119,125
+< def ref_url(file: str) -> str:
+<     """角色参考图 ASCII 资产 URL (经代理 /batch/__asset__/ref/<file>)."""
+<     return f"{ASSET_BASE}/ref/{file}"
+---
+> def ref_url(file: str, batch: Optional[str] = None) -> str:
+>     """角色参考图 ASCII 资产 URL (经代理 /batch/__asset__/<batch>/ref/<file>).
+> 
+>     角色参考图为各批次共用, 但 URL 仍带批次段以保证路由统一定位。
+>     """
+>     b = batch or CURRENT_BATCH
+>     return f"{ASSET_BASE}/{b}/ref/{file}"
+365a404,430
+>   /* ---- T-19: 提示词修正意见可编辑块 (wp-corr) ---- */
+>   .wp-corr {
+>     margin: 8px 0 0; padding: 8px 10px; background: rgba(245,158,11,.06);
+>     border: 1px solid rgba(245,158,11,.30); border-radius: 6px;
+>   }
+>   .wp-corr-title { color: var(--dual); font-weight: 700; margin-bottom: 4px; font-size: 13px; }
+>   .wp-corr-field { margin: 4px 0; }
+>   .wp-corr label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+>   .wp-corr textarea {
+>     width: 100%; box-sizing: border-box; background: #12151c; color: var(--text);
+>     border: 1px solid var(--border); border-radius: 6px; padding: 6px;
+>     font-family: inherit; font-size: 12px; line-height: 1.4; resize: vertical;
+>   }
+>   .correction-save {
+>     margin-top: 6px; background: var(--dual); border-color: var(--dual); color: #3a2600;
+>   }
+>   .corr-msg { margin-left: 8px; font-size: 12px; }
+>   .corr-msg.ok { color: var(--primary); }
+>   .corr-msg.err { color: var(--reject); }
+> 
+>   /* ---- T-19: 手机端统计栏 .toolbar 在 <=768px 取消 sticky (AC-1.5) ---- */
+>   @media (max-width: 768px) {
+>     .toolbar {
+>       position: static; top: auto; box-shadow: none;
+>     }
+>   }
+> 
+377c442
+<   <h1>训练线采纳面板 · batch-001
+---
+>   <h1>训练线采纳面板 · @@BATCH@@
+478c543
+<   <span>生成时间：@@GENERATED_AT@@　|　数据源：batch-001/out/prompts.csv + prompts_zh.csv（UTF-8 BOM）</span>
+---
+>   <span>生成时间：@@GENERATED_AT@@　|　数据源：@@BATCH@@/out/prompts.csv + prompts_zh.csv（UTF-8 BOM）</span>
+967a1033,1075
+> // T-19: 提示词修正意见保存 (POST /batch/api/correction -> 写回 writing_purpose.csv)
+> // ===========================================================================
+> function saveCorrection(block, btn) {
+>   const writing = block.getAttribute("data-correction-writing");
+>   const noteTa = block.querySelector('textarea[data-role="correction-note"]');
+>   const promptTa = block.querySelector('textarea[data-role="correction-prompt"]');
+>   const msg = block.querySelector('[data-role="corr-msg"]');
+>   const note = noteTa ? noteTa.value : "";
+>   const nextPrompt = promptTa ? promptTa.value : "";
+>   btn.disabled = true;
+>   if (msg) { msg.textContent = "保存中…"; msg.className = "corr-msg"; }
+>   fetch("/batch/api/correction", {
+>     method: "POST",
+>     headers: { "Content-Type": "application/json" },
+>     body: JSON.stringify({
+>       writing: parseInt(writing, 10),
+>       note: note,
+>       next_prompt: nextPrompt
+>     })
+>   })
+>     .then(function (resp) {
+>       return resp.json().then(function (j) { return { ok: resp.ok, status: resp.status, j: j }; });
+>     })
+>     .then(function (r) {
+>       // 成功: 200 且 ok 为真 -> 写回 DOM 并轻提示; 失败 -> 错误提示
+>       const ok = r.ok && r.j && (r.j.ok === true || r.j.status === 200 || r.status === 200);
+>       if (ok) {
+>         if (msg) { msg.textContent = "✅ 已保存"; msg.className = "corr-msg ok"; }
+>         if (noteTa) noteTa.value = note;
+>         if (promptTa) promptTa.value = nextPrompt;
+>       } else {
+>         const err = (r.j && (r.j.error || r.j.message)) ? (r.j.error || r.j.message)
+>                     : ("HTTP " + (r.status || "?"));
+>         if (msg) { msg.textContent = "❌ " + err; msg.className = "corr-msg err"; }
+>       }
+>     })
+>     .catch(function (e) {
+>       if (msg) { msg.textContent = "❌ 网络错误：" + e; msg.className = "corr-msg err"; }
+>     })
+>     .finally(function () { btn.disabled = false; });
+> }
+> 
+> // ===========================================================================
+970a1079,1083
+>   const corrBtn = ev.target.closest('.correction-save[data-correction-writing]');
+>   if (corrBtn) {
+>     const block = corrBtn.closest('.wp-corr');
+>     if (block) { saveCorrection(block, corrBtn); return; }
+>   }
+1099c1212,1213
+<     文件列: 写法号,测试目的,合并建议 (UTF-8 BOM). 缺失时返回空字典(面板降级占位).
+---
+>     文件列: 写法号,测试目的,合并建议,提示词修正意见(T-19),修正后prompt(T-19)
+>     (UTF-8 BOM). 缺失列时自动降级(对应字段取空串), 不中断构建 (AC-1.1).
+1115a1230,1232
+>             # T-19: 新增两列, 缺列时降级为空串 (AC-1.1)
+>             "note": row.get("提示词修正意见", "").strip(),
+>             "next_prompt": row.get("修正后prompt", "").strip(),
+1339a1457,1458
+>         note_val = wp.get("note", "")
+>         next_val = wp.get("next_prompt", "")
+1341,1343c1460
+<             wp_html = (
+<                 f'<div class="writing-purpose">'
+<                 f'<div class="wp-title">📋 写法 {key_esc} · 测试目的 &amp; 合并建议</div>'
+---
+>             wp_inner = (
+1346,1347d1462
+<                 + WP_CMP_HTML
+<                 + f"</div>"
+1350,1356c1465,1496
+<             wp_html = (
+<                 f'<div class="writing-purpose">'
+<                 f'<div class="wp-title">📋 写法 {key_esc} · 测试目的 &amp; 合并建议</div>'
+<                 f'<div class="wp-merge">（暂无测试目的记录）</div>'
+<                 + WP_CMP_HTML
+<                 + f"</div>"
+<             )
+---
+>             wp_inner = f'<div class="wp-merge">（暂无测试目的记录）</div>'
+>         wp_html = (
+>             f'<div class="writing-purpose">'
+>             f'<div class="wp-title">📋 写法 {key_esc} · 测试目的 &amp; 合并建议</div>'
+>             + wp_inner
+>             + WP_CMP_HTML
+>             + f"</div>"
+>         )
+>         # T-19: 每写法号「合并建议」+「两张图参数对比」下追加「提示词修正意见」可编辑块。
+>         # 铁律: 自然语 textarea 必须用 data-correction-writing (严禁 data-writing, 否则污染
+>         # DATA_WRITING_RE 去重计数 == 27 的不变式); textarea 非 <img>, 不增 img 计数;
+>         # wp-corr 块数须 == group_count (27 / 3)。
+>         wp_corr = (
+>             f'<div class="wp-corr" data-correction-writing="{key_esc}">'
+>             f'<div class="wp-corr-title">✏️ 提示词修正意见（老板手填，保存落盘 CSV）</div>'
+>             f'<div class="wp-corr-field">'
+>             f'<label>自然语说明：</label>'
+>             f'<textarea class="corr-note" rows="2" '
+>             f'data-correction-writing="{key_esc}" data-role="correction-note" '
+>             f'placeholder="例如：写法2 要明确进门动作（非出门）">'
+>             f'{html.escape(note_val)}</textarea>'
+>             f'</div>'
+>             f'<div class="wp-corr-field">'
+>             f'<label>修正后 prompt：</label>'
+>             f'<textarea class="corr-prompt" rows="3" data-role="correction-prompt" '
+>             f'placeholder="留空则沿用本轮 prompt">{html.escape(next_val)}</textarea>'
+>             f'</div>'
+>             f'<button class="correction-save" data-correction-writing="{key_esc}">'
+>             f'💾 保存修正</button>'
+>             f'<span class="corr-msg" data-role="corr-msg"></span>'
+>             f'</div>'
+>         )
+1358a1499
+>             + wp_corr
+1424a1566
+>         "@@BATCH@@": CURRENT_BATCH,
+1651a1794,1807
+>     # --- T-19: 提示词修正意见块 (每写法号一个, == group_count) --------------
+>     wp_corr_count = html_text.count('class="wp-corr"')
+>     print(f"  提示词修正意见块 wp-corr       = {wp_corr_count} (期望 {group_count})")
+>     assert wp_corr_count == group_count, (
+>         f"wp-corr {wp_corr_count} != {group_count} (应每个写法号都有修正意见可编辑块)"
+>     )
+>     # 铁律复验: 修正块用的是 data-correction-writing, 不得污染 data-writing 去重计数
+>     dw_after = {v for v in DATA_WRITING_RE.findall(html_text)}
+>     print(f"  data-writing 去重(修正块后)    = {len(dw_after)} (必须仍 == {group_count})")
+>     assert len(dw_after) == group_count, (
+>         f"data-writing 去重 {len(dw_after)} != {group_count} (修正块误用 data-writing!)"
+>     )
+>     report["wp_corr_count"] = wp_corr_count
+> 
+1672a1829,1834
+>     parser = argparse.ArgumentParser(description="训练线采纳面板生成器 (支持多批次, T-19)")
+>     parser.add_argument("--batch", default="batch-001",
+>                         help="批次目录名, 如 batch-001 / batch-002 (默认 batch-001)")
+>     args = parser.parse_args()
+>     set_batch(args.batch)
+>     print(f"[信息] 当前批次     : {CURRENT_BATCH}")
