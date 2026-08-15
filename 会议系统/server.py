@@ -308,6 +308,8 @@ CHAT_HTML = r"""<!DOCTYPE html>
   #inputbar { display: flex; gap: 8px; padding: 12px 20px; background: #fff; border-top: 1px solid #eee; }
   #input { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
   #input:focus { border-color: #3742fa; }
+  #agent-select { padding: 10px 8px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fff; outline: none; max-width: 170px; }
+  #agent-select:focus { border-color: #3742fa; }
   #send { padding: 10px 22px; background: #3742fa; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
   #send:hover { background: #2f35c4; }
   #endbtn { padding: 10px 18px; background: #ff6b6b; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
@@ -329,6 +331,7 @@ CHAT_HTML = r"""<!DOCTYPE html>
     <div id="hint"></div>
     <div id="messages"></div>
     <div id="inputbar">
+      <select id="agent-select"><option value="">@ 选择 agent…</option></select>
       <input id="input" placeholder="输入消息，回车发送..." autocomplete="off">
       <button id="send">发送</button>
       <button id="endbtn">结束会议</button>
@@ -341,6 +344,7 @@ var myUid = "user_" + Math.random().toString(36).slice(2, 8);
 var myName = "";
 var seq = 0;
 var lastPhase = "waiting";
+var selectedAgent = "";  // 下拉框选中的 agent（选中即相当于 @它）
 
 function init() {
   myName = (prompt("请输入你的名字：", "用户" + Math.floor(Math.random() * 1000)) || "匿名").trim();
@@ -378,6 +382,29 @@ function renderSidebar(members, phase) {
     if (m.uid === myUid) li.classList.add("me");
     ul.appendChild(li);
   }
+  renderAgentSelect(members);  // 同步下拉框里的 agent 列表
+}
+
+function renderAgentSelect(members) {
+  var sel = document.getElementById("agent-select");
+  if (!sel) return;
+  var prev = selectedAgent;
+  sel.innerHTML = '<option value="">@ 选择 agent…</option>';
+  for (var i = 0; i < members.length; i++) {
+    var m = members[i];
+    if (m.uid === myUid) continue;  // 不列自己
+    var opt = document.createElement("option");
+    opt.value = m.name;
+    opt.textContent = "@ " + m.name;
+    sel.appendChild(opt);
+  }
+  // 保留此前选中的 agent（若它仍在房间）
+  var keep = "";
+  for (var j = 0; j < sel.options.length; j++) {
+    if (sel.options[j].value === prev) { keep = prev; break; }
+  }
+  sel.value = keep;
+  selectedAgent = keep;
 }
 
 function renderMessages(msgs) {
@@ -467,9 +494,17 @@ function poll() {
 }
 
 function sendMsg() {
-  var content = document.getElementById("input").value.trim();
+  var input = document.getElementById("input");
+  var content = input.value.trim();
   if (!content) return;
-  document.getElementById("input").value = "";
+  // 选中了 agent 且消息开头还不是 @它，则自动补上 @（下拉框选择 = 相当于 @该 agent）
+  if (selectedAgent) {
+    var pre = "@" + selectedAgent;
+    if (content.indexOf(pre) !== 0 && content.indexOf(pre + " ") !== 0) {
+      content = pre + " " + content;
+    }
+  }
+  input.value = "";
   fetch("/api/room/" + roomId + "/message", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -479,6 +514,15 @@ function sendMsg() {
 
 document.getElementById("send").addEventListener("click", sendMsg);
 document.getElementById("input").addEventListener("keydown", function(e) { if (e.key === "Enter") sendMsg(); });
+document.getElementById("agent-select").addEventListener("change", function() {
+  selectedAgent = this.value;
+  if (selectedAgent) {
+    var inp = document.getElementById("input");
+    var pre = "@" + selectedAgent;
+    if (inp.value.indexOf(pre) !== 0) inp.value = pre + " " + inp.value;  // 选中即把 @它 带进输入框
+    inp.focus();
+  }
+});
 document.getElementById("endbtn").addEventListener("click", function() {
   fetch("/api/room/" + roomId + "/message", {
     method: "POST",
@@ -488,7 +532,7 @@ document.getElementById("endbtn").addEventListener("click", function() {
 });
 
 init();
-setInterval(poll, 5000);
+setInterval(poll, 3000);
 </script>
 </body>
 </html>
