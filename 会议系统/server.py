@@ -5,7 +5,7 @@
 - All data in memory (lost on restart)
 - Rooms, members (with seq_num), messages (with seq), phase
 - @mention support: @uid in content -> mentions field
-- Phase switch: only via "/" prefix commands (/开始提问 /出方案 /互相评审 /结束会议)
+- Phase switch: only via "/" prefix commands (/开始提问 /出方案 /互相评审); 结束会议 via END_KEYWORDS (#结束会议)
 """
 import os
 import re
@@ -44,17 +44,16 @@ PHASE_COMMANDS = {
     "asking":     "/开始提问",
     "planning":   "/出方案",
     "reviewing":  "/互相评审",
-    "done":       "/结束会议",
 }
 COMMAND_TO_PHASE = {v: k for k, v in PHASE_COMMANDS.items()}
 
 # 上线状态：超过该秒数无任何活动(发/收)即判离线（对应 AC-6）
 ONLINE_TIMEOUT = 30
-# 结束会议关键词（可配置，满足 A3）：无斜杠的纯文本也能结束（对应 AC-3 双触发）
-END_KEYWORDS = {"结束会议"}
+# 结束会议关键词（固定，对应 AC-3 双触发）：阶段1 唯一结束文本 = "#结束会议"（5字符精确）
+END_KEYWORDS = {"#结束会议"}
 
 # ---------------------------------------------------------------- mention parsing
-MENTION_RE = re.compile(r'@([\w-]+)')
+MENTION_RE = re.compile(r'@([^\s@]+)')  # 放宽：可解析中文名(老板)与ASCII名(OpenClaw)
 
 
 def parse_mentions(content):
@@ -347,8 +346,9 @@ var lastPhase = "waiting";
 var selectedAgent = "";  // 下拉框选中的 agent（选中即相当于 @它）
 
 function init() {
-  myName = (prompt("请输入你的名字：", "用户" + Math.floor(Math.random() * 1000)) || "匿名").trim();
-  if (myName === "老板") myUid = "boss";  // 老板输入"老板"即获得 boss 身份与提示
+  // 老板身份自动登录，无需输入名字（网页端仅老板使用）
+  myUid = "boss";
+  myName = "老板";
   fetch("/api/room/" + roomId + "/join", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -527,7 +527,7 @@ document.getElementById("endbtn").addEventListener("click", function() {
   fetch("/api/room/" + roomId + "/message", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({uid: myUid, type: "text", content: "/结束会议"})
+    body: JSON.stringify({uid: myUid, type: "text", content: "#结束会议"})
   }).catch(function() {});
 });
 
