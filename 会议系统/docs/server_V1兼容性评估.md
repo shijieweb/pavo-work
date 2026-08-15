@@ -4,6 +4,7 @@
 > 评估基准：`会议系统/docs/阶段1_需求简报.md` 的 AC-1 ~ AC-7
 > 评估方法：① 通读源码 ② 实弹 smoke test（系统 Python 3.14 + Flask 3.0，`app.test_client()` 实测路由）
 > 日期：2026-08-16
+> **实施状态：补丁 A+B 已于 2026-08-16 落地，实弹 smoke test 全绿（见 §六）。**
 
 ---
 
@@ -63,6 +64,17 @@
 - **不用重写、不用换框架、不用加 WebSocket**：老板定的"通用 HTTP"方向与原 server.py 天然一致。
 - 阶段1 实际开发量 = 在 `server.py` 打 2 处小补丁（上线状态、结束触发）+ 网页加按钮/状态点，约 40~50 行。
 - 另有 `agent_client.py` / `boss_driver.py` / `agent_a.py` / `agent_b.py` / `*.ps1` / `msgs*.json` 为原团队**演示与诊断脚本**，阶段1 不必依赖；正式接入由外部工具照新 `agent_skill.md` 直连。
+
+---
+
+## 六、实施记录（补丁 A+B 已落地 · 2026-08-16）
+- **补丁 A（AC-6）**：成员加 `last_seen`；新增 `ONLINE_TIMEOUT=30`；`public_members` 返回 `online` 字段；`GET /messages?uid=` 心跳刷新；网页成员列表渲染绿/灰点，每次轮询刷新。
+- **补丁 B（AC-3）**：网页加「结束会议」按钮（POST `/结束会议`）；`/message` 增加对可配关键词 `END_KEYWORDS={"结束会议"}` 的匹配（无斜杠也能结束）；phase=done 时插入 `type="system"` 停止信号消息。
+- **实弹验证（Flask 3.0 test_client）**：
+  - 刚 join 两人均 `online=true`；模拟静默 999s 后 `online=false`（离线判定 ✅）；心跳轮询后 `online=true`（✅）。
+  - 文本 `结束会议`（无斜杠）→ `phase=done` 且存在停止信号消息（✅）；`/结束会议` 斜杠路径仍 `done`（✅）。
+  - 服务网页 `/` 含 `id="endbtn"`、`.dot.online/.dot.offline` 样式、每次轮询刷新侧栏（✅）。
+- 结论：**AC-1 ~ AC-7 现已 100% 覆盖**，server.py 可支撑阶段1 上线联调（先接 openclaw）。
 
 ---
 
