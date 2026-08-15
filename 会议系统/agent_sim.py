@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # 模拟外部 agent (openclaw) 经 agent_skill.md 的通用 HTTP 协议接入会议系统中转服务。
 # 行为（严格照 agent_skill.md）：
-#   - 加入房间 -> 每 3 秒轮询(带 uid 心跳) -> 收到 @/直接消息即回复 -> 收到结束会议/phase=done 即停止。
+#   - 加入房间 -> 每 3 秒轮询(带 uid 心跳) -> 收到 @/直接消息即回复 -> 收到结束会议/phase=done 即停止回复（保留连接）。
+#   - 会议被重置回 waiting 后自动恢复回复（让 P1-1 重置功能端到端可用，无需重启 agent）。
 #   - 回复必须基于用户消息内容，且单条 ≤ 100 字（含 @提及前缀，超出截断）。
 # 说明：本脚本用规则化应答模拟一个接入 agent；真实 openclaw 会用它自己的 LLM 生成回复。
 import json, re, time, urllib.request, urllib.error
@@ -79,7 +80,8 @@ def main():
 
     seq = j.get("seq", 0)
     processed = set()
-    print("[sim] entering poll loop (3s), 等到 结束会议 才停")
+    paused = False
+    print("[sim] entering poll loop (3s); 结束会议后停止回复，会议重置后可自动恢复")
     while True:
         try:
             snap = poll(seq)
@@ -87,9 +89,20 @@ def main():
                 time.sleep(3)
                 continue
             seq = snap.get("seq", seq)
-            if snap.get("phase") == "done":
-                print("[sim] 检测到 phase=done，收到结束信号，停止轮询")
-                break
+            phase = snap.get("phase")
+            if phase == "done":
+                if not paused:
+                    paused = True
+                    print("[sim] phase=done，已停止回复（保留连接，等待会议重置恢复）")
+                time.sleep(3)
+                continue
+            if paused:
+                # 检测到会议被重置（回到 waiting），恢复回复
+                paused = False
+                seq = 0
+                processed.clear()
+                print("[sim] phase=waiting，会议已重置，恢复回复")
+                send("@boss 会议已重置，我还在，可以继续聊。")
             for m in snap.get("messages", []):
                 s = m.get("seq")
                 if s in processed:

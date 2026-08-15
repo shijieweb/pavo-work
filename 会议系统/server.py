@@ -276,6 +276,19 @@ def get_doc(room_id, doc_id):
     return send_from_directory(doc_dir, doc_id, mimetype="text/markdown; charset=utf-8")
 
 
+@app.route("/api/room/<room_id>/reset", methods=["POST"])
+def reset_room(room_id):
+    """重新开始会议（P1-1）：清空消息、phase 回 waiting、seq 归零。
+    保留 members（已连接的 agent 不断连，重置后 idle-resume 即可继续），
+    仅老板有权调用（阶段1 本机/内网无鉴权，按 G4 接受）。"""
+    room = get_room(room_id)
+    with rooms_lock:
+        room["messages"] = []
+        room["seq"] = 0
+        room["phase"] = "waiting"
+    return jsonify({"ok": True, "seq": 0, "members": public_members(room), "phase": "waiting"})
+
+
 # ---------------------------------------------------------------- chat html
 CHAT_HTML = r"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -313,6 +326,9 @@ CHAT_HTML = r"""<!DOCTYPE html>
   #send:hover { background: #2f35c4; }
   #endbtn { padding: 10px 18px; background: #ff6b6b; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
   #endbtn:hover { background: #e74c3c; }
+  #resetbtn { padding: 10px 18px; background: #57606f; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  #resetbtn:hover { background: #2f3542; }
+  #input:disabled, #send:disabled, #endbtn:disabled, #agent-select:disabled { opacity: .5; cursor: not-allowed; }
   #member-list li .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
   #member-list li .dot.online { background: #2ecc71; }
   #member-list li .dot.offline { background: #95a5a6; }
@@ -334,6 +350,7 @@ CHAT_HTML = r"""<!DOCTYPE html>
       <input id="input" placeholder="输入消息，回车发送..." autocomplete="off">
       <button id="send">发送</button>
       <button id="endbtn">结束会议</button>
+      <button id="resetbtn">重新开会</button>
     </div>
   </div>
 
@@ -346,7 +363,8 @@ var lastPhase = "waiting";
 var selectedAgent = "";  // 下拉框选中的 agent（选中即相当于 @它）
 
 function init() {
-  // 老板身份自动登录，无需输入名字（网页端仅老板使用）
+  // 老板身份由前端硬编码，服务端不校验（G4 本机/内网无鉴权下可接受；
+  // 风险：任意客户端自报 uid=boss 即获老板权。未来应服务端签发 token。）
   myUid = "boss";
   myName = "老板";
   fetch("/api/room/" + roomId + "/join", {
@@ -478,6 +496,14 @@ function updateHint() {
   }
 }
 
+function setInputsDisabled(dis) {
+  // 会议结束后禁用输入/发送/结束/下拉框（重新开会按钮保持可用）
+  ["input", "send", "endbtn", "agent-select"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.disabled = dis; }
+  });
+}
+
 function poll() {
   fetch("/api/room/" + roomId + "/messages?since=" + seq + "&uid=" + encodeURIComponent(myUid))
     .then(function(r) { return r.json(); })
@@ -489,6 +515,7 @@ function poll() {
       seq = data.seq;
       lastPhase = data.phase;
       renderSidebar(data.members, data.phase);  // 每次轮询刷新在线状态点
+      setInputsDisabled(data.phase === "done");  // 结束后禁用输入
       updateHint();
     }).catch(function() {});
 }
@@ -528,6 +555,30 @@ document.getElementById("endbtn").addEventListener("click", function() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({uid: myUid, type: "text", content: "#结束会议"})
+  }).catch(function() {});
+});
+document.getElementById("resetbtn").addEventListener("click", function() {
+  if (!confirm("确定重新开会？将清空当前会议的全部消息记录。")) return;
+  fetch("/api/room/" + roomId + "/reset", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: "{}"
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    allMsgs = [];
+    document.getElementById("messages").innerHTML = "";
+    seq = 0;
+    lastPhase = "waiting";
+    // 以老板身份重新加入（members 未被清空，重连刷新即可）
+    return fetch("/api/room/" + roomId + "/join", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({uid: myUid, name: myName})
+    });
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    renderSidebar(data.members, data.phase);
+    renderMessages(data.messages);
+    setInputsDisabled(false);
+    updateHint();
   }).catch(function() {});
 });
 
