@@ -47,20 +47,18 @@ def send(content, reply_to=None):
 
 
 def mentioned_me(msg):
-    # 被 @我 或 @所有人，或消息里没有任何 @（单 agent 房间默认回）
+    # 仅当被 @我 或 @所有人 时才回复（阶段1 规则：必须识别@名字，带自己才回）
     mentions = msg.get("mentions") or []
-    if UID in mentions or NAME in mentions or "@所有人" in mentions:
+    if "@所有人" in mentions:
         return True
-    if not mentions and "@" not in (msg.get("content") or ""):
-        return True
-    return False
+    return UID in mentions or NAME in mentions
 
 
 def make_reply(msg):
     # 基于用户消息生成回复；硬性 ≤ 100 字（含 @前缀），send() 再兜底截断一次
     text = (msg.get("content") or "").strip()
     # 去掉开头的 @某人 前缀，避免把 "@OpenClaw" 也复述进回复（对话更自然）
-    text = re.sub(r'^@[\w-]+\s*', '', text).strip()
+    text = re.sub(r'^@[^\s@]+\s*', '', text).strip()
     boss = msg.get("from", {}).get("name", "老板")
     if not text:
         return None
@@ -68,7 +66,7 @@ def make_reply(msg):
     if "?" in text or "？" in text:
         reply = f"@{boss} 收到你的问题：「{quoted}」。我理解为你在确认可行性，补范围/验收我出方案。"
     else:
-        reply = f"@{boss} 收到：「{quoted}」。需要我先出哪块初步想法？或发「结束会议」我即停。"
+        reply = f"@{boss} 收到：「{quoted}」。需要我先出哪块初步想法？或发 `#结束会议` 我即停。"
     return reply[:100]
 
 
@@ -77,7 +75,7 @@ def main():
     j = join()
     members = [m["name"] for m in j.get("members", [])]
     print(f"[sim] join ok={j.get('ok')} members={members}")
-    send("@boss 你好，我是接入的 agent（OpenClaw）。从网页下拉框选我或直接 @我 即可聊天；发「结束会议」我即停止。")
+    send("@boss 你好，我是接入的 agent（OpenClaw）。从网页下拉框选我或直接 @我 即可聊天；发 `#结束会议` 我即停止。")
 
     seq = j.get("seq", 0)
     processed = set()
