@@ -21,7 +21,7 @@ AGNES 轻量代理（同源本地服务器 + 资产库视频拼接）
 运行：python agnes_proxy.py  （默认 8787 端口）
 使用：浏览器打开 http://localhost:8787/ 即可（页面内所有请求同源转发）
 """
-import os, sys, json, re, time, shutil, subprocess, tempfile, urllib.request, urllib.error, urllib.parse
+import os, sys, json, re, time, shutil, subprocess, tempfile, csv, urllib.request, urllib.error, urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
 
 API_ROOT = "https://apihub.agnes-ai.cn"
@@ -35,6 +35,14 @@ SOUNDSFREE_FILE = os.path.join(SCRIPT_DIR, "soundsfree_home.html")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
 # batch 训练采纳面板（T-0815）：training_panel.html 整目录静态托管在 /batch（外网经 8787 可达）
 BATCH_PANEL_DIR = r"C:\Users\67972\projects\short-drama-training"
+
+# T-19: 资产路由批次白名单 — <batch> 段 -> 对应 out 目录 (防任意目录穿越 + 支持多批次)
+BATCH_DIRS = {
+    "batch-001": os.path.join(BATCH_PANEL_DIR, "01_配方训练", "实验批次", "batch-001", "out"),
+    "batch-002": os.path.join(BATCH_PANEL_DIR, "01_配方训练", "实验批次", "batch-002", "out"),
+}
+# 角色参考图目录 (各批次共用, 经 /batch/__asset__/<batch>/ref/<file> 定位)
+BATCH_REF_DIR = os.path.join(BATCH_PANEL_DIR, "01_配方训练", "角色参考图")
 
 # ===== 统一门户：8787 作为唯一入口，工作台(8777)整段反向代理过来 =====
 # 两个台的路由集经逐条核对【零冲突】，故无需改动任何前端请求路径即可共存：
@@ -397,6 +405,9 @@ class H(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if self._route_dispatch(path, "POST", data):
             return
+        if path == "/batch/api/correction":
+            self._serve_correction(data)
+            return
         if path == "/api/hub/start-studio":
             self._send(200, json.dumps(_launch_studio(), ensure_ascii=False))
             return
@@ -703,19 +714,24 @@ class H(BaseHTTPRequestHandler):
             self._send(500, json.dumps({"error": str(e)}))
 
     def _serve_batch_asset(self, path):
-        """T-18: 纯 ASCII 静态资产路由, 绕过中文目录 URL 被外网隧道/代理层拒载的问题.
+        """T-18/T-19: 纯 ASCII 静态资产路由, 绕过中文目录 URL 被外网隧道/代理层拒载的问题.
 
-        路径格式: /batch/__asset__/<kind>/<name>
-          - kind=cand -> BATCH_PANEL_DIR/01_配方训练/实验批次/batch-001/out/<name>  (候选图)
-          - kind=ref  -> BATCH_PANEL_DIR/01_配方训练/角色参考图/<name>            (角色参考图)
-        返回对应磁盘 PNG (HTTP 200 image/png); 路径含 .. 或 / 等穿越字符 -> 403;
-        kind 非白名单 -> 403; 文件不存在 -> 404; 非 .png -> 403。
+        路径格式: /batch/__asset__/<batch>/<kind>/<name>
+          - batch 段 -> BATCH_DIRS 白名单映射到对应 out 目录 (cand) 或共用 ref 目录 (ref)
+          - kind=cand -> BATCH_DIRS[batch]/<name>  (候选图)
+          - kind=ref  -> BATCH_REF_DIR/<name>        (角色参考图, 各批次共用)
+        返回对应磁盘 PNG (HTTP 200 image/png); 段数不对 / batch 非白名单 / 路径含 ..
+        或 / 等穿越字符 / kind 非白名单 / 文件不存在 / 非 .png -> 拒绝。
         """
         rel = path[len("/batch/__asset__/"):]
-        if "/" not in rel:
+        parts = rel.split("/")
+        if len(parts) != 3:
             self._send(403, json.dumps({"error": "forbidden"}))
             return
-        kind, rest = rel.split("/", 1)
+        batch_id, kind, rest = parts
+        if batch_id not in BATCH_DIRS:
+            self._send(403, json.dumps({"error": "forbidden batch: " + batch_id}))
+            return
         name = os.path.basename(rest)  # 拒绝含 / 或 .. 的穿越字符
         if name != rest or ".." in rest or "/" in rest:
             self._send(403, json.dumps({"error": "forbidden"}))
@@ -724,11 +740,9 @@ class H(BaseHTTPRequestHandler):
             self._send(403, json.dumps({"error": "forbidden"}))
             return
         if kind == "cand":
-            full = os.path.normpath(os.path.join(
-                BATCH_PANEL_DIR, "01_配方训练", "实验批次", "batch-001", "out", name))
+            full = os.path.normpath(os.path.join(BATCH_DIRS[batch_id], name))
         else:
-            full = os.path.normpath(os.path.join(
-                BATCH_PANEL_DIR, "01_配方训练", "角色参考图", name))
+            full = os.path.normpath(os.path.join(BATCH_REF_DIR, name))
         if not os.path.isfile(full):
             self._send(404, json.dumps({"error": "not found: " + rel}))
             return
@@ -741,6 +755,112 @@ class H(BaseHTTPRequestHandler):
             self._send(200, data, "image/png")
         except Exception as e:
             self._send(500, json.dumps({"error": str(e)}))
+
+    def _update_writing_purpose(self, csv_path, writing, note, next_prompt):
+        """更新 writing_purpose.csv 中指定写法号行的「提示词修正意见 / 修正后prompt」。
+
+        保留 UTF-8 BOM、全部列、行顺序与其它行内容; 原子写盘 (先写 .tmp 再 os.replace)。
+        写法号不在表中时追加一行 (补齐列)。返回 True 成功 / False 失败。
+        """
+        if not os.path.isfile(csv_path):
+            return False
+        try:
+            rows = []
+            with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                if not fieldnames:
+                    return False
+                # 确保两列存在 (AC-1.1): 缺失则追加到列尾
+                fn = list(fieldnames)
+                for col in ("提示词修正意见", "修正后prompt"):
+                    if col not in fn:
+                        fn.append(col)
+                fieldnames = fn
+                for r in reader:
+                    rows.append(r)
+            wkey = str(int(writing))
+            found = False
+            for r in rows:
+                raw = (r.get("写法号") or "").strip()
+                norm = raw
+                try:
+                    norm = str(int(raw))
+                except (ValueError, TypeError):
+                    norm = raw
+                if norm == wkey:
+                    r["提示词修正意见"] = note
+                    r["修正后prompt"] = next_prompt
+                    found = True
+                    break
+            if not found:
+                new_row = {c: "" for c in fieldnames}
+                new_row["写法号"] = wkey
+                new_row["提示词修正意见"] = note
+                new_row["修正后prompt"] = next_prompt
+                rows.append(new_row)
+            tmp = csv_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8-sig", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for r in rows:
+                    writer.writerow({c: (r.get(c) or "") for c in fieldnames})
+            os.replace(tmp, csv_path)
+            return True
+        except Exception as e:
+            print("[correction] 写回 CSV 失败:", e)
+            return False
+
+    def _serve_correction(self, data):
+        """T-19: POST /batch/api/correction 接收 {writing, note, next_prompt[, batch]}。
+
+        data 为 do_POST 已读取的请求体字节 (避免重复读取 rfile 导致挂起)。
+        校验 writing∈1..27、note/next_prompt 为字符串且不含路径穿越/超长,
+        然后写回对应批次 writing_purpose.csv。成功 200 JSON, 非法 400, 写入失败 403。
+        """
+        try:
+            body = json.loads(data.decode("utf-8")) if data else {}
+        except Exception as e:
+            self._send(400, json.dumps({"ok": False, "error": "bad json: " + str(e)}))
+            return
+        if not isinstance(body, dict):
+            self._send(400, json.dumps({"ok": False, "error": "body 必须是对象"}))
+            return
+        writing = body.get("writing")
+        note = body.get("note", "")
+        next_prompt = body.get("next_prompt", "")
+        batch = body.get("batch", "batch-001")
+        # writing 必须为 1..27 整数
+        try:
+            writing = int(writing)
+        except (TypeError, ValueError):
+            self._send(400, json.dumps({"ok": False, "error": "writing 必须为 1..27 整数"}))
+            return
+        if writing < 1 or writing > 27:
+            self._send(400, json.dumps({"ok": False, "error": "writing 超出范围 1..27"}))
+            return
+        if not isinstance(note, str) or not isinstance(next_prompt, str):
+            self._send(400, json.dumps({"ok": False, "error": "note/next_prompt 必须为字符串"}))
+            return
+        # next_prompt 仅作文本落盘, 绝不拼路径: 禁路径穿越字符 / 超长
+        if (len(next_prompt) > 20000 or "\x00" in next_prompt
+                or "../" in next_prompt or "..\\" in next_prompt
+                or next_prompt.startswith("..")):
+            self._send(400, json.dumps({"ok": False, "error": "next_prompt 含非法字符或超长"}))
+            return
+        if len(note) > 20000 or "\x00" in note:
+            self._send(400, json.dumps({"ok": False, "error": "note 含非法字符或超长"}))
+            return
+        # batch 白名单
+        if batch not in BATCH_DIRS:
+            self._send(400, json.dumps({"ok": False, "error": "未知批次: " + str(batch)}))
+            return
+        csv_path = os.path.join(BATCH_DIRS[batch], "writing_purpose.csv")
+        ok = self._update_writing_purpose(csv_path, writing, note, next_prompt)
+        if ok:
+            self._send(200, json.dumps({"ok": True, "writing": writing, "batch": batch}))
+        else:
+            self._send(403, json.dumps({"ok": False, "error": "写入 writing_purpose.csv 失败"}))
 
     def _serve_train_video(self, rel):
         """训练实验视频（experiments 目录内 .mp4，防止目录穿越）。"""
