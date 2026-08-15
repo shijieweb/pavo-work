@@ -364,7 +364,10 @@ class H(BaseHTTPRequestHandler):
             self._serve_html(SOUNDSFREE_FILE)   # 音效台（T-12：SoundsFree 本地静态页，_route_dispatch 之前，避免被反代吞掉）
             return
         if path.startswith("/batch"):
-            self._serve_batch(path)             # batch 训练采纳面板（T-0815）：整目录静态托管，外网经 8787 可达
+            if path.startswith("/batch/__asset__/"):
+                self._serve_batch_asset(path)   # T-18: 纯 ASCII 资产路由 (绕过中文目录 URL 被外网拒载)
+            else:
+                self._serve_batch(path)         # batch 训练采纳面板（T-0815）：整目录静态托管，外网经 8787 可达
             return
         if path == "/training/api/experiments":
             self._train_experiments()
@@ -696,6 +699,46 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(data)
+        except Exception as e:
+            self._send(500, json.dumps({"error": str(e)}))
+
+    def _serve_batch_asset(self, path):
+        """T-18: 纯 ASCII 静态资产路由, 绕过中文目录 URL 被外网隧道/代理层拒载的问题.
+
+        路径格式: /batch/__asset__/<kind>/<name>
+          - kind=cand -> BATCH_PANEL_DIR/01_配方训练/实验批次/batch-001/out/<name>  (候选图)
+          - kind=ref  -> BATCH_PANEL_DIR/01_配方训练/角色参考图/<name>            (角色参考图)
+        返回对应磁盘 PNG (HTTP 200 image/png); 路径含 .. 或 / 等穿越字符 -> 403;
+        kind 非白名单 -> 403; 文件不存在 -> 404; 非 .png -> 403。
+        """
+        rel = path[len("/batch/__asset__/"):]
+        if "/" not in rel:
+            self._send(403, json.dumps({"error": "forbidden"}))
+            return
+        kind, rest = rel.split("/", 1)
+        name = os.path.basename(rest)  # 拒绝含 / 或 .. 的穿越字符
+        if name != rest or ".." in rest or "/" in rest:
+            self._send(403, json.dumps({"error": "forbidden"}))
+            return
+        if kind not in ("cand", "ref"):
+            self._send(403, json.dumps({"error": "forbidden"}))
+            return
+        if kind == "cand":
+            full = os.path.normpath(os.path.join(
+                BATCH_PANEL_DIR, "01_配方训练", "实验批次", "batch-001", "out", name))
+        else:
+            full = os.path.normpath(os.path.join(
+                BATCH_PANEL_DIR, "01_配方训练", "角色参考图", name))
+        if not os.path.isfile(full):
+            self._send(404, json.dumps({"error": "not found: " + rel}))
+            return
+        if os.path.splitext(full)[1].lower() != ".png":
+            self._send(403, json.dumps({"error": "forbidden"}))
+            return
+        try:
+            with open(full, "rb") as f:
+                data = f.read()
+            self._send(200, data, "image/png")
         except Exception as e:
             self._send(500, json.dumps({"error": str(e)}))
 
