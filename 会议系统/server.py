@@ -48,6 +48,11 @@ PHASE_COMMANDS = {
 }
 COMMAND_TO_PHASE = {v: k for k, v in PHASE_COMMANDS.items()}
 
+# 上线状态：超过该秒数无任何活动(发/收)即判离线（对应 AC-6）
+ONLINE_TIMEOUT = 30
+# 结束会议关键词（可配置，满足 A3）：无斜杠的纯文本也能结束（对应 AC-3 双触发）
+END_KEYWORDS = {"结束会议"}
+
 # ---------------------------------------------------------------- mention parsing
 MENTION_RE = re.compile(r'@([\w-]+)')
 
@@ -91,8 +96,14 @@ def members_list(room):
 
 
 def public_members(room):
+    now = time.time()
     return [
-        {"uid": m["uid"], "name": m["name"], "seq_num": m["seq_num"]}
+        {
+            "uid": m["uid"],
+            "name": m["name"],
+            "seq_num": m["seq_num"],
+            "online": (now - m["last_seen"]) < ONLINE_TIMEOUT,
+        }
         for m in members_list(room)
     ]
 
@@ -142,6 +153,7 @@ def join_room(room_id):
                 "name": name,
                 "seq_num": room["next_seq_num"],
                 "joined_at": time.time(),
+                "last_seen": time.time(),
             }
             room["next_seq_num"] += 1
             room["members"][uid] = member
@@ -165,6 +177,12 @@ def join_room(room_id):
 @app.route("/api/room/<room_id>/messages", methods=["GET"])
 def get_messages(room_id):
     since = request.args.get("since", 0, type=int)
+    uid = request.args.get("uid", type=str)
+    if uid:
+        room = get_room(room_id)
+        with rooms_lock:
+            if uid in room["members"]:
+                room["members"][uid]["last_seen"] = time.time()  # 轮询即心跳
     return jsonify(room_snapshot(room_id, since))
 
 
@@ -181,13 +199,15 @@ def send_message(room_id):
         member = room["members"].get(uid)
         if member is None:
             return jsonify({"ok": False, "error": "uid not joined"}), 400
+        member["last_seen"] = time.time()  # 刷新在线心跳
 
         msg_type = str(data.get("type") or "text").strip() or "text"
         reply_to = data.get("reply_to")
 
-        # Phase switch: ONLY exact "/" prefix commands trigger phase change.
-        # Everything else (semantic intent, casual speech, etc.) is ignored by the server.
+        # Phase switch: exact "/" prefix commands, or configurable end keywords (AC-3 双触发).
         next_phase = COMMAND_TO_PHASE.get(content)
+        if next_phase is None and content.strip() in END_KEYWORDS:
+            next_phase = "done"
         if next_phase is not None:
             room["phase"] = next_phase
 
@@ -196,6 +216,14 @@ def send_message(room_id):
             reply_to=reply_to, doc_url=data.get("doc_url"),
         )
         add_message(room_id, msg)
+
+        # 会议结束时插入停止信号消息，明确通知所有接入 agent 停止轮询(R3 兜底)
+        if next_phase == "done":
+            add_message(
+                room_id,
+                build_msg(room, "system", {"name": "系统", "seq_num": 0}, "system",
+                          "会议已结束，所有接入的 agent 请停止轮询并退出。"),
+            )
 
     return jsonify({"ok": True, "seq": room["seq"], "message": msg})
 
@@ -282,6 +310,11 @@ CHAT_HTML = r"""<!DOCTYPE html>
   #input:focus { border-color: #3742fa; }
   #send { padding: 10px 22px; background: #3742fa; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
   #send:hover { background: #2f35c4; }
+  #endbtn { padding: 10px 18px; background: #ff6b6b; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  #endbtn:hover { background: #e74c3c; }
+  #member-list li .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  #member-list li .dot.online { background: #2ecc71; }
+  #member-list li .dot.offline { background: #95a5a6; }
 #hint { padding: 8px 20px; background: #fffbe6; border-bottom: 1px solid #ffe58f; font-size: 13px; color: #ad6800; min-height: 18px; }
 </style>
 </head>
@@ -298,6 +331,7 @@ CHAT_HTML = r"""<!DOCTYPE html>
     <div id="inputbar">
       <input id="input" placeholder="输入消息，回车发送..." autocomplete="off">
       <button id="send">发送</button>
+      <button id="endbtn">结束会议</button>
     </div>
   </div>
 
@@ -337,7 +371,10 @@ function renderSidebar(members, phase) {
   for (var i = 0; i < members.length; i++) {
     var m = members[i];
     var li = document.createElement("li");
-    li.textContent = m.seq_num + ". " + m.name;
+    var dot = document.createElement("span");
+    dot.className = "dot " + (m.online ? "online" : "offline");
+    li.appendChild(dot);
+    li.appendChild(document.createTextNode(m.seq_num + ". " + m.name));
     if (m.uid === myUid) li.classList.add("me");
     ul.appendChild(li);
   }
@@ -415,7 +452,7 @@ function updateHint() {
 }
 
 function poll() {
-  fetch("/api/room/" + roomId + "/messages?since=" + seq)
+  fetch("/api/room/" + roomId + "/messages?since=" + seq + "&uid=" + encodeURIComponent(myUid))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.messages && data.messages.length) {
@@ -423,10 +460,8 @@ function poll() {
         renderMessages(data.messages);
       }
       seq = data.seq;
-      if (data.phase !== lastPhase) {
-        lastPhase = data.phase;
-        renderSidebar(data.members, data.phase);
-      }
+      lastPhase = data.phase;
+      renderSidebar(data.members, data.phase);  // 每次轮询刷新在线状态点
       updateHint();
     }).catch(function() {});
 }
@@ -444,6 +479,13 @@ function sendMsg() {
 
 document.getElementById("send").addEventListener("click", sendMsg);
 document.getElementById("input").addEventListener("keydown", function(e) { if (e.key === "Enter") sendMsg(); });
+document.getElementById("endbtn").addEventListener("click", function() {
+  fetch("/api/room/" + roomId + "/message", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({uid: myUid, type: "text", content: "/结束会议"})
+  }).catch(function() {});
+});
 
 init();
 setInterval(poll, 5000);
