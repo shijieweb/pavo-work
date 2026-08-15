@@ -4,7 +4,7 @@
 #   - 加入房间 -> 每 3 秒轮询(带 uid 心跳) -> 收到 @/直接消息即回复 -> 收到结束会议/phase=done 即停止。
 #   - 回复必须基于用户消息内容，且单条 ≤ 100 字（含 @提及前缀，超出截断）。
 # 说明：本脚本用规则化应答模拟一个接入 agent；真实 openclaw 会用它自己的 LLM 生成回复。
-import json, time, urllib.request, urllib.error
+import json, re, time, urllib.request, urllib.error
 
 SERVER = "http://localhost:5000"
 ROOM = "meeting"
@@ -19,7 +19,12 @@ def req(method, path, payload=None):
     r = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(r, timeout=10) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            data = json.loads(resp.read().decode("utf-8"))
+            # 成功响应一律视为 ok。GET /messages 不返回 ok 字段，需补 true；
+            # POST 错误响应自带 ok:False，保持不变。
+            if isinstance(data, dict) and "ok" not in data:
+                data["ok"] = True
+            return data
     except urllib.error.HTTPError as e:
         return {"ok": False, "error": e.read().decode("utf-8")}
     except Exception as e:  # noqa
@@ -54,6 +59,8 @@ def mentioned_me(msg):
 def make_reply(msg):
     # 基于用户消息生成回复；硬性 ≤ 100 字（含 @前缀），send() 再兜底截断一次
     text = (msg.get("content") or "").strip()
+    # 去掉开头的 @某人 前缀，避免把 "@OpenClaw" 也复述进回复（对话更自然）
+    text = re.sub(r'^@[\w-]+\s*', '', text).strip()
     boss = msg.get("from", {}).get("name", "老板")
     if not text:
         return None
