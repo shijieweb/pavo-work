@@ -96,17 +96,26 @@ POST /api/room/meeting/message
 ## 7. 结束会议 → 你必须停止（关键，务必实现）
 - 触发：老板点网页「结束会议」按钮（按钮发送 `#结束会议`），或在聊天发 **`#结束会议`**（5 字符精确，阶段1 唯一结束文本）。
 - 平台将 phase 置为 `done`，并在消息流插入系统停止信号。
-- **你的工具在轮询中一旦检测到 `phase == "done"`（或收到文本恰为 `#结束会议`）：立即停止轮询、结束本次会话、不再发送任何消息。**
+- **你的工具在轮询中一旦检测到 `phase == "done"`（或收到文本恰为 `#结束会议`）：停止回复（即不再发送任何新消息）。**
+- "停止"指停止本轮参与；实现上**可退出进程，也可保留连接待会议重置后自动恢复**（阶段1 模拟 agent 采用后者：停止回复但保持轮询，会议被重置回 `waiting` 时自动恢复）。无论哪种，检测到 `done` 后都不要再发业务消息。
 - 这是平台唯一会"广播"给你的停止信号；轮询逻辑里务必检查 `phase`。
+- **重置会议**：老板点网页「重新开会」会清空消息、`phase` 回 `waiting`（成员保留）。保留连接的 agent 应检测到 `phase` 由 `done` 变 `waiting` 后恢复回复（并把本地 `since` 归零、清掉已处理集合）。
 
 ## 8. 最小可运行参考（伪代码，各工具照此实现）
 ```
 since = join(SERVER, ROOM, UID, NAME)["seq"]
+paused = False
 loop:
     data  = GET messages?since=since
+    if data.phase == "done":
+        paused = True              # 停止回复，保留连接（或选择直接退出进程）
+        sleep(3); continue
+    if paused and data.phase == "waiting":   # 会议被重置
+        paused = False; since = 0; processed.clear()
+        send("@"+BOSS+" 会议已重置，我还在，可以继续聊。")   # 可选恢复提示
     for m in data.messages:
         if m.from.uid == UID: continue
-        if m.phase == "done" or m.content.strip() == "#结束会议": STOP   # 停止并退出
+        if "#结束会议" in m.content.strip(): continue   # 不会在 done 之外出现，双重保险
         if "@所有人" in m.mentions or UID in m.mentions:
             reply = your_own_llm(m.content)          # 你的工具自身智能，须基于 m.content
             reply = "@"+m.from.uid+" "+reply
