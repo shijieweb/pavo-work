@@ -5,6 +5,7 @@
 """
 import json
 import os
+import re
 import tempfile
 import threading
 import time
@@ -78,3 +79,49 @@ def update_json_atomic(name, default, mutator):
         result = mutator(data)
         _write_nolock(name, data)
         return result
+
+
+# ---------------------------------------------------------------------------
+# per-agent 已读集合（未读下沉：判断逻辑服务端做，客户端只透传）
+# 落盘 data/agent_read_<X>.json，内容为已读消息 id 列表。
+# ---------------------------------------------------------------------------
+
+def agent_read_set_file(agent_name: str) -> str:
+    """返回某 agent 的已读集合落盘文件名：data/agent_read_<X>.json。
+
+    X 为对文件名非法/空白字符做了安全转义的 agent 名（中文名保留，仅替换 \\/:*?\"<>| 与空白）。
+    """
+    safe = re.sub(r'[\\/:*?"<>|\s]+', '_', str(agent_name))
+    return "agent_read_{0}.json".format(safe)
+
+
+def load_agent_read_set(agent_name: str) -> set:
+    """读取某 agent 已读消息 id 集合；文件不存在或非法返回空集。"""
+    return set(read_json(agent_read_set_file(agent_name), []))
+
+
+def agent_read_set_exists(agent_name: str) -> bool:
+    """该 agent 的已读集合文件是否已落盘（用于判断是否需要从 reads.json 迁移种子）。"""
+    return os.path.isfile(_path(agent_read_set_file(agent_name)))
+
+
+def save_agent_read_set(agent_name: str, read_set) -> None:
+    """原子写某 agent 的已读消息 id 集合（迁移种子用）。"""
+    write_json(agent_read_set_file(agent_name), sorted(set(read_set)))
+
+
+def mark_agent_read(agent_name: str, message_ids) -> None:
+    """在锁内把若干消息 id 加入该 agent 的已读集合（read-modify-write 原子）。
+
+    用于服务端 pull 后持久化已读，保证后续 pull 不重复返回（去重下沉）。
+    """
+    ids = list(message_ids or [])
+    if not ids:
+        return
+
+    def _mut(local_set):
+        s = set(local_set)
+        s.update(ids)
+        return sorted(s)
+
+    update_json_atomic(agent_read_set_file(agent_name), [], _mut)

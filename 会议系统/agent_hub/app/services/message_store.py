@@ -9,7 +9,16 @@
 """
 import uuid
 
-from .storage import read_json, write_json, now_iso, update_json_atomic
+from .storage import (
+    read_json,
+    write_json,
+    now_iso,
+    update_json_atomic,
+    agent_read_set_file,
+    agent_read_set_exists,
+    save_agent_read_set,
+    mark_agent_read,
+)
 from .agent_store import load_agents, record_pull
 
 
@@ -78,15 +87,48 @@ def send_user_message(content, target_type, target_agent_name=None, client_msg_i
     return msg
 
 
+def _mark_reads_json(agent_name, message_ids):
+    """把指定消息在该 agent 的 read 回执上标记 read_at（供前端 ✓已读 / N/N 展示）。"""
+    if not message_ids:
+        return
+    ids = set(message_ids)
+
+    def _mut(reads):
+        for r in reads:
+            if r["agent_name"] == agent_name and r["message_id"] in ids and r["read_at"] is None:
+                r["read_at"] = now_iso()
+        return reads
+
+    update_json_atomic(READS_FILE, [], _mut)
+
+
 def pull_messages(agent_name):
     """Agent 拉取@自己且未读的消息，并标记为已读。对应方案书 §5.3 pull_messages。
 
-    对 reads.json 的「读-改-写」在 update_json_atomic 锁内完成，满足 §7 T-PULL-05
-    （并发拉取时同一条消息只会被一个 Agent 领取）。
+    未读判断由服务端完成（per-agent 已读集合 agent_read_<X>.json）：
+    - 读入该 agent 已读 id 集合，过滤掉已读 -> 仅剩未读；
+    - 在 update_json_atomic 锁内把本次返回的未读 id 写入已读集合（read-modify-write 原子），
+      满足 §7 T-PULL-05（并发拉取同一条消息只会被一个 Agent 领取）；
+    - 同时更新 reads.json 回执的 read_at，供前端「✓已读 / N/N」展示。
+    客户端只透传结果，不再做 seen.json 去重。
     """
     msgs = load_messages()
+    # 迁移种子：若该 agent 的已读集合文件尚不存在（多为既有 agent 首次接入），
+    # 从 reads.json 取「该 agent 已读过的消息 id」作为初始集合，避免首次 pull 把历史消息全当未读回灌。
+    if not agent_read_set_exists(agent_name):
+        seed = {
+            r["message_id"]
+            for r in load_reads()
+            if r.get("agent_name") == agent_name and r.get("read_at") is not None
+        }
+        save_agent_read_set(agent_name, seed)
 
-    def _mark(reads):
+    read_holder = {}
+
+    def _mut(read_set):
+        # 注意：update_json_atomic 写入的是被原地修改的 read_set（见 storage.update_json_atomic），
+        # 因此这里必须在 read_set 上原地修改，不能只返回新对象。
+        s = set(read_set)
         unread = []
         for msg in msgs:
             if msg["sender_type"] != "user":
@@ -97,16 +139,20 @@ def pull_messages(agent_name):
             )
             if not targeted:
                 continue
-            rec = next(
-                (r for r in reads if r["message_id"] == msg["id"] and r["agent_name"] == agent_name),
-                None,
-            )
-            if rec and rec["read_at"] is None:
-                unread.append(msg)
-                rec["read_at"] = now_iso()
-        return unread
+            if msg["id"] in s:
+                continue
+            unread.append(msg)
+        for m in unread:
+            s.add(m["id"])
+        read_holder["unread"] = unread
+        read_set.clear()
+        read_set.extend(sorted(s))
 
-    unread = update_json_atomic(READS_FILE, [], _mark)
+    update_json_atomic(agent_read_set_file(agent_name), [], _mut)
+    unread = read_holder.get("unread", [])
+    if unread:
+        # 服务端持久化已读：per-agent 集合（已写入）+ reads.json 回执（前端展示）
+        _mark_reads_json(agent_name, [m["id"] for m in unread])
     record_pull(agent_name, len(unread) > 0)  # pull 即心跳：刷新 last_seen + 状态(拉到数据=working / 没拉到=waiting)
     return unread
 
