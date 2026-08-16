@@ -10,7 +10,7 @@
 import uuid
 
 from .storage import read_json, write_json, now_iso, update_json_atomic
-from .agent_store import load_agents
+from .agent_store import load_agents, record_pull
 
 
 def gen_id(prefix="msg"):
@@ -106,7 +106,9 @@ def pull_messages(agent_name):
                 rec["read_at"] = now_iso()
         return unread
 
-    return update_json_atomic(READS_FILE, [], _mark)
+    unread = update_json_atomic(READS_FILE, [], _mark)
+    record_pull(agent_name, len(unread) > 0)  # pull 即心跳：刷新 last_seen + 状态(拉到数据=working / 没拉到=waiting)
+    return unread
 
 
 def submit_reply(agent_name, content, reply_to_message_id=None, client_msg_id=None):
