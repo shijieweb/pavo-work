@@ -69,6 +69,33 @@ async function loadHistory() {
   renderMessages(data.messages);
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function inlineMd(t) {
+  return t.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+function renderMarkdown(src) {
+  const lines = escapeHtml(src).split('\n');
+  const out = [];
+  let inList = false;
+  const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+  for (const raw of lines) {
+    if (/^###\s+/.test(raw)) { closeList(); out.push('<h4>' + inlineMd(raw.replace(/^###\s+/, '')) + '</h4>'); }
+    else if (/^##\s+/.test(raw)) { closeList(); out.push('<h3>' + inlineMd(raw.replace(/^##\s+/, '')) + '</h3>'); }
+    else if (/^#\s+/.test(raw)) { closeList(); out.push('<h3>' + inlineMd(raw.replace(/^#\s+/, '')) + '</h3>'); }
+    else if (/^&gt;\s+/.test(raw)) { closeList(); out.push('<blockquote>' + inlineMd(raw.replace(/^&gt;\s+/, '')) + '</blockquote>'); }
+    else if (/^[-*]\s+/.test(raw)) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push('<li>' + inlineMd(raw.replace(/^[-*]\s+/, '')) + '</li>');
+    }
+    else if (raw.trim() === '') { closeList(); }
+    else { closeList(); out.push('<p>' + inlineMd(raw) + '</p>'); }
+  }
+  closeList();
+  return out.join('');
+}
+
 function renderMessages(messages) {
   const list = document.getElementById('message-list');
   list.innerHTML = '';
@@ -80,7 +107,7 @@ function renderMessages(messages) {
       bubble.textContent = msg.content;
     } else {
       bubble.classList.add('agent');
-      bubble.textContent = `${msg.sender_agent_name}: ${msg.content}`;
+      bubble.innerHTML = '<div class="agent-name">' + escapeHtml(msg.sender_agent_name) + ':</div>' + renderMarkdown(msg.content);
     }
     list.appendChild(bubble);
 
