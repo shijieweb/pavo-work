@@ -10,6 +10,15 @@ body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #
 .message-bubble { max-width: 80%; padding: 10px 14px; border-radius: 16px; word-wrap: break-word; }
 .message-bubble.user { align-self: flex-end; background: #4a90d9; color: white; border-bottom-right-radius: 4px; }
 .message-bubble.agent { align-self: flex-start; background: #e5e5ea; color: #000; border-bottom-left-radius: 4px; }
+.message-bubble.agent .agent-name { font-size: 0.75rem; color: #666; margin-bottom: 2px; }
+.message-bubble.agent h3 { font-size: 1rem; font-weight: 700; margin: 6px 0 4px; }
+.message-bubble.agent h4 { font-size: 0.95rem; font-weight: 700; margin: 6px 0 4px; }
+.message-bubble.agent p { margin: 4px 0; }
+.message-bubble.agent ul { margin: 4px 0 4px 18px; padding: 0; }
+.message-bubble.agent li { margin: 2px 0; }
+.message-bubble.agent code { background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 4px; font-family: monospace; font-size: 0.88em; }
+.message-bubble.agent blockquote { border-left: 3px solid #bbb; margin: 4px 0; padding: 2px 8px; color: #555; }
+.message-bubble.agent strong { font-weight: 700; }
 .read-status { font-size: 0.75rem; color: #888; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
 .status-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: normal; }
 .status-dot::before { content: ''; width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
