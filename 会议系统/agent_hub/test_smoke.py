@@ -75,7 +75,8 @@ req("GET", "/api/messages/pull?agent_name=AgentX")  # X 读
 req("GET", "/api/messages/pull?agent_name=AgentY")  # Y 读
 s, d = req("GET", "/api/messages/history")
 ah = [m for m in d["messages"] if m["id"] == all_id][0]
-check("@all 全部已读 read_by=2", set(ah["read_by"]) == {"AgentX", "AgentY"}, str(ah.get("read_by")))
+# 注：后台活 DemoAgent 也会读 @all，故只断言本测试可控的 X/Y 已读（子集而非精确相等）
+check("@all 广播被 X/Y 已读（活 DemoAgent 也读属正常）", {"AgentX", "AgentY"}.issubset(set(ah["read_by"])), str(ah.get("read_by")))
 
 print("== 6. 验证持久化（文件落盘）==")
 import os
