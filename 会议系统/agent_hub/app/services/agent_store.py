@@ -38,15 +38,14 @@ def list_agent_names():
 
 def record_pull(name, got_data):
     """记录一次 pull（pull 即心跳 + 状态）：刷新 last_seen，并据是否拉到消息置状态。
-    got_data=True → working；会话中(session)即便空 pull 也保持 working；否则 waiting。
-    对应老板逻辑：拉到数据=去干活(处理中)；没拉到=在线等待(待命)；久未拉=离线(前端据 last_seen 判定)。"""
+    got_data=True → working(处理中)；got_data=False → waiting(待命中)。
+    对应老板逻辑：拉到数据=去干活(处理中)；没拉到=在线等待(待命中)；久未拉=离线(前端据 last_seen 判定)。
+    session 仅影响前端离线判定窗口(600s)与"需重唤"，不改变 working/waiting 着色。"""
     agents = load_agents()
     for a in agents:
         if a.get("name") == name:
             a["last_seen"] = now_iso()
             if got_data:
-                a["status"] = "working"
-            elif a.get("session"):
                 a["status"] = "working"
             else:
                 a["status"] = "waiting"
