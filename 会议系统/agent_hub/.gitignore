@@ -9,3 +9,6 @@ __pycache__/
 *.log
 .server.log
 .agent.log
+_doc_*.json
+_doc_*.md
+_reply_tmp.txt
