@@ -70,6 +70,7 @@
 | T-17 训练面板顶部实验目的说明块+扩展(每写法号目的+合并建议+测试参数置顶) | ✅ 完成(主理人把关·2026-08-15) | software-engineer | software-qa-engineer | AC-1.1~1.7（主体）+ 扩展 AC-2.1~2.6（每写法号测试目的+合并建议+顶部全部测试参数区）全 PASS·研发/测试分离铁律已守·主理人读盘核产 |
 | T-18 外网图裂根治+每写法号参数对比行 | ✅ 完成(主理人把关·2026-08-15) | software-engineer | software-qa-engineer | AC-1.1~1.8（纯ASCII资产路由54候选+2参考全200·铁律56img/54thumb/54唯一/0base64/27组全保·wp-cmp27·中文目录URL=0·安全403×3+404·6路由零回归）全 PASS·研发/测试分离铁律已守·主理人读盘核产 |
 | T-19 训练提示词修正意见(可编辑)+手机端头部优化+脚本化进化闭环 | ✅ 完成(主理人把关·2026-08-15) | software-engineer | software-qa-engineer-1 | AC-1.1~1.10(可编辑修正字段+保存端点/手机CSS不固定+gen_next_round确定性+run_round出图+资产路由泛化batch-002+小批量L1验证+铁律batch感知) |
+| T-20 看板重构综合方案(执行中台+进站/堵塞可视) | 🔧 进行中(主理人开卡·2026-08-15) | 主理人(阿编) | 待派QA | PRD/design(综合方案)已就位·待老板闸1签核AC后转实施(Phase1重定位+双系统合并+T-08b基础 / Phase2进站+堵塞视图+老板首页) |
 
 ## 任务卡 T-20260812-01 · P0-1 变体模板硬编码 → YAML 配置化
 
@@ -398,6 +399,14 @@
 | 2026-08-15 | 开发(software-engineer) | T-19 训练线·修正意见可编辑+手机端头部优化+脚本化进化闭环 | 派活→待验证 | 团队模式(software-board-8d31)；四文档T-19就位(G0-1)+GATE0勾；实现 agnes_proxy.py(git before+5038825→diff 133+/13-：POST /batch/api/correction 校验writing∈1..27/防穿越/批次白名单 + _update_writing_purpose 原子写回BOM/全列/行序 + _serve_batch_asset BATCH_DIRS 泛化 batch-002) + build_training_panel.py(set_batch/--batch+cand_url ASCII+read_writing_purpose 5列降级+wp-corr块 data-correction-writing 非 data-writing + @media(max-width:768px).toolbar static + self_check 复验铁律) + scripts/evolution(gen_next_round 零LLM确定性27/1/26 + run_round 免费TEST_KEY真出6张2K/9:16 + sample_corrections) + 双面板(training_panel.html 205390B / training_panel_batch-002.html 63530B) + writing_purpose.csv 5列迁移；L0自测 AC-1.6 27/1/26 · AC-1.7 dry-run 6张 · AC-1.10 双批次 self_check EXACT 计数 · AC-1.3/1.4 代理 live POST 5例 · AC-1.5 手机 CSS · AC-1.1/1.2/1.8 功能标注；推待验证即停(无done权)·派QA做L1真测 |
 | 2026-08-15 | QA(software-qa-engineer-1) | T-19 | 待验证→已验证 | 独立L1真·管线冒烟：删batch-002占位图(3752757字节)→run_round 免费TEST_KEY 真出6张合法PNG(w02_1=3990598≠占位·magic=89PNG·IHDR 1472x2624·3.50~3.81MB) · batch-002 面板 self_check 全过(wp-corr=3/data-writing=3/中文0/base640/6图全量) · 8787 不裂(6 PNG 200 image/png + HTML 200 text/html) · 闭环成立(写法2 prompt 确带进门修正) · 无P0/P1/P2；AC-1.1~1.10 全 PASS 落 test.md；建议放行 |
 | 2026-08-15 | 主理人(合伙人) | T-19 | 待验证→完成 | 主理人§4.3读盘核产(真图字节变更 w02_1=3990598≠占位3752757 / PNG magic 89PNG 合法 / IHDR 1472x2624 / grep 面板含「明确进门动作·推门向内·进入咖啡馆(非出门)·data-correction-writing」 / 主理人独立重跑 build_training_panel.py --batch batch-002 自检全过 wp-corr=3/data-writing=3/中文0 / 读 test.md 全 PASS) · 研发software-engineer推待验证即停 + 测试software-qa-engineer-1推已验证即停 + 主理人把关标完成 · 研发/测试分离铁律已守 · 前身 design.md 误判为空(实则completed通知后已填完整)·独立重跑核对一致非盲信 · 放行完成 |
+| 2026-08-15 | 主理人(合伙人) | T-20 看板重构综合方案 | 待办→进行中(开卡) | 老板19:12诉求(看板两方向：①团队执行任务标准地方②看进站/堵塞)+认可三根因；主理人读执行流程.md+software-team-dispatch+主理人守则+模板→开卡四文档(T-20/PRD·design综合方案·test·acceptance)→design=综合方案(现状分析6事实+根因3+方案6块:重定位执行中台/进站可视/堵塞可视/补T-08b/清垃圾项目+建3工作线/老板首页+接口契约+分期+验证)；属新增功能·无裁量权·待老板闸1签核AC后转实施·研发/测试分离铁律预备 |
+| 2026-08-15 | 主理人(合伙人) | T-20 看板重构综合方案 | 设计强化(待签核中) | 老板19:23/19:27反馈：①方案须锁死"调度团队时统一用看板"②确认看板两种接入方式(远程API/本地目录)及全走API开销；主理人查 server.py 实证(DB=每次请求新连·无WAL·单线程HTTPServer→禁止直写SQLite抢锁；看板=低频状态变更→API开销可忽略)→design 加 Phase 0(3.0 看板=调度唯一真相源·G0-0派活前置建卡+agent对卡读写+三系统收敛单源)+3.7两种接入方式(远程API/本地API+spool目录兜底/禁直写SQLite)+开销核实结论；PRD 加 F7+AC-7.1~7.3+禁直写SQLite/不存遥测禁止项；仍属新增功能·待老板闸1签核 |
+| 2026-08-15 | 主理人(合伙人) | T-20 看板重构综合方案 | 设计定稿(全程API·待老板签核) | 老板19:41决策：不开发本地spool模式·全程API·看板外网可达·大量云端agent走外网直连(经8787/board反代)；design 3.7 改全程API(云端外网/本地也API·禁直写SQLite·不开发spool)·实测1.60ms/op佐证开销可忽略·服务可用性靠常驻+自启保障替代本地兜底；PRD F7/AC-7.3/新增脚本/server.py改动/禁直写段同步去除spool；仍在T-20卡内·待老板签核AC后转实施(研发/测试分离铁律照走) |
+| 2026-08-15 | 主理人(合伙人) | T-20 看板重构综合方案 | 设计再强化(文档库·待签核) | 老板19:47问"需求文档怎么传输/远程agent怎么办/是否建总文档库"；主理人查 server.py(零文件端点)+agnes_proxy.py(已有/batch/__asset__/远程取资产范式但训练专用)→断点=远程agent能打卡但拿不到素材；design 加 3.8 文档/资产传输通道+统一文档库(磁盘shared_board/docs/<doc_id>/+DB仅元数据不存blob+POST/GET /api/ext/docs+经8787/board反代外网可达+卡挂documents引用+本地远端全程API+与/batch/__asset__并存)；PRD 加 F8+AC-8.1~8.5+产出docs目录+边界7(不存blob进SQLite)；仍在T-20卡内·待老板签核AC |
+
+| 2026-08-15 | 主理人(合伙人) | T-20 看板重构综合方案 | 方案补盲点(待签核) | 老板点名"再想想还有没考虑到的"；design 加 3.9 架构盲点(4项P0+4项P1+3项P2)：P0-1泄密面(公网+共享token·剧本裸奔→文档库项目级权限+下载审计) / P0-2单点故障无降级(砍spool后服务挂=全员停工→探活+自愈+告警) / P0-3状态模型不全(缺排队中/等待外部/返工/已取消→看不准) / P0-4纪律系统级强制缺失(软约束G0-0可绕过→派活前API查卡/git pre-commit校验) ；P1-1文档库技术债(大文件分片续传/version/清理/mime白名单/去重) / P1-2远程agent身份信任(X-Agent任意填无注册无速率限制) / P1-3双写一致性(建卡+传文档+挂引用原子·素材就绪状态机) / P1-4移动端+主动通知(手机看+堵塞推飞书)；P2-1与飞书关系 / P2-2 L1真外网agent+越权测试 / P2-3带宽门户稳定；PRD 加 F9+AC-9.1~9.6(锚P0+P1关键项)。仍在T-20卡内·待老板签核AC后转实施。 |
+
+| 2026-08-15 | 主理人(合伙人) | T-20 看板重构 | 设计修订(纪律降级+本地标准) | 老板20:00反馈：①状态流转关系需讲清(当前5主态+阻塞旁路+在途WIP口径·P0-3拟扩排队中/等待外部/返工/已取消·阻塞vs等待外部区别须讲清) ②纪律不要系统硬卡·用提示词约束+本地标准；design P0-4处置由"系统级校验(git pre-commit/API前置)"降级为"本地标准(技能G0-0内嵌+dev-work/调度公约.md明文+派活prompt引用)"·git hook/API前置降为可选P2；新建 dev-work/调度公约.md(看板=真相源/无卡不派活/状态流转明文)；PRD AC-9.4同步改。方案更贴合小团队·风险更低 |
 
 #### 子角色判定台账（judge，自动追加）
 
@@ -461,6 +470,7 @@
 - 2026-08-15 21:05 | T-17 | judge=✅ PASS（主理人读盘核产+QA独立验收全 PASS） | 训练面板顶部实验目的说明块+扩展：①exp-note「这批图在测什么」(为何同写法2张图·4测试目的) ②扩展 params-note(顶部全部测试参数9项·含S英文原文/TEST key/2K·9:16/54张/NEG) ③writing-purpose×27(每写法号测试目的+合并建议·内容来自writing_purpose.csv逐字一致)；build_training_panel.py单源改动+重生成 training_panel.html(178396B自包含)；铁律56img/54thumb/54唯一/0base64/54锚点/27组全保·新增块禁词扫描0违规；研发software-engineer(agent-7214cc4d)自测全过+QA software-qa-engineer(agent-a2dcab0b)独立验收 PASS·研发/测试分离铁律守·主理人放行完成
 - 2026-08-15 21:50 | T-18 | judge=✅ PASS（主理人读盘核产+QA独立验收24检查点全 PASS） | 外网图裂根治+每写法号参数对比行：agnes_proxy.py 新增 /batch/__asset__ 纯 ASCII 资产路由(_serve_batch_asset·cand/ref白名单·防穿越·非png/不存在403/404) + build_training_panel.py 改生成器(ASSET_BASE/cand_url/ref_url·ITEMS_JSON/REFS_JSON rel_path 改ASCII·wp-cmp27) + 重生成 training_panel.html(181,486B)；git before 86d6f49 + 5038825；主理人 verify_live.py 实测线上8787(PID26628) 54候选/2参考全200·zh_dir=0·安全403×3+404·6路由零回归·wp-cmp27·铁律经精确matcher全保(55thumb/33writing-purpose/4base64三处表面偏差已逐一甄别非回归)；software-qa-engineer 独立验收24检查点0BUG·研发/测试分离铁律守·主理人放行完成
 - 2026-08-15 22:10 | T-19 | judge=✅ PASS（主理人读盘核产+QA独立验收全 PASS） | 训练提示词修正意见(可编辑)+手机端头部优化+脚本化进化闭环：agnes_proxy.py POST /batch/api/correction(校验writing∈1..27/防穿越/批次白名单)+_update_writing_purpose 原子写回BOM/全列/行序 + _serve_batch_asset BATCH_DIRS 泛化 batch-002；build_training_panel.py wp-corr块(data-correction-writing 非 data-writing·不污染不变式)+@media(max-width:768px).toolbar position:static(手机端不sticky·桌面sticky不变)+--batch 参数化+self_check 铁律复验(组数/中文0)；scripts/evolution gen_next_round(零LLM确定性·总27/修正1/沿用26·写法2进门修正确定性拼入)+run_round(免费TEST_KEY真出6张2K/9:16 PNG·IHDR 1472x2624)+sample_corrections；双面板 training_panel.html(205390B)/training_panel_batch-002.html(63530B)含「明确进门动作·推门向内·进入咖啡馆(非出门)」修正文案；L1 QA实测 6张合法PNG(w02_1=3990598≠占位3752757)/8787 200不裂/无BUG；写法2进门修正确定性流入真出图·进化闭环成立·研发/测试分离铁律守·主理人放行完成
+- 2026-08-15 19:16 | T-20 | judge=⏳ PENDING（待老板闸1签核PRD的AC后转实施） | 看板重构综合方案(执行中台+进站/堵塞可视)：老板19:12两方向(①团队执行任务标准地方②看进站/堵塞)+认可三根因(方向错位/双系统漂移/T-08b未做)；主理人开卡四文档(T-20/PRD·design综合方案·test·acceptance)；design=综合方案(现状6事实:8788在跑/22任务0进行中/3测试项目残留/仅kanban+tree两视图/API底座够缺进站堵塞聚合/机制齐无人喂数据 + 方案6块:重定位执行中台(看板=唯一真相源+sync_board_to_md自动生成current_state表·根治漂移)/进站可视(收件箱视图+指标条积压新进吞吐WIP)/堵塞可视(视图+blockedBy字段+超N天标红)/补T-08b筛选快切留言自动刷新完成时间戳flash/清测试项目建3真实工作线/老板首页全派生) + 接口契约(新增/api/intake /api/blocked /api/metrics+tasks加blockedBy/blocked_reason+sync脚本) + 分期Phase1重定位+T-08b基础 / Phase2进站+堵塞+首页；属新增功能无裁量权·待老板签核AC转实施 |
 
 ## 阿编把关结论（主理人·2026-08-15，T-18 外网图裂根治 + 每写法号参数对比行）
 
@@ -487,3 +497,13 @@
 - 2026-08-13 16:58 | T-20260813-03 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实跑·公网+localhost 双路径 401/200 全过
 - 2026-08-13 16:30 | T-20260813-01 | judge=❌ 打回（原因:） | 验证打回留痕
 - 2026-08-13 16:30 | T-20260813-01 | judge=✅ PASS（子角色产出经主会话读盘核验，可勾验收→完成） | 主理人主会话实证·AC-1.1成片URL
+
+---
+
+## 外接新项目登记册
+
+> 与短剧主业务**物理隔离**的独立新产品线；未来有独立 GitHub 仓库。当前在主仓内暂存、**不** commit 进短剧主仓。
+
+| 日期 | 项目 | 状态 | 仓库 | 关联资产 | 下一步 |
+|---|---|---|---|---|---|
+| 2026-08-16 02:36 | **会议系统 / Meeting System**（多 Agent 协作评审） | 基线替换·分析+需求澄清中·未立项 | `<待老板提供>` | **基线已替换为 `.qclaw` v1.1 设计文档**（2026-08-16 老板令：删我方旧版`README.md`+`docs/需求简报_PRD.md`，改采 `.qclaw/workspace-agent-16a3f8bf/meeting_system` 的内容迁入主工作区）；现含 `设计文档.md`(v1.1) + `server.py` + `agent_client.py` + `boss_driver.py` + `agent_skill.md` + 测试消息json。`docs/meeting/doc_*.md` 运行时生成。复用 `requirement-clarifier`(B角色) 对 v1.1 设计做需求澄清 | ①B 角色按 v1.1 设计追问老板澄清需求 ②老板给 GitHub 仓库地址→建仓迁移 ③立T卡进 `software-team-dispatch` 前置门 |
