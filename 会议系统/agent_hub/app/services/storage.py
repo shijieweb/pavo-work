@@ -22,36 +22,59 @@ def _path(name):
     return os.path.join(DATA_DIR, name)
 
 
+def _read_nolock(name, default):
+    """读取 JSON（调用方需已持有 _lock）；文件不存在或非法返回 default 并备份损坏文件。"""
+    p = _path(name)
+    if not os.path.isfile(p):
+        return default
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError, ValueError):
+        backup = p + ".corrupt"
+        try:
+            os.replace(p, backup)
+        except OSError:
+            pass
+        return default
+
+
+def _write_nolock(name, data):
+    """原子写（调用方需已持有 _lock）：写临时文件后 os.replace，避免半截文件。"""
+    p = _path(name)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    d = os.path.dirname(p)
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, p)
+    except Exception:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
+
+
 def read_json(name, default):
     """读取 JSON；文件不存在或非法返回 default 并备份损坏文件。"""
     with _lock:
-        p = _path(name)
-        if not os.path.isfile(p):
-            return default
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError, ValueError):
-            backup = p + ".corrupt"
-            try:
-                os.replace(p, backup)
-            except OSError:
-                pass
-            return default
+        return _read_nolock(name, default)
 
 
 def write_json(name, data):
     """原子写：写临时文件后 os.replace，避免半截文件。"""
     with _lock:
-        p = _path(name)
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        d = os.path.dirname(p)
-        fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            os.replace(tmp, p)
-        except Exception:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-            raise
+        _write_nolock(name, data)
+
+
+def update_json_atomic(name, default, mutator):
+    """在锁内完成「读 -> mutator 修改 -> 写回」，保证 read-modify-write 原子。
+
+    满足方案书 §5.3 / §7 T-PULL-05（并发拉取只一个拿到消息）。
+    mutator(data) 直接原地修改 data（或将新数据 return），返回任意值会作为本函数结果。
+    """
+    with _lock:
+        data = _read_nolock(name, default)
+        result = mutator(data)
+        _write_nolock(name, data)
+        return result

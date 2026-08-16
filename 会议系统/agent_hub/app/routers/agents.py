@@ -9,8 +9,11 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 @router.post("/register")
 def register(body: AgentRegister):
-    agent_store.register_agent(body.name)
-    return {"status": "ok", "message": "Agent registered successfully"}
+    # T-REG-02 / T-PERM-01：区分新注册与已存在，重注册提示唯一性
+    agents, created = agent_store.register_agent(body.name)
+    if created:
+        return {"status": "ok", "message": "Agent registered successfully"}
+    return {"status": "ok", "message": "Agent already registered", "already_exists": True}
 
 
 @router.get("")
