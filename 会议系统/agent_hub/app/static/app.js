@@ -14,30 +14,38 @@ async function loadAgentStatus() {
     const data = await res.json();
     const me = (data.agents || []).find(a => a.name === 'WorkBuddy');
     const dot = document.getElementById('agent-status');
+    const hint = document.getElementById('reawaken-hint');
     if (!dot) return;
     if (!me || !me.last_seen) {
       dot.className = 'status-dot idle';
       dot.textContent = '阿编·待命';
+      if (hint) hint.style.display = 'none';
       return;
     }
     const ageSec = (Date.now() - new Date(me.last_seen).getTime()) / 1000;
+    let cls, label, showHint = false;
     if (me.status === 'offline') {
-      dot.className = 'status-dot idle';
-      dot.textContent = '阿编·离线';
+      // 通过「结束会议」正常收工
+      cls = 'idle'; label = '阿编·已收工';
     } else {
-      // 会话中：pull 间隙窗口放宽到 600s（开会期间即便长时间没拉也不误报离线）；非会话：120s
+      // 会话中：pull 间隙窗口放宽到 600s；非会话：120s
       const aliveWindow = me.session ? 600 : 120;
       if (ageSec > aliveWindow) {
-        dot.className = 'status-dot idle';
-        dot.textContent = '阿编·离线';
+        if (me.session) {
+          // 会话仍 active 但大脑循环意外中断 → 需重唤（老板要的"为什么离线"）
+          cls = 'lost'; label = '阿编·已掉线·需重唤'; showHint = true;
+        } else {
+          cls = 'idle'; label = '阿编·离线';
+        }
       } else if (me.status === 'working') {
-        dot.className = 'status-dot working';
-        dot.textContent = '阿编·处理中';
+        cls = 'working'; label = '阿编·处理中';
       } else {
-        dot.className = 'status-dot waiting';
-        dot.textContent = '阿编·待命';
+        cls = 'waiting'; label = '阿编·待命';
       }
     }
+    dot.className = 'status-dot ' + cls;
+    dot.textContent = label;
+    if (hint) hint.style.display = showHint ? 'block' : 'none';
   } catch (e) { /* 状态接口异常不阻断聊天 */ }
 }
 
