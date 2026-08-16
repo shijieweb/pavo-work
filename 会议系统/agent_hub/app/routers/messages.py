@@ -9,6 +9,8 @@ router = APIRouter(prefix="/api/messages", tags=["messages"])
 
 @router.get("/pull")
 def pull(agent_name: str = Query(..., description="Agent 名字")):
+    # 未读下沉：pull_messages 仅返回该 agent 未读 user 消息，并在服务端持久化已读
+    # （per-agent 已读集合 data/agent_read_<X>.json + reads.json 回执），客户端只透传。
     return {"messages": message_store.pull_messages(agent_name)}
 
 
