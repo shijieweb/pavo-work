@@ -3,7 +3,42 @@ let currentAgentList = [];
 async function init() {
   await loadAgents();
   await loadHistory();
+  await loadAgentStatus();
   setInterval(loadHistory, 2000); // 每2秒轮询历史消息
+  setInterval(loadAgentStatus, 3000); // 每3秒刷新阿编在线状态（pull 即心跳）
+}
+
+async function loadAgentStatus() {
+  try {
+    const res = await fetch('/api/agents/status');
+    const data = await res.json();
+    const me = (data.agents || []).find(a => a.name === 'WorkBuddy');
+    const dot = document.getElementById('agent-status');
+    if (!dot) return;
+    if (!me || !me.last_seen) {
+      dot.className = 'status-dot idle';
+      dot.textContent = '阿编·待命';
+      return;
+    }
+    const ageSec = (Date.now() - new Date(me.last_seen).getTime()) / 1000;
+    if (me.status === 'offline') {
+      dot.className = 'status-dot idle';
+      dot.textContent = '阿编·离线';
+    } else {
+      // 会话中：pull 间隙窗口放宽到 600s（开会期间即便长时间没拉也不误报离线）；非会话：120s
+      const aliveWindow = me.session ? 600 : 120;
+      if (ageSec > aliveWindow) {
+        dot.className = 'status-dot idle';
+        dot.textContent = '阿编·离线';
+      } else if (me.status === 'working') {
+        dot.className = 'status-dot working';
+        dot.textContent = '阿编·处理中';
+      } else {
+        dot.className = 'status-dot waiting';
+        dot.textContent = '阿编·待命';
+      }
+    }
+  } catch (e) { /* 状态接口异常不阻断聊天 */ }
 }
 
 async function loadAgents() {

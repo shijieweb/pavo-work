@@ -22,7 +22,7 @@ def register_agent(name):
     agents = load_agents()
     if any(a.get("name") == name for a in agents):
         return agents, False
-    agents.append({"name": name, "registered_at": now_iso()})
+    agents.append({"name": name, "registered_at": now_iso(), "last_seen": now_iso(), "status": "waiting", "session": False})
     save_agents(agents)
     return agents, True
 
@@ -34,3 +34,41 @@ def agent_exists(name):
 
 def list_agent_names():
     return [a.get("name") for a in load_agents() if a.get("name")]
+
+
+def record_pull(name, got_data):
+    """记录一次 pull（pull 即心跳 + 状态）：刷新 last_seen，并据是否拉到消息置状态。
+    got_data=True → working；会话中(session)即便空 pull 也保持 working；否则 waiting。
+    对应老板逻辑：拉到数据=去干活(处理中)；没拉到=在线等待(待命)；久未拉=离线(前端据 last_seen 判定)。"""
+    agents = load_agents()
+    for a in agents:
+        if a.get("name") == name:
+            a["last_seen"] = now_iso()
+            if got_data:
+                a["status"] = "working"
+            elif a.get("session"):
+                a["status"] = "working"
+            else:
+                a["status"] = "waiting"
+            save_agents(agents)
+            return True
+    return False
+
+
+def set_session(name, active):
+    """开会=进入会话(置 working + session=True)、结束会议=退出(置 offline + session=False)。
+    会话级状态：整个开会期间保持绿色，不因回话/改代码的 pull 间隙而变灰——解决『30分钟没拉消息就不知道在不在』。"""
+    agents = load_agents()
+    for a in agents:
+        if a.get("name") == name:
+            a["session"] = active
+            a["status"] = "working" if active else "offline"
+            a["last_seen"] = now_iso()
+            save_agents(agents)
+            return True
+    return False
+
+
+def get_agent_statuses():
+    """返回所有 Agent 的 {name, last_seen}，供前端判断在线/工作状态。"""
+    return [{"name": a.get("name"), "last_seen": a.get("last_seen"), "status": a.get("status", "waiting"), "session": a.get("session", False)} for a in load_agents()]
