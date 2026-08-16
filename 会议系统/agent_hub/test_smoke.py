@@ -83,4 +83,20 @@ import os
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 check("messages.json 存在且有内容", os.path.isfile(os.path.join(data_dir, "messages.json")) and os.path.getsize(os.path.join(data_dir, "messages.json")) > 0)
 
+print("== 7. 边界校验（§7 T-SEND-03 / T-REPLY-04 / T-REG-02）==")
+# T-SEND-03：发给不存在的 Agent → 400 且不保存
+s, d = req("POST", "/api/messages/send",
+           {"sender_type": "user", "content": "hi", "target_type": "single", "target_agent_name": "ghost_not_exist"})
+check("T-SEND-03 目标不存在返回400", s == 400, str(s))
+s, d = req("GET", "/api/messages/history")
+ghost_msgs = [m for m in d["messages"] if m.get("target_agent_name") == "ghost_not_exist"]
+check("T-SEND-03 未保存 ghost 消息", len(ghost_msgs) == 0, f"ghost_msgs={len(ghost_msgs)}")
+# T-REPLY-04：未注册 Agent 回复 → 400
+s, d = req("POST", "/api/messages/reply", {"agent_name": "ghost2", "content": "x"})
+check("T-REPLY-04 未注册 Agent 回复返回400", s == 400, str(s))
+# T-REG-02：重注册 → 提示已存在
+req("POST", "/api/agents/register", {"name": "EdgeProbe"})
+s, d = req("POST", "/api/agents/register", {"name": "EdgeProbe"})
+check("T-REG-02 重注册提示已存在", s == 200 and d.get("already_exists") is True, str(d))
+
 print(f"\n结果：PASS={PASS}  FAIL={FAIL}")

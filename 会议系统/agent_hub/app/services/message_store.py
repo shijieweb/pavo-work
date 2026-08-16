@@ -9,7 +9,7 @@
 """
 import uuid
 
-from .storage import read_json, write_json, now_iso
+from .storage import read_json, write_json, now_iso, update_json_atomic
 from .agent_store import load_agents
 
 
@@ -79,53 +79,62 @@ def send_user_message(content, target_type, target_agent_name=None, client_msg_i
 
 
 def pull_messages(agent_name):
-    """Agent 拉取@自己且未读的消息，并标记为已读。对应方案书 §5.3 pull_messages。"""
+    """Agent 拉取@自己且未读的消息，并标记为已读。对应方案书 §5.3 pull_messages。
+
+    对 reads.json 的「读-改-写」在 update_json_atomic 锁内完成，满足 §7 T-PULL-05
+    （并发拉取时同一条消息只会被一个 Agent 领取）。
+    """
     msgs = load_messages()
-    reads = load_reads()
-    unread = []
-    changed = False
-    for msg in msgs:
-        if msg["sender_type"] != "user":
-            continue
-        targeted = (
-            (msg["target_type"] == "single" and msg["target_agent_name"] == agent_name)
-            or msg["target_type"] == "all"
-        )
-        if not targeted:
-            continue
-        rec = next(
-            (r for r in reads if r["message_id"] == msg["id"] and r["agent_name"] == agent_name),
-            None,
-        )
-        if rec and rec["read_at"] is None:
-            unread.append(msg)
-            rec["read_at"] = now_iso()
-            changed = True
-    if changed:
-        save_reads(reads)
-    return unread
+
+    def _mark(reads):
+        unread = []
+        for msg in msgs:
+            if msg["sender_type"] != "user":
+                continue
+            targeted = (
+                (msg["target_type"] == "single" and msg["target_agent_name"] == agent_name)
+                or msg["target_type"] == "all"
+            )
+            if not targeted:
+                continue
+            rec = next(
+                (r for r in reads if r["message_id"] == msg["id"] and r["agent_name"] == agent_name),
+                None,
+            )
+            if rec and rec["read_at"] is None:
+                unread.append(msg)
+                rec["read_at"] = now_iso()
+        return unread
+
+    return update_json_atomic(READS_FILE, [], _mark)
 
 
 def submit_reply(agent_name, content, reply_to_message_id=None, client_msg_id=None):
-    """Agent 提交回复：保存回复，并捎带返回该 Agent 剩余未读消息。对应方案书 §5.3 submit_reply。"""
-    msgs = load_messages()
-    dup = _dup_by_client_msg_id(msgs, client_msg_id)
-    if dup:
-        return {"status": "ok", "new_messages": [], "duplicate": True}
+    """Agent 提交回复：保存回复，并捎带返回该 Agent 剩余未读消息。对应方案书 §5.3 submit_reply。
 
-    reply = {
-        "id": gen_id("msg"),
-        "content": content,
-        "sender_type": "agent",
-        "sender_agent_name": agent_name,
-        "target_type": "user",
-        "target_agent_name": None,
-        "created_at": now_iso(),
-        "client_msg_id": client_msg_id,
-        "read_by": [],
-    }
-    msgs.append(reply)
-    save_messages(msgs)
+    消息追加用 update_json_atomic 保证原子（并发回复不会互相覆盖）。
+    """
+    def _add(msgs):
+        dup = _dup_by_client_msg_id(msgs, client_msg_id)
+        if dup:
+            return {"dup": True}
+        reply = {
+            "id": gen_id("msg"),
+            "content": content,
+            "sender_type": "agent",
+            "sender_agent_name": agent_name,
+            "target_type": "user",
+            "target_agent_name": None,
+            "created_at": now_iso(),
+            "client_msg_id": client_msg_id,
+            "read_by": [],
+        }
+        msgs.append(reply)
+        return {"dup": False}
+
+    res = update_json_atomic(MESSAGES_FILE, [], _add)
+    if res.get("dup"):
+        return {"status": "ok", "new_messages": [], "duplicate": True}
     new_messages = pull_messages(agent_name)  # 捎带返回新未读
     return {"status": "ok", "new_messages": new_messages}
 
