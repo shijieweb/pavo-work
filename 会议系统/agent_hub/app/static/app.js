@@ -40,7 +40,7 @@ async function loadAgentStatus() {
       } else if (me.status === 'working') {
         cls = 'working'; label = '阿编·处理中';
       } else {
-        cls = 'waiting'; label = '阿编·待命';
+        cls = 'waiting'; label = '阿编·待命中';
       }
     }
     dot.className = 'status-dot ' + cls;
