@@ -252,6 +252,13 @@
         "board_token_inject": true
       },
       "note": "外部指导 API（T-20260813-05）：/ext/* 改写为 8788 /api/ext/*；无鉴权直达（老板决策），代理自动注入 X-Board-Token 过 board 写闸"
+    },
+    {
+      "prefix": "/meeting",
+      "target": "http://127.0.0.1:8000",
+      "kind": "generic",
+      "flags": { "rewrite_html_api": true, "rewrite_html_static": true },
+      "note": "Agent Hub 会议系统整段反代到 8000（纯 HTTP 轮询，无 WS/SSE）"
     }
   ],
   "examples": [
