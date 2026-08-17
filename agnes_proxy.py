@@ -492,11 +492,19 @@ class H(BaseHTTPRequestHandler):
             with urllib.request.urlopen(req, timeout=300) as resp:
                 body = resp.read()
                 ctype = resp.headers.get("Content-Type", "application/octet-stream")
-                # 可选：仿看板的 HTML /api/→<prefix>/api/ 改写，使子服务前端仍走 8787 单入口
-                if flags.get("rewrite_html_api") and method == "GET" \
-                        and p0 in (prefix, prefix + "/", prefix + ".html") \
-                        and "text/html" in ctype:
-                    body = body.replace(b"/api/", (prefix + "/api/").encode("utf-8"))
+                # 可选：仿看板的 HTML/JS 改写，使子服务前端仍走 8787 单入口。
+                # 注意：Agent Hub 前端硬编码绝对路径 /api/ 与 /static/，且 app.js 以
+                # application/javascript 返回，故对 JS 也做 /api/ 改写；/static/ 改写同理。
+                if (flags.get("rewrite_html_api") or flags.get("rewrite_html_static")) and method == "GET":
+                    if "text/html" in ctype:
+                        if flags.get("rewrite_html_api"):
+                            body = body.replace(b"/api/", (prefix + "/api/").encode("utf-8"))
+                        if flags.get("rewrite_html_static"):
+                            body = body.replace(b"/static/", (prefix + "/static/").encode("utf-8"))
+                    if "javascript" in ctype:
+                        body = body.replace(b"/api/", (prefix + "/api/").encode("utf-8"))
+                        if flags.get("rewrite_html_static"):
+                            body = body.replace(b"/static/", (prefix + "/static/").encode("utf-8"))
                 self.send_response(resp.status)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(body)))

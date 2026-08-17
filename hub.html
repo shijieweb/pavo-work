@@ -174,11 +174,10 @@
         <code>cd short_drama_workflow/html_prototype &amp;&amp; REAL=1 python server.py</code>
       </div>
     </a>
-  </div>
 
   <!-- 共享看板入口：手机经 8787 /board 反代直达（无需直连 8788） -->
   <a class="card" id="cardBoard" href="#"
-     style="--accent:var(--gold);--tint:rgba(232,194,104,.13);display:block;margin-bottom:16px;">
+     style="--accent:var(--gold);--tint:rgba(232,194,104,.13)">
     <div class="ico">📋</div>
     <p class="ct">共享任务看板 <span class="st no" id="stBoard"><i class="dot"></i>检测中</span></p>
     <p class="cd">跨设备同步的任务进度看板：项目 → 任务树，状态 / 优先级一目了然。<b>手机同 WiFi 即看进度预览。</b></p>
@@ -188,11 +187,24 @@
       <button class="lbtn" id="btnStartBoard">⚡ 一键启动看板</button>
       <code>cd shared_board &amp;&amp; python server.py</code>
     </div>
+    </a>
+
+  <!-- 小伙伴会议系统 / Agent Hub 入口：经 8787 /meeting 反代到 8000（纯 HTTP 轮询，无 WS/SSE） -->
+  <a class="card" id="cardMeeting" href="/meeting"
+     style="--accent:var(--blue);--tint:rgba(76,141,255,.13)">
+    <div class="ico">💬</div>
+    <p class="ct">小伙伴会议系统 / Agent Hub <span class="st on" id="stMeeting"><i class="dot on"></i>本地可用</span></p>
+    <p class="cd">Agent Hub 会议系统：拉取人类网页消息 + 多智能体经 HTTP 轮询协同接入。<b>经 8787 单入口直达，无需直连 8000。</b></p>
+    <div class="tags"><span class="tag">Agent Hub</span><span class="tag">多 Agent</span><span class="tag">HTTP 轮询</span><span class="tag">无 WS/SSE</span></div>
+    <div class="foot"><span class="port">:8787 → /meeting :8000</span><span class="go">进入 →</span></div>
+    <div class="hint">会议系统后端未启动。
+      <code>cd agent-meeting/server &amp;&amp; python -m uvicorn app.main:app --port 8000</code>
+    </div>
   </a>
 
   <!-- 运行日志入口：出问题顺时间线回溯（开发模式开放） -->
   <a class="card" id="cardLogs" href="/logs"
-     style="--accent:var(--blue);--tint:rgba(76,141,255,.13);display:block;margin-bottom:16px;">
+     style="--accent:var(--blue);--tint:rgba(76,141,255,.13)">
     <div class="ico">📜</div>
     <p class="ct">运行日志 <span class="st on" id="stLogs"><i class="dot on"></i>按天归档</span></p>
     <p class="cd">服务端 + 前端上报共用一份日志：API 请求耗时、生成任务、异常栈、前端 JS 错误。<b>出问题先说一句，阿编顺着这里查。</b></p>
@@ -202,7 +214,7 @@
 
   <!-- 提示词训练营入口：实验过程/结果/方案审查（老板 0811） -->
   <a class="card" id="cardTraining" href="/training"
-     style="--accent:var(--gold);--tint:rgba(245,158,11,.13);display:block;margin-bottom:16px;">
+     style="--accent:var(--gold);--tint:rgba(245,158,11,.13)">
     <div class="ico">🎓</div>
     <p class="ct">提示词训练营 <span class="st on" id="stTraining"><i class="dot on"></i>实验看板</span></p>
     <p class="cd">阿编跑提示词方法实验（不同写法变体 → 生成 → 质检对比），数据实时到这里。<b>候选方案需您在这里点「采纳」才固化进工作台。</b></p>
@@ -212,7 +224,7 @@
 
   <!-- Batch 训练采纳面板入口（T-0815）：batch-001 结果，经 8787 /batch 直出，外网可达 -->
   <a class="card" id="cardBatch" href="/batch"
-     style="--accent:var(--gold);--tint:rgba(232,194,104,.13);display:block;margin-bottom:16px;">
+     style="--accent:var(--gold);--tint:rgba(232,194,104,.13)">
     <div class="ico">🖼️</div>
     <p class="ct">Batch 训练采纳面板 <span class="st on"><i class="dot on"></i>本地可用</span></p>
     <p class="cd">提示词配方 batch-001 的 54 张候选图 + 每写法号测试目的/合并建议 + 全部测试参数。<b>做采纳决策直接用它。</b></p>
@@ -222,7 +234,7 @@
 
   <!-- 音效台入口（T-12）：SoundsFree 程序化音效生成器本地静态页，经 8787 直出，无需探活 -->
   <a class="card" id="cardSoundsfree" href="/soundsfree"
-     style="--accent:var(--rose);--tint:rgba(232,85,110,.13);display:block;margin-bottom:16px;">
+     style="--accent:var(--rose);--tint:rgba(232,85,110,.13)">
     <div class="ico">🔊</div>
     <p class="ct">音效台 <span class="st on"><i class="dot on"></i>本地可用</span></p>
     <p class="cd">SoundsFree 离线程序化音效生成器：零 API、零网络、零版权风险，商用免费。<b>做短剧/视频音效直接用它。</b></p>
@@ -232,13 +244,14 @@
 
   <!-- 看板 API 说明入口（T-12）：经 /board/docs 反代到 8788 shared_board/docs.html，零后端改动 -->
   <a class="card" id="cardDocs" href="/board/docs"
-     style="--accent:var(--gold);--tint:rgba(232,194,104,.13);display:block;margin-bottom:16px;">
+     style="--accent:var(--gold);--tint:rgba(232,194,104,.13)">
     <div class="ico">📖</div>
     <p class="ct">看板 API 说明 <span class="st on"><i class="dot on"></i>本地可用</span></p>
     <p class="cd">共享看板对外 API 的字段、鉴权与调用示例说明页。<b>对接看板接口前先读这里。</b></p>
     <div class="tags"><span class="tag">API 说明</span><span class="tag">看板</span><span class="tag">反代</span><span class="tag">实时</span></div>
     <div class="foot"><span class="port">:8787 → /board/docs</span><span class="go">进入 →</span></div>
   </a>
+  </div>
 
   <!-- 项目切换器 -->
   <div class="panel">
@@ -276,6 +289,7 @@ const $ = (id) => document.getElementById(id);
 // ---------- 实时探测：服务状态 + 项目列表 ----------
 let _studioOnline = false;
 let _boardOnline = false;
+let _meetingOnline = false;
 let _activeProject = null;
 
 async function ping(url){
@@ -335,10 +349,18 @@ async function probe(){
     }
   }
 
+  // Agent Hub 会议系统（8000）：经 8787 /meeting 反代可达；下线时卡片显示启动提示
+  try{
+    const rm = await fetch("/meeting/health", {cache:"no-store"});
+    _meetingOnline = rm.ok;
+  }catch(e){ _meetingOnline = false; }
+  markMeeting(_meetingOnline);
+
   // 统一刷新运行服务文案
   const running = ["8787 门户"];
   if(_studioOnline) running.push("8777 工作台");
   if(_boardOnline) running.push("8788 看板");
+  if(_meetingOnline) running.push("8000 会议");
   $("resRunning").textContent = running.join(" + ");
   $("msClock").textContent = "更新 " + new Date().toLocaleTimeString("zh-CN", {hour12:false});
 }
@@ -366,6 +388,18 @@ function markStudio(online){
 function markBoard(online){
   const c = $("cardBoard");
   const st = $("stBoard");
+  if(online){
+    c.classList.remove("down");
+    st.className = "st on"; st.innerHTML = '<i class="dot on"></i>在线';
+  }else{
+    c.classList.add("down");
+    st.className = "st no"; st.innerHTML = '<i class="dot"></i>未启动';
+  }
+}
+
+function markMeeting(online){
+  const c = $("cardMeeting");
+  const st = $("stMeeting");
   if(online){
     c.classList.remove("down");
     st.className = "st on"; st.innerHTML = '<i class="dot on"></i>在线';
