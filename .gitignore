@@ -35,3 +35,16 @@ _archive_*/
 _probe_*
 _trae_*.html
 .chrome_cdp/
+
+# ===== 子仓库 / 临时垃圾（不入库, 2026-08-20 归档清理）=====
+# dev-work 与 agent-meeting 均为独立 git 仓库, 禁止 workspace 根二重置
+dev-work/
+agent-meeting/
+# 临时 / 测试垃圾文件
+big.bin
+nul
+test.png
+test.svg
+hist_full.json
+test_ac17_regression.py
+test_edit.txt
