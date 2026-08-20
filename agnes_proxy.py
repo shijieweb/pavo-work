@@ -480,6 +480,16 @@ class H(BaseHTTPRequestHandler):
         ct = self.headers.get("Content-Type")
         if ct:
             req.add_header("Content-Type", ct)
+
+        # ── R1 令牌闸（T-am-hardening-r1）：令牌透传 + 真实客户端 IP 注入 ──
+        # ① 透传浏览器从 8787 取得的 Authorization，使其能到达 8000 校验（AC-1.7）。
+        # ② 覆盖式注入 X-Forwarded-For = 网关直连客户端 IP（覆盖而非追加，防伪造）。
+        # ③ 客户端自带 X-Gateway-* 头本就不会被转发（本方法仅显式转发
+        #    Content-Type / X-Board-Token / X-Agent），无需额外剥离代码。
+        auth = self.headers.get("Authorization")
+        if auth:
+            req.add_header("Authorization", auth)
+        req.add_header("X-Forwarded-For", self.client_address[0])
         # 可选：仿看板的令牌自动注入（本地自用免门禁）
         if flags.get("board_token_inject"):
             tok = self.headers.get("X-Board-Token") or _board_token()
