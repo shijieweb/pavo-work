@@ -1,0 +1,80 @@
+classDiagram
+    class MessageStore {
+        +send_user_message(content, target_type, target_agent_name, client_msg_id) dict
+        +append_system_event(event, agent_name) dict
+        +get_history(since_id, before_id, limit) list
+        +pull_messages(agent_name) list
+        +submit_reply(agent_name, content, reply_to_message_id, client_msg_id) dict
+        +cleanup_messages(keep_last, older_than) dict
+    }
+    class AgentStore {
+        +register_agent(name) tuple
+        +set_session(name, active) bool
+        +scan_and_sweep() int
+        +record_pull(name, got_data) bool
+        +get_agent_statuses() list
+        +derive_state(a, now) str
+    }
+    class Storage {
+        +read_json(name, default)
+        +write_json(name, data)
+        +update_json_atomic(name, default, mutator)
+        +append_jsonl(name, record)
+    }
+    class Message {
+        +str id
+        +str content
+        +str sender_type
+        +str sender_agent_name
+        +str target_type
+        +str target_agent_name
+        +str created_at
+        +str client_msg_id
+        +list read_by
+        +str message_type
+        +str event
+    }
+    class Agent {
+        +str name
+        +str registered_at
+        +str last_seen
+        +str status
+        +bool session
+        +str token_hash
+    }
+    class RouterMessages {
+        +pull(agent_name) dict
+        +reply(body) dict
+        +send(body) dict
+        +history(since_id, before_id, limit) dict
+        +cleanup(body) dict
+    }
+    class RouterAgents {
+        +agents_status() dict
+        +set_session_endpoint(name, active) dict
+        +register(body) dict
+        +list_agents(all) dict
+    }
+    class FrontendState {
+        +Set insertedIds
+        +str pollCursorId
+        +str clientNewestId
+        +Map pendingMap
+        +Map tempToServerId
+        +sendMessage() void
+        +upgradeOptimisticMsg(tempId, serverId) void
+        +retryMessage(tempId) void
+        +removeMessage(tempId) void
+        +buildMessageNodes(msg) list
+        +pollNew() void
+    }
+    RouterMessages --> MessageStore
+    RouterAgents --> AgentStore
+    RouterAgents --> MessageStore : agent_has_unread
+    MessageStore --> Storage
+    AgentStore --> Storage
+    MessageStore --> AgentStore : load_agents
+    AgentStore ..> MessageStore : append_system_event (函数体内局部导入)
+    Message <-- MessageStore : 读写
+    Agent <-- AgentStore : 读写
+    FrontendState ..> RouterMessages : fetch API
