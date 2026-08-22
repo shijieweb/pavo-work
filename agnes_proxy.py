@@ -35,6 +35,8 @@ SOUNDSFREE_FILE = os.path.join(SCRIPT_DIR, "soundsfree_home.html")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
 # batch 训练采纳面板（T-0815）：training_panel.html 整目录静态托管在 /batch（外网经 8787 可达）
 BATCH_PANEL_DIR = r"C:\Users\67972\projects\short-drama-training"
+# 项目生命周期看板原型（T-0822）：整目录静态托管在 /board-prototype
+BOARD_PROTOTYPE_DIR = os.path.join(SCRIPT_DIR, "dev-work", "board-prototype")
 
 # T-19: 资产路由批次白名单 — <batch> 段 -> 对应 out 目录 (防任意目录穿越 + 支持多批次)
 BATCH_DIRS = {
@@ -370,6 +372,12 @@ class H(BaseHTTPRequestHandler):
             return
         if path in ("/soundsfree", "/soundsfree.html"):
             self._serve_html(SOUNDSFREE_FILE)   # 音效台（T-12：SoundsFree 本地静态页，_route_dispatch 之前，避免被反代吞掉）
+            return
+        if path in ("/board-prototype", "/board-prototype/"):
+            self._serve_board_prototype()       # 项目生命周期看板原型（T-0822）
+            return
+        if path.startswith("/board-prototype/"):
+            self._serve_board_prototype_asset(path[len("/board-prototype/"):])
             return
         if path.startswith("/batch"):
             if path.startswith("/batch/__asset__/"):
@@ -879,6 +887,51 @@ class H(BaseHTTPRequestHandler):
             self._send(200, json.dumps({"ok": True, "writing": writing, "batch": batch}))
         else:
             self._send(403, json.dumps({"ok": False, "error": "写入 writing_purpose.csv 失败"}))
+
+    def _serve_board_prototype(self, path="/board-prototype/"):
+        """项目生命周期看板原型（T-0822）：整目录静态托管在 /board-prototype。"""
+        rel = path[len("/board-prototype"):].lstrip("/")
+        rel = urllib.parse.unquote(rel)
+        norm_base = os.path.normpath(BOARD_PROTOTYPE_DIR)
+        if rel == "" or rel.endswith("/"):
+            rel = "index.html"
+        full = os.path.normpath(os.path.join(norm_base, rel))
+        if full != norm_base and not full.startswith(norm_base + os.sep):
+            self._send(403, json.dumps({"error": "forbidden"}))
+            return
+        if not os.path.isfile(full):
+            self._send(404, json.dumps({"error": "not found: " + rel}))
+            return
+        ext = os.path.splitext(full)[1].lower()
+        ctype = {
+            ".html": "text/html; charset=utf-8",
+            ".htm": "text/html; charset=utf-8",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".webp": "image/webp",
+            ".json": "application/json",
+            ".css": "text/css",
+            ".js": "application/javascript",
+        }.get(ext, "application/octet-stream")
+        try:
+            with open(full, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as e:
+            self._send(500, json.dumps({"error": str(e)}))
+
+    def _serve_board_prototype_asset(self, path):
+        """T-0822: 项目生命周期看板原型资产路由。"""
+        self._serve_board_prototype("/board-prototype/" + path)
 
     def _serve_train_video(self, rel):
         """训练实验视频（experiments 目录内 .mp4，防止目录穿越）。"""

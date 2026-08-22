@@ -1,0 +1,68 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户(浏览器)
+    participant FE as app.js FrontendState
+    participant RM as RouterMessages
+    participant MS as MessageStore
+    participant AG as AgentStore
+    participant ST as Storage
+
+    rect rgb(238,244,255)
+    Note over U,ST: 场景1：发送消息「先显示后落盘」(F1/F2)
+    U->>FE: 点击发送
+    FE->>FE: 生成 tempId + client_msg_id，立即渲染气泡(insertedIds.add(tempId))
+    FE->>RM: POST /api/messages/send {content,target_type,client_msg_id}
+    RM->>MS: send_user_message(...)
+    MS->>ST: update_json_atomic(messages.json) 同步落盘
+    MS->>ST: 写 reads.json 回执
+    MS-->>RM: {id: msg_xxx}
+    RM-->>FE: {status:ok, message_id: msg_xxx}
+    FE->>FE: upgradeOptimisticMsg(tempId, msg_xxx) 替换 DOM id + insertedIds
+    Note over FE: 轮询带回 msg_xxx → insertedIds 命中 → 不重复追加(AC-1.2)
+    end
+
+    rect rgb(255,240,240)
+    Note over U,ST: 场景2：发送失败兜底(AC-2.3)
+    U->>FE: 点击发送(single 目标不存在)
+    FE->>FE: 立即渲染气泡(tempId, sendStatus=sending)
+    FE->>RM: POST /api/messages/send
+    RM-->>FE: 400 target agent not found
+    FE->>FE: 气泡保留 + 标记「发送失败」+ 重试/删除按钮(不推进游标)
+    U->>FE: 点击重试
+    FE->>RM: POST /api/messages/send (复用同一 client_msg_id)
+    alt 成功
+        RM-->>FE: {message_id}
+        FE->>FE: upgradeOptimisticMsg → sent，按钮消失
+    else 仍失败
+        RM-->>FE: 错误
+        FE->>FE: 保持 failed
+    end
+    U->>FE: 点击删除
+    FE->>FE: 移除 DOM + pendingMap/insertedIds 清理
+    end
+
+    rect rgb(240,255,240)
+    Note over U,ST: 场景3：上下线事件持久化入消息流(F3/F4)
+    AG->>AG: set_session(name, active=True) init
+    AG->>ST: 写 agents.json(session=true/status=working)
+    AG->>AG: append_jsonl(status_events.jsonl, session_on)
+    AG->>MS: append_system_event("init", name) (函数体内局部导入)
+    MS->>ST: update_json_atomic(messages.json) 追加系统消息
+    Note over U,FE: 前端轮询 / history 拉到 sender_type=system 消息
+    FE->>RM: GET /api/messages/history?since_id=...
+    RM->>MS: get_history(...)
+    MS-->>RM: [..., 系统消息, ...] (read_by=[])
+    RM-->>FE: {messages}
+    FE->>FE: buildMessageNodes system 分支 → 灰色居中 .sys-notice
+    Note over FE: 不参与 newCount → 不弹「N 条新消息」(AC-4.2)；不入 reads.json/pull(AC-4.1)
+    end
+
+    rect rgb(245,245,245)
+    Note over U,ST: 场景4：刷新/重启后可见(AC-2.1/2.2/3.4/4.1)
+    U->>FE: 刷新页面
+    FE->>RM: GET /api/messages/history?limit=30
+    RM->>MS: get_history()
+    MS-->>RM: 用户消息 + 系统消息(按 created_at 排序)
+    RM-->>FE: {messages}
+    FE->>FE: 首屏渲染(用户气泡 + 灰色系统提示)，刷新后仍可见
+    end
