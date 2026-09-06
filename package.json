@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "framer-motion": "^13.1.1",
+    "nanoid": "^6.0.1",
+    "react-router-dom": "^7.18.2",
+    "uuid": "^14.0.2",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "jsdom": "^23.2.0"
+  }
+}
