@@ -20,3 +20,4 @@
 ## 最近变化
 
 - 2026-09-06：从 C:\Users\67972\WorkBuddy\workbuddy 复制入 projects\pavo-work（源保留），套壳，remote 去 token，体检健康
+- 2026-09-07：文档旧路径统一修正为 D:\aiagent\projects\pavo-work
