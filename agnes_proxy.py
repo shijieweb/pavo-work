@@ -21,7 +21,7 @@ AGNES 轻量代理（同源本地服务器 + 资产库视频拼接）
 运行：python agnes_proxy.py  （默认 8787 端口）
 使用：浏览器打开 http://localhost:8787/ 即可（页面内所有请求同源转发）
 """
-import os, sys, json, re, time, shutil, subprocess, tempfile, csv, urllib.request, urllib.error, urllib.parse
+import os, sys, json, re, time, shutil, subprocess, tempfile, csv, threading, urllib.request, urllib.error, urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
 
 API_ROOT = "https://apihub.agnes-ai.cn"
@@ -65,7 +65,7 @@ STUDIO_PREFIXES = ("/studio", "/api/projects", "/api/spec", "/api/generate",
                    "/api/outline/", "/api/asset/", "/assets/", "/projects/", "/vendor/",
                    "/api/faceqc", "/api/facefix", "/api/agnes/", "/api/vision/",
                    "/api/log", "/api/logs")
-BOARD_PORT = int(os.environ.get("BOARD_PORT", "8788"))
+BOARD_PORT = int(os.environ.get("BOARD_PORT", "8791"))
 BOARD_BASE = "http://127.0.0.1:%d" % BOARD_PORT
 
 # ===== 看板令牌自动注入（老板 0807 指令：本地自用，网页端零配置，不做门禁）=====
@@ -136,11 +136,11 @@ def _launch_studio():
 
 def _launch_board():
     try:
-        urllib.request.urlopen("http://127.0.0.1:8788/api/projects", timeout=2)
+        urllib.request.urlopen(BOARD_BASE + "/api/projects", timeout=2)
         return {"ok": True, "already_running": True}
     except Exception:
         pass
-    return _launch_service(BOARD_SCRIPT, {}, "board")
+    return _launch_service(BOARD_SCRIPT, {"BOARD_PORT": str(BOARD_PORT)}, "board")
 
 def _is_studio(path):
     return any(path == p or path.startswith(p) for p in STUDIO_PREFIXES)
@@ -294,7 +294,92 @@ def _load_env():
 
 _load_env()
 KEYS = os.environ.get("AGNES_API_KEYS") or os.environ.get("AGNES_API_KEY", "")
-KEY = KEYS.split(",")[0].strip() if KEYS else ""
+_KEY_LIST = [k.strip() for k in KEYS.split(",") if k.strip()]
+KEY = _KEY_LIST[0] if _KEY_LIST else ""
+# 两级 key：cpk- = 老板 VIP（Token Plan）；sk- = 免费/测试渠道（文本图片能用，视频进不去队列）
+KEY_VIP = [k for k in _KEY_LIST if k.startswith("cpk-")]
+KEY_FREE = [k for k in _KEY_LIST if not k.startswith("cpk-")]
+VIP_CONCURRENCY = int(os.environ.get("AGNES_VIP_CONCURRENCY", "4") or 4)
+_VIP_SEM = threading.Semaphore(max(1, VIP_CONCURRENCY))
+_KEY_COOL = {}          # key -> 冷却到期时间戳
+
+# 任务级并发表：video_id -> [tier, 过期时间]。VIP 套餐实测只放 4 个视频任务同时跑，
+# 第 5 个提交会被网关 503 video_queue_full 拒掉，所以必须在提交前排队等空位。
+_RUNNING = {}
+_RUN_LOCK = threading.Lock()
+_RUN_TTL = 900          # 兜底：超过 15 分钟没收到终态就自动放位，避免泄漏卡死
+
+
+def _vip_running():
+    now = time.time()
+    with _RUN_LOCK:
+        for vid, it in list(_RUNNING.items()):
+            if it[1] < now:
+                _RUNNING.pop(vid, None)
+        return sum(1 for it in _RUNNING.values() if it[0] == "vip")
+
+
+def _acquire_vip_slot(max_wait=90):
+    """占一个 VIP 并发位（先占位再提交，避免 5 个请求同时抢过检查）。
+
+    返回占位 id；等不到空位返回 None。
+    """
+    t0 = time.time()
+    while True:
+        with _RUN_LOCK:
+            now = time.time()
+            for vid, it in list(_RUNNING.items()):
+                if it[1] < now:
+                    _RUNNING.pop(vid, None)
+            running = sum(1 for it in _RUNNING.values() if it[0] == "vip")
+            if running < VIP_CONCURRENCY:
+                pid = "pending-%s-%s" % (threading.get_ident(), int(now * 1000) % 1000000)
+                _RUNNING[pid] = ["vip", now + _RUN_TTL]
+                return pid
+        if time.time() - t0 > max_wait:
+            return None
+        time.sleep(1)
+
+
+def _bind_placeholder(pid, raw):
+    """提交成功：把占位符换成真实 video_id（沿用同一槽位）。"""
+    try:
+        j = json.loads(raw.decode("utf-8"))
+        vid = j.get("video_id") or j.get("id")
+        with _RUN_LOCK:
+            item = _RUNNING.pop(pid, None) or ["vip", time.time() + _RUN_TTL]
+            if vid:
+                _RUNNING[vid] = item
+    except Exception:
+        _drop_placeholder(pid)
+
+
+def _drop_placeholder(pid):
+    with _RUN_LOCK:
+        _RUNNING.pop(pid, None)
+
+
+def _track_poll(raw):
+    try:
+        j = json.loads(raw.decode("utf-8"))
+        vid = j.get("video_id") or j.get("id")
+        if vid and j.get("status") in ("completed", "failed"):
+            with _RUN_LOCK:
+                _RUNNING.pop(vid, None)
+    except Exception:
+        pass
+
+
+def _pick_key(path):
+    """按端点挑 key：图像/文本走免费池省钱；视频与任务轮询走 VIP（免费 key 被拒/易限流）。"""
+    now = time.time()
+    def ok(k):
+        return _KEY_COOL.get(k, 0) <= now
+    if path.startswith("/v1/videos") or path.startswith("/agnesapi"):
+        pool = [k for k in (KEY_VIP or KEY_FREE) if ok(k)]
+        return (pool or KEY_VIP or KEY_FREE or [KEY])[0]
+    pool = [k for k in (KEY_FREE or KEY_VIP) if ok(k)]
+    return (pool or KEY_FREE or KEY_VIP or [KEY])[0]
 
 # 服务端持久化（资产库 + 设置），使 localhost 与 127.0.0.1 同源共享同一份数据
 _STATE = {"assets": [], "settings": {}}
@@ -545,7 +630,7 @@ class H(BaseHTTPRequestHandler):
     def _hub_status(self):
         """门户健康探测：报告工作台/共享看板后端是否在线（首页卡片据此显示在线/未启动）。"""
         st = {"console": True, "studio": False, "studio_port": STUDIO_PORT,
-              "board": False, "board_port": 8788}
+              "board": False, "board_port": BOARD_PORT}
         try:
             with urllib.request.urlopen(STUDIO_BASE + "/api/projects", timeout=2) as r:
                 j = json.loads(r.read().decode("utf-8"))
@@ -555,7 +640,7 @@ class H(BaseHTTPRequestHandler):
         except Exception as e:
             st["error"] = str(e)[:120]
         try:
-            urllib.request.urlopen("http://127.0.0.1:8788/api/projects", timeout=2)
+            urllib.request.urlopen(BOARD_BASE + "/api/projects", timeout=2)
             st["board"] = True
         except Exception:
             pass
@@ -1023,25 +1108,59 @@ class H(BaseHTTPRequestHandler):
             return
         # 自愈：连接重置(10054)/超时/5xx 自动退避重试，扛过 AGNES 网关瞬时抖动，
         # 避免旧进程在抖动窗口里持续 502 而需手动重启。4xx(参数/鉴权)不重试。
+        # key 分层：图像/文本走免费池，视频提交与轮询走 VIP；提交瞬间限流 ≤VIP_CONCURRENCY。
         last_err = None
-        for attempt in range(4):  # 首次 + 最多 3 次重试
-            req = urllib.request.Request(target, data=data, method=method)
-            req.add_header("Authorization", "Bearer " + KEY)
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=300) as resp:
-                    self._send(resp.status, resp.read())
-                    return
-            except urllib.error.HTTPError as e:
-                if 400 <= e.code < 500:
-                    self._send(e.code, e.read())  # 客户端错误，立即透传，不重试
-                    return
-                last_err = "HTTP %d %s" % (e.code, e.read().decode("utf-8", "ignore")[:200])
-            except Exception as e:
-                last_err = str(e)  # 连接重置(10054)/超时/解析失败等网络层错误
-            if attempt < 3:
-                time.sleep(2 ** (attempt + 1))  # 退避 2s / 4s / 8s
-        self._send(502, json.dumps({"error": "AGNES 网关持续不可用（已重试3次）: " + str(last_err)}))
+        is_video = path.startswith("/v1/videos")
+        slot = None
+        if is_video:
+            slot = _acquire_vip_slot(90)
+            if not slot:
+                self._send(429, json.dumps({
+                    "error": {"message": "VIP %d 并发已满（%d 个视频任务在跑），请 1-2 分钟后再提交"
+                                         % (VIP_CONCURRENCY, _vip_running()), "type": "vip_concurrency"}},
+                    ensure_ascii=False))
+                return
+        try:
+            for attempt in range(4):  # 首次 + 最多 3 次重试
+                use_key = _pick_key(path)
+                if is_video:
+                    _VIP_SEM.acquire()
+                try:
+                    req = urllib.request.Request(target, data=data, method=method)
+                    req.add_header("Authorization", "Bearer " + use_key)
+                    req.add_header("Content-Type", "application/json")
+                    try:
+                        with urllib.request.urlopen(req, timeout=300) as resp:
+                            raw = resp.read()
+                            # 任务级并发记账：提交成功把占位换成 video_id，轮询到终态出表
+                            if is_video and resp.status == 200:
+                                _bind_placeholder(slot, raw)
+                            elif path.startswith("/agnesapi"):
+                                _track_poll(raw)
+                            self._send(resp.status, raw)
+                            return
+                    except urllib.error.HTTPError as e:
+                        raw = e.read()
+                        if e.code in (429, 503):
+                            # 限流/队列满：记冷却（下次换 key），重试
+                            _KEY_COOL[use_key] = time.time() + (60 if e.code == 429 else 20)
+                            last_err = "HTTP %d %s" % (e.code, raw.decode("utf-8", "ignore")[:160])
+                        elif 400 <= e.code < 500:
+                            self._send(e.code, raw)  # 客户端错误，立即透传，不重试
+                            return
+                        else:
+                            last_err = "HTTP %d %s" % (e.code, raw.decode("utf-8", "ignore")[:200])
+                    except Exception as e:
+                        last_err = str(e)  # 连接重置(10054)/超时/解析失败等网络层错误
+                finally:
+                    if is_video:
+                        _VIP_SEM.release()
+                if attempt < 3:
+                    time.sleep(2 ** (attempt + 1))  # 退避 2s / 4s / 8s
+            self._send(502, json.dumps({"error": "AGNES 网关持续不可用（已重试3次）: " + str(last_err)}))
+        finally:
+            if slot:
+                _drop_placeholder(slot)  # 已 bind 成功时占位符早被换掉，这里是 no-op
 
     def _merge(self, data):
         if not data:
@@ -1149,17 +1268,19 @@ if __name__ == "__main__":
         print("   路由注册表   route_registry.json  (%d 条路由·单一事实源)" % len(_rr))
     else:
         print("   路由注册表   缺失/解析失败 → 回退硬编码白名单（兼容模式）")
-    # 默认拉起共享看板（8788）：手机经 8787 入口可一键直达，跨设备看进度预览
+    # 默认拉起共享看板（8791）：手机经 8787 入口可一键直达，跨设备看进度预览
+    # ★ 2026-10-24：端口从 8788 迁到 8791 —— 8788 是 autofreetoken 网关的硬编码契约，
+    #   两项目抢同一端口曾导致网关永远起不来（gateway-ensure.ps1 见端口有监听即跳过）。
     try:
         lb = _launch_board()
         if lb.get("already_running"):
-            print("   共享看板   :8788        -> 已在线（复用既有进程）")
+            print("   共享看板   :%d        -> 已在线（复用既有进程）" % BOARD_PORT)
         elif lb.get("ok"):
-            print("   共享看板   :8788        -> 已拉起（PID %s）" % lb.get("pid"))
+            print("   共享看板   :%d        -> 已拉起（PID %s）" % (BOARD_PORT, lb.get("pid")))
         else:
-            print("   共享看板   :8788        -> 拉起失败：%s" % lb.get("error"))
+            print("   共享看板   :%d        -> 拉起失败：%s" % (BOARD_PORT, lb.get("error")))
     except Exception as e:
-        print("   共享看板   :8788        -> 拉起异常：%s" % e)
+        print("   共享看板   :%d        -> 拉起异常：%s" % (BOARD_PORT, e))
     # 默认拉起工作台（8777, REAL=1）：此前只有看板自启，studio 需手动点按钮，
     # 一旦旧进程退出，手机从门户进 /studio 就 503。现与看板对齐自启。
     try:

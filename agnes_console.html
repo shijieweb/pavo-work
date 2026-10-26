@@ -184,10 +184,10 @@
   <!-- 顶栏 -->
   <div class="topbar">
     <div class="brand"><span class="dot"></span>AGNES 控制台</div>
-    <div class="mtag" id="topTag">IMAGE 2.1</div>
+    <div class="mtag" id="topTag">IMAGE 2.5</div>
   </div>
 
-  <div class="warnbanner">⚠️ 测试模式：API 密钥已内嵌于本文件，仅限本地 / 内网调试。若预览面板报 <b>Failed to fetch</b>，请运行 <b>agnes_proxy.py</b> 后改用 <b>http://localhost:8787/</b> 打开（同源绕开跨域）。新增：资产库 / 提示词增强 / 自动配置 / 设置。</div>
+  <div class="warnbanner">⚠️ 测试模式：API 密钥已内嵌于本文件，仅限本地 / 内网调试（该文件在公开仓库中，正式使用请改走 8787 服务端代理）。若预览面板报 <b>Failed to fetch</b>，请运行 <b>agnes_proxy.py</b> 后改用 <b>http://localhost:8787/console</b> 打开（同源绕开跨域）。已升级 <b>image-2.5-flash</b> / <b>video-2.5-flash</b>：视频 3 种模式（text / keyframe / reference）、720P、4-12 秒、轮询带 model_name。</div>
 
   <!-- Tab 切换 -->
   <div class="tabs">
@@ -200,11 +200,11 @@
   <div class="panel active" id="panel-image">
     <div class="hero-card">
       <div class="hero-row">
-        <span class="hero-name">agnes-image-2.1-flash</span>
+        <span class="hero-name">agnes-image-2.5-flash</span>
         <span class="badge-gold">同步返回</span>
       </div>
       <div class="hero-ep">POST /v1/images/generations</div>
-      <div class="hero-desc">角色参考图 · 场景概念图 · 文生图 / 图生图（高密度构图）</div>
+      <div class="hero-desc">角色参考图 · 场景概念图 · 文生图 / 图生图 / 多图合成（1K-4K，7 种比例）</div>
     </div>
 
     <div class="field">
@@ -224,16 +224,16 @@
     </div>
     <div class="field hidden" id="img-input-wrap">
       <div class="field-head">
-        <label>输入图 URL（图生图，须公开 HTTPS）</label>
+        <label>输入图 URL（图生图/多图合成，多张用逗号或换行分隔，须公开 HTTPS 或 DataURI）</label>
         <button class="mini" data-pick="img-input-url">📦 选图</button>
       </div>
       <div class="url-row">
-        <input type="text" id="img-input-url" placeholder="https://.../ref.png" />
+        <input type="text" id="img-input-url" placeholder="https://.../ref.png  （多图：url1,url2,url3）" />
       </div>
     </div>
 
     <div class="field">
-      <label>尺寸档位 size（推荐档位）</label>
+      <label>尺寸档位 size（推荐档位，或自定义精确尺寸）</label>
       <div class="chips" data-group="img-size">
         <div class="chip" data-value="1K">1K</div>
         <div class="chip sel" data-value="2K">2K</div>
@@ -242,11 +242,16 @@
       </div>
     </div>
     <div class="field">
-      <label>比例 ratio（仅档位生效）</label>
+      <label>比例 ratio（仅档位 size 生效）</label>
       <div class="chips" data-group="img-ratio">
         <div class="chip sel" data-value="9:16">9:16</div>
         <div class="chip" data-value="16:9">16:9</div>
         <div class="chip" data-value="1:1">1:1</div>
+        <div class="chip" data-value="3:4">3:4</div>
+        <div class="chip" data-value="4:3">4:3</div>
+        <div class="chip" data-value="2:3">2:3</div>
+        <div class="chip" data-value="3:2">3:2</div>
+        <div class="chip" data-value="21:9">21:9</div>
       </div>
     </div>
     <div class="field">
@@ -275,11 +280,11 @@
   <div class="panel" id="panel-video">
     <div class="hero-card">
       <div class="hero-row">
-        <span class="hero-name">agnes-video-v2.0</span>
-        <span class="badge-gold">异步轮询</span>
+        <span class="hero-name">agnes-video-2.5-flash</span>
+        <span class="badge-gold">异步轮询 · 720P</span>
       </div>
-      <div class="hero-ep">POST /v1/videos → GET /agnesapi?video_id=</div>
-      <div class="hero-desc">镜头成片 · 图生视频锁脸 · 多图关键帧动画（推荐）</div>
+      <div class="hero-ep">POST /v1/videos → GET /agnesapi?video_id=&amp;model_name=agnes-video-2.5-flash</div>
+      <div class="hero-desc">三种模式：文生视频 / 首尾帧（锁脸最稳）/ 参考图+音频（可对口型踩 BGM）· 4-12 秒</div>
     </div>
 
     <div class="field">
@@ -296,58 +301,66 @@
     <div class="field">
       <label>模式 mode</label>
       <div class="chips" data-group="vid-mode">
-        <div class="chip" data-value="t2v">文生视频</div>
-        <div class="chip sel" data-value="i2v">图生视频</div>
-        <div class="chip" data-value="kf">关键帧</div>
+        <div class="chip" data-value="text">text · 文生视频</div>
+        <div class="chip sel" data-value="keyframe">keyframe · 首尾帧</div>
+        <div class="chip" data-value="reference">reference · 参考图音</div>
       </div>
     </div>
-    <div class="field hidden" id="vid-i2v-wrap">
+    <div class="field" id="vid-kf-wrap">
       <div class="field-head">
-        <label>首帧图 URL（图生视频）</label>
-        <button class="mini" data-pick="vid-i2v-url">📦 选图</button>
-      </div>
-      <div class="url-row"><input type="text" id="vid-i2v-url" placeholder="https://.../first_frame.png" /></div>
-    </div>
-    <div class="field hidden" id="vid-kf-wrap">
-      <div class="field-head">
-        <label>关键帧图 URL（2 张，首→末帧过渡）</label>
+        <label>首帧图 first_frame（keyframe，与尾帧至少一个）</label>
         <button class="mini" data-pick="vid-kf-url1">📦 首帧</button>
       </div>
-      <div class="url-row"><input type="text" id="vid-kf-url1" placeholder="首帧 https://.../f1.png" style="margin-bottom:8px;" /></div>
+      <div class="url-row"><input type="text" id="vid-kf-url1" placeholder="首帧 https://.../f1.png（只给首帧=锁脸图生视频，最常用）" style="margin-bottom:8px;" /></div>
       <div class="field-head">
-        <label></label>
-        <button class="mini" data-pick="vid-kf-url2">📦 末帧</button>
+        <label>尾帧图 last_frame（可选，首→尾过渡）</label>
+        <button class="mini" data-pick="vid-kf-url2">📦 尾帧</button>
       </div>
-      <div class="url-row"><input type="text" id="vid-kf-url2" placeholder="末帧 https://.../f2.png" /></div>
+      <div class="url-row"><input type="text" id="vid-kf-url2" placeholder="尾帧 https://.../f2.png" /></div>
+    </div>
+    <div class="field hidden" id="vid-ref-wrap">
+      <div class="field-head">
+        <label>参考图 images（reference，最多 5 张，逗号/换行分隔）</label>
+        <button class="mini" data-pick="vid-ref-imgs">📦 选图</button>
+      </div>
+      <div class="url-row"><input type="text" id="vid-ref-imgs" placeholder="https://.../char1.png, https://.../char2.png" /></div>
+      <div class="field-head">
+        <label>参考音频 audios（可选，最多 3 段，mp3/wav URL）</label>
+        <button class="mini" data-pick="vid-ref-auds">📦 选音频</button>
+      </div>
+      <div class="url-row"><input type="text" id="vid-ref-auds" placeholder="https://.../bgm.mp3" /></div>
+      <div class="hint">prompt 里可用 &lt;Picture 1&gt; / &lt;Audio 1&gt; 指代第 1 张图 / 第 1 段音频</div>
     </div>
 
     <div class="field">
-      <label>分辨率（9:16 竖屏短剧）</label>
-      <div class="chips" data-group="vid-res">
+      <label>画幅 aspect_ratio（size 固定 720P）</label>
+      <div class="chips" data-group="vid-aspect">
         <div class="chip sel" data-value="9:16">9:16 · 720×1280</div>
-        <div class="chip" data-value="16:9">16:9 · 1280×720</div>
-        <div class="chip" data-value="1:1">1:1 · 1024×1024</div>
+        <div class="chip" data-value="16:9">16:9 · 1280×704</div>
+        <div class="chip" data-value="1:1">1:1 · 720×720</div>
+        <div class="chip" data-value="3:4">3:4 · 720×960</div>
+        <div class="chip" data-value="4:3">4:3 · 960×720</div>
+        <div class="chip" data-value="21:9">21:9 · 1680×720</div>
       </div>
     </div>
     <div class="field">
-      <label>时长（num_frames = 8n+1）</label>
+      <label>时长 seconds（4-12 秒，字符串传参）</label>
       <div class="chips" data-group="vid-dur">
-        <div class="chip" data-value="3">3s · 73帧</div>
-        <div class="chip sel" data-value="5">5s · 121帧</div>
-        <div class="chip" data-value="6">6s · 145帧</div>
-        <div class="chip" data-value="7">7s · 169帧</div>
-        <div class="chip" data-value="8">8s · 193帧</div>
-        <div class="chip" data-value="10">10s · 241帧</div>
-        <div class="chip" data-value="14">14s · 337帧</div>
-        <div class="chip" data-value="18">18s · 433帧</div>
+        <div class="chip" data-value="4">4s</div>
+        <div class="chip sel" data-value="5">5s</div>
+        <div class="chip" data-value="6">6s</div>
+        <div class="chip" data-value="7">7s</div>
+        <div class="chip" data-value="8">8s</div>
+        <div class="chip" data-value="10">10s</div>
+        <div class="chip" data-value="12">12s</div>
       </div>
     </div>
     <div class="field">
       <div class="field-head">
-        <label>negative_prompt（可选）</label>
+        <label>补充描述（2.5-flash 无 negative_prompt，此内容会拼到 prompt 尾部作为约束）</label>
         <button class="mini" data-enhance="negative" data-target="vid-neg">✨生成</button>
       </div>
-      <input type="text" id="vid-neg" placeholder="blurry, deformed face, extra fingers, watermarks" />
+      <input type="text" id="vid-neg" placeholder="avoid blurry, deformed face, extra fingers, watermarks" />
     </div>
 
     <button class="btn" id="vid-submit">
@@ -554,6 +567,10 @@ function selected(group){
   const el = document.querySelector('[data-group="'+group+'"] .chip.sel');
   return el ? el.dataset.value : null;
 }
+/* ---------- URL 列表拆分（逗号 / 中文逗号 / 换行 / 空白分隔） ---------- */
+function splitUrls(raw){
+  return String(raw || "").split(/[,，\n\r\s]+/).map(s => s.trim()).filter(Boolean);
+}
 function selectChip(group, value){
   const g = document.querySelector('[data-group="'+group+'"]');
   if(!g) return;
@@ -573,8 +590,8 @@ function initChips(){
 function onChipChange(){
   document.getElementById('img-input-wrap').classList.toggle('hidden', selected('img-mode') !== 'i2i');
   const vm = selected('vid-mode');
-  document.getElementById('vid-i2v-wrap').classList.toggle('hidden', vm !== 'i2v');
-  document.getElementById('vid-kf-wrap').classList.toggle('hidden', vm !== 'kf');
+  document.getElementById('vid-kf-wrap').classList.toggle('hidden', vm !== 'keyframe');
+  document.getElementById('vid-ref-wrap').classList.toggle('hidden', vm !== 'reference');
   document.getElementById('txt-img-wrap').classList.toggle('hidden', selected('txt-adv') !== 'img');
 }
 
@@ -583,7 +600,7 @@ function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
-  const tag = {image:"IMAGE 2.1", video:"VIDEO 2.0", text:"TEXT 2.5"}[name];
+  const tag = {image:"IMAGE 2.5", video:"VIDEO 2.5", text:"TEXT 2.5"}[name];
   document.getElementById('topTag').textContent = tag;
 }
 document.querySelectorAll('.tab').forEach(t=>{
@@ -601,12 +618,12 @@ function nfFor(sec, fps=24){
    ============================================================ */
 const DEFAULT_SETTINGS = {
   enhance: {
-    image: `你是一名顶尖的 AI 短剧图像提示词工程师，熟悉 AGNES image-2.1-flash 模型。用户会给你一段简短的中文/英文描述。请将其扩写为符合该模型最优结构的高质量英文提示词。
+    image: `你是一名顶尖的 AI 短剧图像提示词工程师，熟悉 AGNES image-2.5-flash 模型。用户会给你一段简短的中文/英文描述。请将其扩写为符合该模型最优结构的高质量英文提示词。
 严格遵循结构：主体 + 场景/环境 + 风格 + 光线 + 构图 + 质量要求。
 追加竖屏锚点：vertical 9:16 mobile short-drama framing, subject chest-up。
 追加质量词：high detail, cinematic lighting, 8k, sharp focus。
 只输出最终提示词本身，不要任何解释、引号或前缀。`,
-    video: `你是一名顶尖的 AI 短剧视频提示词工程师，熟悉 AGNES video-v2.0 模型（提示词需为英文）。用户会给你一段简短描述。请扩写为最优英文视频提示词。
+    video: `你是一名顶尖的 AI 短剧视频提示词工程师，熟悉 AGNES video-2.5-flash 模型（提示词需为英文）。用户会给你一段简短描述。请扩写为最优英文视频提示词。
 严格遵循结构：主体 + 动作 + 场景 + 运镜 + 光线 + 风格。
 若含人物，追加人脸稳定约束：stable face, no face distortion, consistent facial features, locked character identity, no morphing。
 只输出最终提示词本身，不要解释或前缀。`,
@@ -617,10 +634,10 @@ const DEFAULT_SETTINGS = {
   },
   autoConfig: {
     video: `你是一名 AI 短剧视频参数配置专家。根据下面的视频提示词内容，判断并返回最优生成参数。
-严格只输出一个 JSON 对象，格式：{"ratio":"9:16|16:9|1:1", "duration_sec":3|5|6|7|8|10|14|18, "negative_prompt":"英文负面词"}。
+严格只输出一个 JSON 对象，格式：{"ratio":"9:16|16:9|1:1|3:4|4:3|21:9", "duration_sec":4|5|6|7|8|10|12, "negative_prompt":"英文负面词"}。
 不要任何解释或前缀，只输出 JSON。`,
     image: `你是一名 AI 短剧图像参数配置专家。根据下面的图像提示词，判断最优参数。
-严格只输出 JSON：{"size":"1K|2K|3K|4K", "ratio":"9:16|16:9|1:1"}。
+严格只输出 JSON：{"size":"1K|2K|3K|4K", "ratio":"9:16|16:9|1:1|3:4|4:3|2:3|3:2|21:9"}。
 只输出 JSON，不要解释。`
   },
   enhanceModel: "agnes-2.5-flash",
@@ -802,9 +819,9 @@ async function autoConfig(tab){
 }
 function applyConfig(tab, j){
   if(tab === 'video'){
-    if(j.ratio) selectChip('vid-res', j.ratio);
+    if(j.ratio) selectChip('vid-aspect', j.ratio);
     if(j.duration_sec){
-      const d = [3,5,6,7,8,10,14,18].reduce((p,c)=>Math.abs(c-j.duration_sec)<Math.abs(p-j.duration_sec)?c:p);
+      const d = [4,5,6,7,8,10,12].reduce((p,c)=>Math.abs(c-j.duration_sec)<Math.abs(p-j.duration_sec)?c:p);
       selectChip('vid-dur', String(d));
     }
     if(j.negative_prompt) setVal('vid-neg', j.negative_prompt);
@@ -1007,12 +1024,12 @@ document.getElementById('img-gen').addEventListener('click', async ()=>{
         ratio = selected('img-ratio'), fmt = selected('img-fmt');
   let p = prompt;
   if(SETTINGS.autoVertical) p += ", vertical 9:16 mobile short-drama framing, subject chest-up";
-  const body = { model:"agnes-image-2.1-flash", prompt:p, size, ratio };
+  const body = { model:"agnes-image-2.5-flash", prompt:p, size, ratio };
   const extra = { response_format: fmt };
   if(mode === 'i2i'){
-    const u = val('img-input-url');
-    if(!u){ err.textContent = "图生图需填写输入图 URL"; return; }
-    extra.image = [u];
+    const urls = splitUrls(val('img-input-url'));
+    if(!urls.length){ err.textContent = "图生图/多图合成需填写输入图 URL"; return; }
+    extra.image = urls;
   }
   body.extra_body = extra;
   btn.disabled = true; status.textContent = "生成中…";
@@ -1046,26 +1063,27 @@ document.getElementById('vid-submit').addEventListener('click', async ()=>{
   err.textContent = ""; prog.style.width = "0%"; lastVideoUrl = null;
   document.getElementById('vid-to-asset').classList.add('hidden');
   if(!prompt){ err.textContent = "请填写 prompt"; return; }
-  const mode = selected('vid-mode'), res = selected('vid-res'), dur = selected('vid-dur');
-  const neg = val('vid-neg');
-  let w=720, h=1280;
-  if(res==='16:9'){ w=1280; h=720; }
-  if(res==='1:1'){ w=1024; h=1024; }
-  const nf = nfFor(parseInt(dur,10));
+  const mode = selected('vid-mode'), aspect = selected('vid-aspect'), dur = selected('vid-dur');
+  const extraDesc = val('vid-neg').trim();
   let p = prompt;
   if(SETTINGS.autoFaceLock) p += ", stable face, no face distortion, consistent facial features, locked character identity, no morphing";
-  const body = { model:"agnes-video-v2.0", prompt:p, height:h, width:w,
-                 num_frames:nf, frame_rate:24 };
-  if(neg) body.negative_prompt = neg;
-  if(mode === 'i2v'){
-    const u = val('vid-i2v-url');
-    if(!u){ err.textContent = "图生视频需填写首帧图 URL"; return; }
-    body.image = u;
+  if(extraDesc) p += ", avoid " + extraDesc;
+  // 2.5-flash：seconds 必须是字符串；size 固定 720P；模式字段互斥
+  const body = { model:"agnes-video-2.5-flash", prompt:p, mode:mode,
+                 seconds:String(dur), size:"720P", aspect_ratio:aspect };
+  if(mode === 'keyframe'){
+    const u1 = val('vid-kf-url1').trim(), u2 = val('vid-kf-url2').trim();
+    if(!u1 && !u2){ err.textContent = "keyframe 模式至少需要首帧或尾帧图 URL"; return; }
+    if(u1) body.first_frame = u1;
+    if(u2) body.last_frame = u2;
   }
-  if(mode === 'kf'){
-    const u1 = val('vid-kf-url1'), u2 = val('vid-kf-url2');
-    if(!u1 || !u2){ err.textContent = "关键帧需填写 2 张图 URL"; return; }
-    body.extra_body = { image:[u1, u2], mode:"keyframes" };
+  if(mode === 'reference'){
+    const imgs = splitUrls(val('vid-ref-imgs')), auds = splitUrls(val('vid-ref-auds'));
+    if(!imgs.length && !auds.length){ err.textContent = "reference 模式至少需要 1 张参考图或 1 段音频"; return; }
+    if(imgs.length > 5){ err.textContent = "参考图最多 5 张，当前 " + imgs.length + " 张"; return; }
+    if(auds.length > 3){ err.textContent = "参考音频最多 3 段，当前 " + auds.length + " 段"; return; }
+    if(imgs.length) body.images = imgs;
+    if(auds.length) body.audios = auds;
   }
   btn.disabled = true; status.textContent = "提交中…";
   try{
@@ -1085,17 +1103,25 @@ async function pollVideo(vid, status, err, prog){
   while(true){
     let r;
     try{
-      r = await callApi('/agnesapi?video_id=' + encodeURIComponent(vid), 'GET');
+      r = await callApi('/agnesapi?video_id=' + encodeURIComponent(vid) + '&model_name=agnes-video-2.5-flash', 'GET');
       consecErr = 0;
     }catch(e){
       consecErr++;
-      err.textContent = "轮询出错(" + consecErr + ")：" + e.message + "，将在 8s 后重试";
-      if(consecErr >= 5){ throw new Error("轮询连续失败 5 次，已停止（可再次点击提交重试）"); }
+      const msg = String(e.message || "");
+      if(msg.indexOf('429') >= 0){
+        // 网关对轮询有频率限制（too many video status queries）：不算失败，拉长间隔继续
+        err.textContent = "网关限流（429），已自动退避重试，任务仍在跑…";
+      }else{
+        err.textContent = "轮询出错(" + consecErr + ")：" + msg + "，将在 8s 后重试";
+        if(consecErr >= 5){ throw new Error("轮询连续失败 5 次，已停止（可再次点击提交重试）"); }
+      }
       await sleep(8000); continue;
     }
     const st = r.status, p = (typeof r.progress === 'number') ? r.progress : null;
-    if(p !== null) prog.style.width = Math.max(2, Math.min(100, p*100)) + "%";
-    status.textContent = (st||"?") + (p!==null ? " · " + Math.round(p*100) + "%" : "");
+    // 2.5-flash 的 progress 是 0-100 整数；旧版可能是 0-1 小数，两种都兼容
+    const pct = (p === null) ? null : (p <= 1 ? p * 100 : p);
+    if(pct !== null) prog.style.width = Math.max(2, Math.min(100, pct)) + "%";
+    status.textContent = (st||"?") + (pct!==null ? " · " + Math.round(pct) + "%" : "");
     if(st === 'completed'){
       const url = r.url || (r.metadata && r.metadata.url);
       if(url){
@@ -1110,7 +1136,7 @@ async function pollVideo(vid, status, err, prog){
       err.textContent = "任务失败：" + JSON.stringify(r.error||r).slice(0,200);
       status.textContent = ""; break;
     }
-    await sleep(8000);
+    await sleep(6000);   // 2.5-flash 约 20-40s 完成；间隔别小于 5s，否则会撞网关轮询限流(429)
   }
 }
 
