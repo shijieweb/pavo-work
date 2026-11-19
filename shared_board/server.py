@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # 共享任务看板 · 后端（纯标准库，零 pip 依赖）
-# 启动: python server.py  ->  http://0.0.0.0:8788 (手机/电脑同WiFi可用电脑局域网IP访问)
+# 启动: python server.py  ->  http://0.0.0.0:8791 (手机/电脑同WiFi可用电脑局域网IP访问)
+# ★ 2026-10-24 端口让位：8788 归还 autofreetoken 网关（其硬编码契约），看板迁 8791，避免抢端口
 import json, sqlite3, os, datetime, traceback, urllib.parse, secrets
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # T-11：DB/PORT 支持环境变量覆盖（BOARD_DB / BOARD_PORT），便于隔离端口/临时 DB 自测，默认行为不变
 DB = os.environ.get("BOARD_DB") or os.path.join(HERE, "board.db")
-PORT = int(os.environ.get("BOARD_PORT", "8788"))
+PORT = int(os.environ.get("BOARD_PORT", "8791"))
 
 # ── 状态/优先级枚举（T-20260813-07：中文 5 态 + 阻塞旁路；服务端校验用）──
 STATUS_ENUM = {"待办", "进行中", "待验证", "已验证", "完成", "阻塞"}
