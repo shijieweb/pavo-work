@@ -1,3 +1,19 @@
+# ===== 媒体/模型：过程产物不入库（2026-11-19 补，老板 m01922）=====
+# 已摘索引（磁盘保留）：sface.onnx 36.9MB、yunet.onnx 0.2MB、两份 simhei.ttf 各 9.3MB。
+# 字体是「本机兜底」——脚本找不到项目内字体就退 C:\Windows\Fonts\simhei.ttf，不是必需资产。
+*.onnx
+*.ttf
+*.otf
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.m4a
+soundsfree_samples/
+_far.png
+_close*.png
+short_drama_workflow/html_prototype/_qa_shot_*.png
+
 # ===== 敏感数据（绝不提交）=====
 # 密钥
 .env
